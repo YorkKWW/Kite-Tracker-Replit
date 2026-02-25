@@ -75,7 +75,7 @@ export default function EquipmentDetailPage() {
             {item.brand} {item.model}
           </h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
-            {item.serialNumber && !item.serialNumber.startsWith("AUTO-") && (
+            {item.serialNumber && !item.serialNumber.startsWith("AUTO-") && !item.serialNumber.startsWith("IMPORT-") && (
               <span className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">S/N</span>
                 <span className="font-mono text-base font-bold text-foreground" data-testid="text-serial-detail">{item.serialNumber}</span>
