@@ -15,7 +15,31 @@ import type { PriceList, PriceListItem } from "@shared/schema";
 
 const KNOWN_SUPPLIERS = ["Core", "Duotone", "North", "Eleveight", "Cabrinha", "Ozone", "F-One"];
 
-type ParsedItem = { sku: string; productName: string; retailPrice: string; dealerPrice: string | null };
+type ParsedItem = { sku: string; productName: string; retailPrice: string; dealerPrice: string | null; productType: string | null };
+
+const TYPE_LABELS: Record<string, string> = {
+  kite: "Kite", board: "Board", foilboard: "Foilboard", foil: "Foil",
+  wing: "Wing", bar_lines: "Bar", wetsuit: "Wetsuit", harness: "Harness", helmet_safety: "Helmet",
+};
+const TYPE_COLORS: Record<string, string> = {
+  kite: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  board: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  foilboard: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
+  foil: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
+  wing: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  bar_lines: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  wetsuit: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
+  harness: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  helmet_safety: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+};
+function TypeBadge({ type }: { type: string | null | undefined }) {
+  if (!type) return <span className="text-muted-foreground text-[10px]">—</span>;
+  return (
+    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${TYPE_COLORS[type] ?? "bg-muted text-muted-foreground"}`}>
+      {TYPE_LABELS[type] ?? type}
+    </span>
+  );
+}
 
 export default function PriceListsPage() {
   const { toast } = useToast();
@@ -246,6 +270,7 @@ export default function PriceListsPage() {
                     <thead className="bg-muted sticky top-0">
                       <tr>
                         <th className="px-2 py-1.5 text-left font-medium w-8">✓</th>
+                        <th className="px-2 py-1.5 text-left font-medium">Type</th>
                         <th className="px-2 py-1.5 text-left font-medium">SKU / UPC</th>
                         <th className="px-2 py-1.5 text-left font-medium">Product Name</th>
                         <th className="px-2 py-1.5 text-right font-medium">Dealer (net)</th>
@@ -263,6 +288,7 @@ export default function PriceListsPage() {
                           <td className="px-2 py-1">
                             <input type="checkbox" checked={!removedRows.has(i)} onChange={() => toggleRow(i)} onClick={(e) => e.stopPropagation()} className="h-3 w-3" />
                           </td>
+                          <td className="px-2 py-1"><TypeBadge type={item.productType} /></td>
                           <td className="px-2 py-1 font-mono text-[10px]">{item.sku}</td>
                           <td className="px-2 py-1">{item.productName}</td>
                           <td className="px-2 py-1 text-right text-muted-foreground">
@@ -354,6 +380,7 @@ export default function PriceListsPage() {
                       <table className="w-full text-xs">
                         <thead className="bg-muted sticky top-0">
                           <tr>
+                            <th className="px-2 py-1.5 text-left font-medium">Type</th>
                             <th className="px-2 py-1.5 text-left font-medium">SKU / UPC</th>
                             <th className="px-2 py-1.5 text-left font-medium">Product Name</th>
                             <th className="px-2 py-1.5 text-right font-medium">Dealer (net)</th>
@@ -363,6 +390,7 @@ export default function PriceListsPage() {
                         <tbody>
                           {viewItems.map((item) => (
                             <tr key={item.id} className="border-t" data-testid={`row-item-${item.id}`}>
+                              <td className="px-2 py-1"><TypeBadge type={item.productType} /></td>
                               <td className="px-2 py-1 font-mono text-[10px]">{item.sku}</td>
                               <td className="px-2 py-1">{item.productName}</td>
                               <td className="px-2 py-1 text-right text-muted-foreground">

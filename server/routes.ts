@@ -1288,6 +1288,52 @@ export async function registerRoutes(
     return parseFloat(s);
   }
 
+  // Infer equipment type from product name using keyword + model-family matching.
+  // Uses the same 9 categories as the app's equipment types.
+  function inferProductType(productName: string): string | null {
+    const n = productName.toLowerCase();
+
+    // Bars & control systems — check first (e.g. "Sensor 4 Bar")
+    if (/\bbar\b|sensor\b|navigator\b|trust bar|depower bar|control bar|control system|chicken loop/.test(n)) return "bar_lines";
+
+    // Harnesses
+    if (/harness|trapez/.test(n)) return "harness";
+
+    // Wetsuits
+    if (/wetsuit|neoprene|neopren|fullsuit|shorty|steamer/.test(n)) return "wetsuit";
+
+    // Helmets / safety
+    if (/helmet|impact vest|impact protection|buoyancy/.test(n)) return "helmet_safety";
+
+    // Foilboards (wingfoil boards) — before generic "foil" check
+    if (/wingfoilboard|wing foil board|foilboard/.test(n)) return "foilboard";
+    // Known foilboard model families
+    if (/\b(roamer|chase)\b/.test(n) && /\d+\s*l\b/.test(n)) return "foilboard";
+
+    // Foil components (frontwings, stabilizers, masts, fuselages)
+    if (/frontwing|front wing|stabilizer|rear wing|fuselage|carbon mast|aluminium mast|mastbase|mast base/.test(n)) return "foil";
+    // Foil system prefixes (CFS = Core Foil System, SLC = Slice system)
+    if (/^(cfs|slc)\s/.test(n) && !/\bkite\b/.test(n)) return "foil";
+
+    // Wings (handheld inflatable wings for wingfoiling)
+    // Core wing families: Halo, XC — sizes in m² (2–8)
+    if (/\b(halo|halo pro)\b/.test(n)) return "wing";
+    if (/^xc\s+\d/.test(n)) return "wing";
+    // Generic wing keyword — but avoid "frontwing" and "wingfoilboard"
+    if (/\bwing\b/.test(n) && !/frontwing|wingfoilboard/.test(n)) return "wing";
+
+    // Kites — Core kite model families (product names don't contain "kite")
+    if (/\bkite\b/.test(n)) return "kite";
+    if (/^(xr|pace|nexus|air|section|impact|rebel|bolt|soul|drift|velocity|neo|free|vibe|escape)\b/.test(n)) return "kite";
+
+    // Kiteboards / boards
+    if (/\bboard\b|twintip|twin.tip|directional|waveboard/.test(n)) return "board";
+    // Known Core kiteboard families
+    if (/\b(imperator|fusion|choice|era|badger|ripper|green room|720)\b/.test(n)) return "board";
+
+    return null;
+  }
+
   // Parse a German price string that uses "." as thousands separator and no mandatory cents.
   // Examples: "2.849 €" → 2849, "849 €" → 849, "2.139,50 €" → 2139.50
   function parseEuroPrice(raw: string): number {
@@ -1375,7 +1421,7 @@ export async function registerRoutes(
       if (seen.has(key)) continue;
       seen.add(key);
 
-      items.push({ sku, productName, retailPrice: retailPrice.toFixed(2), dealerPrice: dealerPrice !== null ? dealerPrice.toFixed(2) : null });
+      items.push({ sku, productName, retailPrice: retailPrice.toFixed(2), dealerPrice: dealerPrice !== null ? dealerPrice.toFixed(2) : null, productType: inferProductType(productName) });
     }
 
     return items;
@@ -1405,7 +1451,7 @@ export async function registerRoutes(
       }
       const pl = await storage.createPriceList(
         { supplier: supplier.trim(), uploadedBy: user.id },
-        items.map((i: any) => ({ sku: i.sku, productName: i.productName, retailPrice: i.retailPrice, dealerPrice: i.dealerPrice || null })),
+        items.map((i: any) => ({ sku: i.sku, productName: i.productName, retailPrice: i.retailPrice, dealerPrice: i.dealerPrice || null, productType: i.productType || null })),
       );
       res.json(pl);
     } catch (err: any) {

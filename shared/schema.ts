@@ -286,6 +286,7 @@ export const priceListItems = pgTable("price_list_items", {
   productName: text("product_name").notNull(),
   retailPrice: decimal("retail_price", { precision: 10, scale: 2 }).notNull(),
   dealerPrice: decimal("dealer_price", { precision: 10, scale: 2 }),
+  productType: text("product_type"),
 });
 
 export const insertStationSchema = createInsertSchema(stations).omit({ id: true });
