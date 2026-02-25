@@ -25,6 +25,7 @@ type LineItem = {
   serialNumber: string;
   sku: string;
   unitPrice: string;
+  priceSuggestion: { label: string; value: string } | null;
   equipment: Equipment;
 };
 
@@ -91,6 +92,11 @@ export default function SaleCreatePage() {
     const desc = [equip.brand, equip.model, size ? `${size}${equip.type === "kite" || equip.type === "wing" ? "m²" : "cm"}` : ""].filter(Boolean).join(" ");
     const isNoSerial = TYPES_WITHOUT_SERIAL.includes(equip.type as any) ||
       equip.serialNumber?.startsWith("AUTO-") || equip.serialNumber?.startsWith("IMPORT-");
+    const priceSuggestion = equip.currentValue && parseFloat(equip.currentValue) > 0
+      ? { label: "Suggested (current value)", value: parseFloat(equip.currentValue).toFixed(2) }
+      : equip.purchasePrice && parseFloat(equip.purchasePrice) > 0
+        ? { label: "Reference (purchase price)", value: parseFloat(equip.purchasePrice).toFixed(2) }
+        : null;
     setItems((prev) => [
       ...prev,
       {
@@ -98,7 +104,8 @@ export default function SaleCreatePage() {
         description: desc,
         serialNumber: isNoSerial ? "" : (equip.serialNumber || ""),
         sku: equip.sku || "",
-        unitPrice: equip.salePrice || equip.currentValue || "",
+        unitPrice: "",
+        priceSuggestion,
         equipment: equip,
       },
     ]);
@@ -345,6 +352,19 @@ export default function SaleCreatePage() {
                         placeholder="0.00"
                         data-testid={`input-item-price-${idx}`}
                       />
+                      {item.priceSuggestion && (
+                        <p className="text-[10px] text-muted-foreground leading-tight" data-testid={`text-price-suggestion-${idx}`}>
+                          {item.priceSuggestion.label}:{" "}
+                          <button
+                            type="button"
+                            className="font-medium text-foreground/70 underline decoration-dotted hover:text-foreground transition-colors"
+                            onClick={() => updateItem(item.equipmentId, "unitPrice", item.priceSuggestion!.value)}
+                            data-testid={`button-use-suggestion-${idx}`}
+                          >
+                            €{item.priceSuggestion.value}
+                          </button>
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
