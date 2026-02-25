@@ -208,8 +208,17 @@ export default function EquipmentDetailPage() {
         </Card>
       )}
 
+      <div className="flex">
+        <Link href={`/incidents?equipment=${item.id}`}>
+          <Button variant="destructive" size="sm" className="gap-2" data-testid="button-report-damage">
+            <AlertTriangle className="h-4 w-4" />
+            Report Damage
+          </Button>
+        </Link>
+      </div>
+
       <Tabs defaultValue="photos" className="w-full">
-        <TabsList className="w-full grid grid-cols-5">
+        <TabsList className="w-full grid grid-cols-6">
           <TabsTrigger value="photos" data-testid="tab-photos">
             <Camera className="h-4 w-4 mr-1 hidden sm:inline" />
             Photos {photosData?.length ? `(${photosData.length})` : ""}
@@ -222,6 +231,11 @@ export default function EquipmentDetailPage() {
           <TabsTrigger value="repairs" data-testid="tab-repairs">
             <Wrench className="h-4 w-4 mr-1 hidden sm:inline" />
             Repairs
+          </TabsTrigger>
+          <TabsTrigger value="damage" data-testid="tab-damage">
+            <AlertTriangle className="h-4 w-4 mr-1 hidden sm:inline" />
+            <span className="hidden sm:inline">Damage</span>
+            <span className="sm:hidden">Dmg.</span>
           </TabsTrigger>
           <TabsTrigger value="transfers" data-testid="tab-transfers">
             <ArrowLeftRight className="h-4 w-4 mr-1 hidden sm:inline" />
@@ -244,6 +258,10 @@ export default function EquipmentDetailPage() {
 
         <TabsContent value="repairs" className="mt-4 space-y-4">
           <RepairsSection equipmentId={item.id} repairs={repairsData || []} isHamburg={isHamburg} />
+        </TabsContent>
+
+        <TabsContent value="damage" className="mt-4 space-y-4">
+          <EquipmentDamageSection equipmentId={item.id} stationId={item.currentStationId} />
         </TabsContent>
 
         <TabsContent value="transfers" className="mt-4 space-y-4">
@@ -811,6 +829,75 @@ function formatRelativeTime(ts: string | null) {
 }
 
 type ActivityEntry = { id: number; userId: number; action: string; equipmentId: number | null; details: string | null; timestamp: string | null; userName: string };
+
+type DamageReportSummary = {
+  id: number;
+  reportedAt: string | null;
+  howItHappened: string;
+  usageType: string;
+  totalLoss: boolean;
+  repairable: boolean;
+  status: string;
+  reporterName: string;
+  photos: { id: number; url: string }[];
+};
+
+function EquipmentDamageSection({ equipmentId, stationId }: { equipmentId: number; stationId: number | null }) {
+  const { data: reports, isLoading } = useQuery<DamageReportSummary[]>({
+    queryKey: ["/api/equipment", equipmentId.toString(), "damage-reports"],
+    queryFn: () => fetch(`/api/equipment/${equipmentId}/damage-reports`, { credentials: "include" }).then(r => r.json()),
+    staleTime: 0,
+  });
+
+  if (isLoading) return <Skeleton className="h-24 w-full" />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-muted-foreground">{reports?.length ? `${reports.length} damage report(s) on file` : "No damage reports"}</p>
+        <Link href={`/incidents?equipment=${equipmentId}`}>
+          <Button size="sm" variant="destructive" className="gap-2" data-testid="button-new-damage-report">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Report Damage
+          </Button>
+        </Link>
+      </div>
+      {reports?.map(r => (
+        <Card key={r.id} className={`border-l-4 ${r.totalLoss ? "border-l-red-600" : r.repairable ? "border-l-orange-400" : "border-l-yellow-400"}`}>
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap gap-1.5 mb-1">
+                  {r.totalLoss && <span className="text-xs font-bold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded-full">Total Loss</span>}
+                  {!r.totalLoss && r.repairable && <span className="text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-2 py-0.5 rounded-full">Repairable</span>}
+                  {!r.totalLoss && !r.repairable && <span className="text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-2 py-0.5 rounded-full">Not Repairable</span>}
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${r.status === "resolved" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : r.status === "in_review" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-muted text-muted-foreground"}`}>
+                    {r.status === "open" ? "Open" : r.status === "in_review" ? "In Review" : "Resolved"}
+                  </span>
+                </div>
+                <p className="text-sm font-medium line-clamp-2">{r.howItHappened}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span>{r.reporterName}</span>
+              <span>·</span>
+              <span>{r.reportedAt ? new Date(r.reportedAt).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "–"}</span>
+            </div>
+            {r.photos.length > 0 && (
+              <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                {r.photos.map(p => (
+                  <a key={p.id} href={p.url} target="_blank" rel="noreferrer">
+                    <img src={p.url} className="h-16 w-16 rounded object-cover shrink-0 border" alt="Damage photo" />
+                  </a>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
 function EquipmentActivitySection({ logs }: { logs: ActivityEntry[] }) {
   if (logs.length === 0) {

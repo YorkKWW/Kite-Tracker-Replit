@@ -1566,5 +1566,178 @@ export async function registerRoutes(
     res.json(null);
   });
 
+  // ─── Damage Reports ────────────────────────────────────────────────────────
+
+  app.get("/api/damage-reports", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const reports = await storage.getAllDamageReports();
+    if (user.role === "station_lead") {
+      return res.json(reports.filter(r => r.stationId === user.stationId));
+    }
+    res.json(reports);
+  });
+
+  app.get("/api/damage-reports/:id", requireAuth, async (req, res) => {
+    const report = await storage.getDamageReport(parseInt(req.params.id));
+    if (!report) return res.status(404).json({ message: "Not found" });
+    const user = req.user as any;
+    if (user.role === "station_lead" && report.stationId !== user.stationId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    res.json(report);
+  });
+
+  app.get("/api/equipment/:id/damage-reports", requireAuth, async (req, res) => {
+    const reports = await storage.getDamageReportsByEquipment(parseInt(req.params.id));
+    res.json(reports);
+  });
+
+  app.post("/api/damage-reports", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const schema = z.object({
+      equipmentId: z.number(),
+      howItHappened: z.string().min(5),
+      customerName: z.string().optional().nullable(),
+      bookingReference: z.string().optional().nullable(),
+      usageType: z.enum(["rental", "lesson", "other"]),
+      customerInsured: z.boolean().default(false),
+      repairable: z.boolean(),
+      totalLoss: z.boolean(),
+      canRepairOnSite: z.boolean().default(false),
+      needsSpareParts: z.boolean().default(false),
+      sparePartsNeeded: z.string().optional().nullable(),
+      stationId: z.number().optional().nullable(),
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.errors });
+
+    const data = parsed.data;
+
+    const report = await storage.createDamageReport({
+      ...data,
+      reportedBy: user.id,
+      status: "open",
+    });
+
+    const eq = await storage.getEquipment(data.equipmentId);
+    const eqLabel = eq ? `${eq.brand} ${eq.model}` : `Equipment #${data.equipmentId}`;
+
+    if (data.totalLoss) {
+      await storage.updateEquipment(data.equipmentId, { status: "retired" });
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "equipment_status_changed",
+        equipmentId: data.equipmentId,
+        stationId: data.stationId ?? undefined,
+        details: `${eqLabel} marked as Total Loss — status set to Retired`,
+      });
+    } else if (data.repairable) {
+      const repair = await storage.createRepair({
+        equipmentId: data.equipmentId,
+        description: `Damage report: ${data.howItHappened}`,
+        status: "pending",
+        loggedBy: user.id,
+      });
+      await storage.updateDamageReport(report.id, { repairId: repair.id });
+      await storage.updateEquipment(data.equipmentId, { status: "in_repair" });
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "repair_logged",
+        equipmentId: data.equipmentId,
+        stationId: data.stationId ?? undefined,
+        details: `Repair created from damage report for ${eqLabel}`,
+      });
+    }
+
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "damage_reported",
+      equipmentId: data.equipmentId,
+      stationId: data.stationId ?? undefined,
+      details: `Damage reported for ${eqLabel}: ${data.howItHappened.substring(0, 100)}`,
+    });
+
+    await storage.updateDamageReport(report.id, { adminNotified: true });
+
+    try {
+      const nodemailer = await import("nodemailer").catch(() => null);
+      if (nodemailer) {
+        const admins = await storage.getAllUsers();
+        const adminEmails = admins.filter(u => u.role === "admin").map(u => u.email);
+        if (adminEmails.length) {
+          const transporter = nodemailer.default.createTransport({
+            host: process.env.SMTP_HOST || "smtp.gmail.com",
+            port: parseInt(process.env.SMTP_PORT || "587"),
+            auth: {
+              user: process.env.SMTP_USER,
+              pass: process.env.SMTP_PASS,
+            },
+          });
+          const usageLabel = data.usageType === "rental" ? "Rental" : data.usageType === "lesson" ? "Lesson (liability on us)" : "Other";
+          await transporter.sendMail({
+            from: process.env.SMTP_USER || "noreply@kitetracker.com",
+            to: adminEmails.join(", "),
+            subject: `[KiteTracker] Damage Report: ${eqLabel}`,
+            text: [
+              `A damage report has been filed by ${user.name}.`,
+              ``,
+              `Equipment: ${eqLabel}`,
+              `Location: ${data.stationId ? "Station #" + data.stationId : "Unknown"}`,
+              ``,
+              `What happened: ${data.howItHappened}`,
+              ``,
+              `Customer: ${data.customerName || "–"}`,
+              `Booking ref: ${data.bookingReference || "–"}`,
+              `Usage type: ${usageLabel}`,
+              `Customer insured: ${data.customerInsured ? "Yes" : "No"}`,
+              ``,
+              `Assessment: ${data.totalLoss ? "TOTAL LOSS" : data.repairable ? "Repairable" : "Not repairable"}`,
+              `Can repair on-site: ${data.canRepairOnSite ? "Yes" : "No"}`,
+              `Needs spare parts: ${data.needsSpareParts ? "Yes" : "No"}`,
+              data.needsSpareParts ? `Parts needed: ${data.sparePartsNeeded || "–"}` : "",
+              ``,
+              `View in KiteTracker: /incidents`,
+            ].filter(Boolean).join("\n"),
+          }).catch(() => null);
+        }
+      }
+    } catch (_) {}
+
+    res.json(report);
+  });
+
+  app.patch("/api/damage-reports/:id/status", requireHamburg, async (req, res) => {
+    const { status } = req.body;
+    if (!["open", "in_review", "resolved"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+    const updated = await storage.updateDamageReport(parseInt(req.params.id), { status });
+    res.json(updated);
+  });
+
+  app.get("/api/damage-reports/:id/photos/upload-url", requireAuth, async (req, res) => {
+    try {
+      const uploadURL = await objectStorage.getObjectEntityUploadURL();
+      const objectPath = objectStorage.normalizeObjectEntityPath(uploadURL);
+      res.json({ uploadURL, objectPath });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to get upload URL: " + err.message });
+    }
+  });
+
+  app.post("/api/damage-reports/:id/photos", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const reportId = parseInt(req.params.id);
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ message: "url is required" });
+    const photo = await storage.createDamageReportPhoto({
+      damageReportId: reportId,
+      url,
+      uploadedBy: user.id,
+    });
+    res.json(photo);
+  });
+
   return httpServer;
 }

@@ -292,6 +292,35 @@ export const priceListItems = pgTable("price_list_items", {
   productType: text("product_type"),
 });
 
+export const damageReports = pgTable("damage_reports", {
+  id: serial("id").primaryKey(),
+  equipmentId: integer("equipment_id").notNull().references(() => equipment.id),
+  reportedBy: integer("reported_by").notNull().references(() => users.id),
+  reportedAt: timestamp("reported_at").defaultNow(),
+  howItHappened: text("how_it_happened").notNull(),
+  customerName: text("customer_name"),
+  bookingReference: text("booking_reference"),
+  usageType: text("usage_type").notNull().default("rental"),
+  customerInsured: boolean("customer_insured").notNull().default(false),
+  repairable: boolean("repairable").notNull().default(true),
+  totalLoss: boolean("total_loss").notNull().default(false),
+  canRepairOnSite: boolean("can_repair_on_site").notNull().default(false),
+  needsSpareParts: boolean("needs_spare_parts").notNull().default(false),
+  sparePartsNeeded: text("spare_parts_needed"),
+  stationId: integer("station_id").references(() => stations.id),
+  status: text("status").notNull().default("open"),
+  adminNotified: boolean("admin_notified").notNull().default(false),
+  repairId: integer("repair_id").references(() => repairs.id),
+});
+
+export const damageReportPhotos = pgTable("damage_report_photos", {
+  id: serial("id").primaryKey(),
+  damageReportId: integer("damage_report_id").notNull().references(() => damageReports.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  uploadedBy: integer("uploaded_by").notNull().references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
 export const insertStationSchema = createInsertSchema(stations).omit({ id: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertEquipmentSchema = createInsertSchema(equipment).omit({ id: true, createdAt: true });
@@ -310,6 +339,8 @@ export const insertSalesInvoiceSchema = createInsertSchema(salesInvoices).omit({
 export const insertSaleItemSchema = createInsertSchema(saleItems).omit({ id: true });
 export const insertPriceListSchema = createInsertSchema(priceLists).omit({ id: true, uploadedAt: true });
 export const insertPriceListItemSchema = createInsertSchema(priceListItems).omit({ id: true });
+export const insertDamageReportSchema = createInsertSchema(damageReports).omit({ id: true, reportedAt: true, adminNotified: true, repairId: true });
+export const insertDamageReportPhotoSchema = createInsertSchema(damageReportPhotos).omit({ id: true, uploadedAt: true });
 
 export type InsertStation = z.infer<typeof insertStationSchema>;
 export type Station = typeof stations.$inferSelect;
@@ -364,6 +395,12 @@ export type PriceList = typeof priceLists.$inferSelect;
 
 export type InsertPriceListItem = z.infer<typeof insertPriceListItemSchema>;
 export type PriceListItem = typeof priceListItems.$inferSelect;
+
+export type InsertDamageReport = z.infer<typeof insertDamageReportSchema>;
+export type DamageReport = typeof damageReports.$inferSelect;
+
+export type InsertDamageReportPhoto = z.infer<typeof insertDamageReportPhotoSchema>;
+export type DamageReportPhoto = typeof damageReportPhotos.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email(),

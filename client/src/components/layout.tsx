@@ -18,6 +18,7 @@ import {
   FileUp,
   ShoppingCart,
   Tag,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -51,6 +52,7 @@ export default function Layout({ children }: LayoutProps) {
     { href: "/equipment", label: "Equipment", icon: Package },
     ...(isHamburg ? [{ href: "/transfers", label: "Transfers", icon: ArrowLeftRight }] : []),
     { href: "/sales", label: "Sales", icon: ShoppingCart },
+    { href: "/incidents", label: "Incidents", icon: AlertTriangle },
     ...(isHamburg
       ? [
           { href: "/price-lists", label: "Price Lists", icon: Tag },

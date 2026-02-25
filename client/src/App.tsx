@@ -20,6 +20,7 @@ import SaleCreatePage from "@/pages/sale-create";
 import PriceListsPage from "@/pages/price-lists";
 import UsersPage from "@/pages/users-page";
 import ActivityPage from "@/pages/activity";
+import IncidentsPage from "@/pages/incidents";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
@@ -52,6 +53,7 @@ function AuthenticatedRouter() {
         <Route path="/inventory-check/:id" component={InventoryCheckPage} />
         {isAdmin && <Route path="/users" component={UsersPage} />}
         {isAdmin && <Route path="/activity" component={ActivityPage} />}
+        <Route path="/incidents" component={IncidentsPage} />
         {isHamburg && <Route path="/invoice-import" component={InvoiceImportPage} />}
         {isHamburg && <Route path="/price-lists" component={PriceListsPage} />}
         <Route path="/sales/new" component={SaleCreatePage} />

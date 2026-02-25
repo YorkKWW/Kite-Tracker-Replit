@@ -16,8 +16,18 @@ Full-stack web application for managing kitesurf school equipment across multipl
 - **Hamburg Manager** (`manager`): Broad access (equipment CRUD, transfers, invoices, price lists), no user management
 - **Station Lead** (`station_lead`): Own station only, no purchase prices, no transfers/equipment creation, sees station activity
 
+## Damage Report / Incidents Module
+Full damage reporting workflow for station leads and managers.
+- **DB Tables**: `damage_reports`, `damage_report_photos`
+- **Triggers**: Equipment set to `in_repair` (auto-repair created) or `retired` (total loss) on submission
+- **Photos**: Up to 3 damage photos via object storage (same presigned URL flow as equipment photos)
+- **Admin notification**: Email sent on submission (SMTP env vars: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS)
+- **Status flow**: open → in_review → resolved (admin/manager only)
+- **Routes**: `GET/POST /api/damage-reports`, `GET /api/damage-reports/:id`, `PATCH /api/damage-reports/:id/status`, `GET /api/equipment/:id/damage-reports`, `GET /api/damage-reports/:id/photos/upload-url`, `POST /api/damage-reports/:id/photos`
+- **UI**: `/incidents` page (nav + bottom bar), "Report Damage" button on equipment detail, Damage tab on equipment detail
+
 ## Activity Log (System-wide Audit Trail)
-All events are logged to `activity_log` table: equipment CRUD, transfers, repairs, photos, sales, inventory checks, logins.
+All events are logged to `activity_log` table: equipment CRUD, transfers, repairs, photos, sales, inventory checks, logins, damage reports.
 - Joined with user names and equipment labels in queries
 - Global page: `/activity` — visible to all roles, station leads see their station only
 - Equipment detail "History" tab: timeline view per item

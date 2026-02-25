@@ -4,6 +4,7 @@ import {
   stations, users, equipment, conditionRatings, repairs, transfers, photos, activityLog,
   inventoryChecks, inventoryCheckItems, suppliers, invoices,
   companySettings, customers, salesInvoices, saleItems, priceLists, priceListItems,
+  damageReports, damageReportPhotos,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -22,6 +23,8 @@ import {
   type SaleItem, type InsertSaleItem,
   type PriceList, type InsertPriceList,
   type PriceListItem, type InsertPriceListItem,
+  type DamageReport, type InsertDamageReport,
+  type DamageReportPhoto, type InsertDamageReportPhoto,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -119,6 +122,13 @@ export interface IStorage {
   getPriceListItems(priceListId: number): Promise<PriceListItem[]>;
   lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>;
   lookupRetailPriceByName(name: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>;
+
+  getAllDamageReports(): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[] })[]>;
+  getDamageReport(id: number): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[] }) | undefined>;
+  getDamageReportsByEquipment(equipmentId: number): Promise<(DamageReport & { reporterName: string; photos: DamageReportPhoto[] })[]>;
+  createDamageReport(report: InsertDamageReport): Promise<DamageReport>;
+  updateDamageReport(id: number, data: Partial<DamageReport>): Promise<DamageReport | undefined>;
+  createDamageReportPhoto(photo: InsertDamageReportPhoto): Promise<DamageReportPhoto>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -763,6 +773,70 @@ export class DatabaseStorage implements IStorage {
       supplier: rows[0].supplier,
       productName: rows[0].productName,
     };
+  }
+
+  private async enrichDamageReports(reports: DamageReport[]): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[] })[]> {
+    if (!reports.length) return [];
+    const equipIds = [...new Set(reports.map(r => r.equipmentId))];
+    const userIds = [...new Set(reports.map(r => r.reportedBy))];
+    const stationIds = [...new Set(reports.map(r => r.stationId).filter(Boolean))] as number[];
+    const reportIds = reports.map(r => r.id);
+
+    const [equips, reportUsers, reportStations, allPhotos] = await Promise.all([
+      db.select({ id: equipment.id, brand: equipment.brand, model: equipment.model }).from(equipment).where(inArray(equipment.id, equipIds)),
+      db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, userIds)),
+      stationIds.length ? db.select({ id: stations.id, name: stations.name }).from(stations).where(inArray(stations.id, stationIds)) : Promise.resolve([]),
+      db.select().from(damageReportPhotos).where(inArray(damageReportPhotos.damageReportId, reportIds)).orderBy(damageReportPhotos.uploadedAt),
+    ]);
+
+    const equipMap = Object.fromEntries(equips.map(e => [e.id, `${e.brand} ${e.model}`]));
+    const userMap = Object.fromEntries(reportUsers.map(u => [u.id, u.name]));
+    const stationMap = Object.fromEntries(reportStations.map(s => [s.id, s.name]));
+    const photoMap: Record<number, DamageReportPhoto[]> = {};
+    for (const p of allPhotos) {
+      if (!photoMap[p.damageReportId]) photoMap[p.damageReportId] = [];
+      photoMap[p.damageReportId].push(p);
+    }
+
+    return reports.map(r => ({
+      ...r,
+      equipmentLabel: equipMap[r.equipmentId] ?? `Equipment #${r.equipmentId}`,
+      reporterName: userMap[r.reportedBy] ?? "Unknown",
+      stationName: r.stationId ? stationMap[r.stationId] : undefined,
+      photos: photoMap[r.id] ?? [],
+    }));
+  }
+
+  async getAllDamageReports(): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[] })[]> {
+    const rows = await db.select().from(damageReports).orderBy(desc(damageReports.reportedAt));
+    return this.enrichDamageReports(rows);
+  }
+
+  async getDamageReport(id: number): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[] }) | undefined> {
+    const [row] = await db.select().from(damageReports).where(eq(damageReports.id, id));
+    if (!row) return undefined;
+    const [enriched] = await this.enrichDamageReports([row]);
+    return enriched;
+  }
+
+  async getDamageReportsByEquipment(equipmentId: number): Promise<(DamageReport & { reporterName: string; photos: DamageReportPhoto[] })[]> {
+    const rows = await db.select().from(damageReports).where(eq(damageReports.equipmentId, equipmentId)).orderBy(desc(damageReports.reportedAt));
+    return this.enrichDamageReports(rows);
+  }
+
+  async createDamageReport(report: InsertDamageReport): Promise<DamageReport> {
+    const [created] = await db.insert(damageReports).values(report).returning();
+    return created;
+  }
+
+  async updateDamageReport(id: number, data: Partial<DamageReport>): Promise<DamageReport | undefined> {
+    const [updated] = await db.update(damageReports).set(data).where(eq(damageReports.id, id)).returning();
+    return updated;
+  }
+
+  async createDamageReportPhoto(photo: InsertDamageReportPhoto): Promise<DamageReportPhoto> {
+    const [created] = await db.insert(damageReportPhotos).values(photo).returning();
+    return created;
   }
 }
 
