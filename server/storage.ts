@@ -439,7 +439,7 @@ export class DatabaseStorage implements IStorage {
     const allStations = await db.select().from(stations);
 
     const equipmentPerStation = allStations.map((s) => {
-      const stEq = allEquipment.filter((e) => e.currentStationId === s.id);
+      const stEq = allEquipment.filter((e) => e.currentStationId === s.id && e.status !== "in_transfer");
       return {
         stationId: s.id,
         stationName: s.name,
