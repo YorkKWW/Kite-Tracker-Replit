@@ -37,6 +37,117 @@ function parseGermanNumber(s: string): number {
   return parseFloat(s.replace(/\./g, "").replace(",", "."));
 }
 
+// Duotone invoices use space as thousands separator: "1 020,00" → 1020.00
+function parseDuotoneNumber(s: string): number {
+  return parseFloat(s.replace(/\s/g, "").replace(/\./g, "").replace(",", "."));
+}
+
+// Convert "15-May-24" → "15.05.2024"
+function convertDuotoneDate(raw: string): string {
+  const months: Record<string, string> = {
+    Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06",
+    Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12",
+  };
+  const m = raw.match(/(\d{1,2})-([A-Za-z]{3})-(\d{2,4})/);
+  if (!m) return raw;
+  const [, day, mon, yr] = m;
+  const month = months[mon.charAt(0).toUpperCase() + mon.slice(1).toLowerCase()] || "01";
+  const year = yr.length === 2 ? (parseInt(yr) >= 70 ? `19${yr}` : `20${yr}`) : yr;
+  return `${day.padStart(2, "0")}.${month}.${year}`;
+}
+
+function parseDuotoneInvoice(text: string) {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+
+  // ── Metadata ──────────────────────────────────────────────────────────────
+  const invoiceNumber = text.match(/INVOICE\s+No[:\s]+([\w\-]+)/i)?.[1] || "";
+  const rawDate = text.match(/Date[:\s]+([\d]+-[A-Za-z]+-[\d]+)/i)?.[1] || "";
+  const invoiceDate = convertDuotoneDate(rawDate);
+  // Delivery date from "Del.note/date/ref.IDEL-007774/15.05.2024/..."
+  const deliveryDate = text.match(/Del\.note\/date\/ref\.[^/]+\/([\d.]+)/i)?.[1] || "";
+  // Order number from "B&M/B2B order no.IOR-0031549/..."
+  const orderNumber = text.match(/B&M\/B2B order no\.([\w\-]+)/i)?.[1] || "";
+  // Totals – appear as "Total Net Value EUR 5 194,20"
+  const totalNetRaw = text.match(/Total Net Value\s+EUR\s+([\d\s.,]+)/i)?.[1]?.trim() || "";
+  const totalGrossRaw = text.match(/Invoice Total\s+EUR\s+([\d\s.,]+)/i)?.[1]?.trim() || "";
+  const totalNet = totalNetRaw ? parseDuotoneNumber(totalNetRaw) : null;
+  const totalGross = totalGrossRaw ? parseDuotoneNumber(totalGrossRaw) : null;
+
+  // ── Line items ────────────────────────────────────────────────────────────
+  // Format: "44240-3004  DTK-Kite Neo : 06.0 : C02:coral/light-grey  SS24  1 pcs  1 020,00  612,00  612,00"
+  // Next line: "LK/95030099   40%"
+  const skuRe = /^(\d{4,6}-\d{3,5})\s+/;
+  const items: any[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const skuMatch = line.match(skuRe);
+    if (!skuMatch) continue;
+
+    const sku = skuMatch[1];
+    const rest = line.slice(skuMatch[0].length);
+
+    // Split on "N pcs" to isolate description (+ season) from prices
+    const pcsIdx = rest.search(/\d+\s+pcs/);
+    if (pcsIdx < 0) continue;
+
+    const descSection = rest.slice(0, pcsIdx).trim();
+    const afterPcs = rest.slice(pcsIdx);
+
+    // Quantity
+    const qtyMatch = afterPcs.match(/^(\d+)\s+pcs\s+(.*)/);
+    if (!qtyMatch) continue;
+    const quantity = parseInt(qtyMatch[1], 10) || 1;
+    const priceSection = qtyMatch[2];
+
+    // Parse description: "DTK-Kite Neo : 06.0 : C02:coral/light-grey   SS24"
+    // Remove trailing season code (SS24, AW24, FW24, SS23 …)
+    const descClean = descSection.replace(/\s+(?:SS|AW|FW)\d{2}\s*$/, "").trim();
+    const descParts = descClean.split(":").map((s) => s.trim());
+    const name = descParts[0] || descClean;
+    const rawSize = descParts[1] || "";
+    // Normalize size: "06.0" → "6", "10.0" → "10"
+    const size = rawSize ? (parseFloat(rawSize) || rawSize).toString() : "";
+    // Color: "C02:coral/light-grey" → strip leading code
+    const colorRaw = descParts.slice(2).join(":").trim();
+    const color = colorRaw.replace(/^[A-Z0-9]+:/, "").trim();
+
+    // Extract all European numbers from price section
+    // e.g. "     1 020,00        612,00        612,00"
+    const numMatches = [...priceSection.matchAll(/\b[\d][\d\s]*,\d{2}\b/g)];
+    // Net value is the last number (= purchase price)
+    const netValue = numMatches.length > 0
+      ? parseDuotoneNumber(numMatches[numMatches.length - 1][0])
+      : 0;
+    const unitPriceAfterDiscount = quantity > 0 ? netValue / quantity : netValue;
+
+    // Discount % on the following line (e.g. "LK/95030099   40%")
+    let discount = 0;
+    if (i + 1 < lines.length) {
+      const discMatch = lines[i + 1].match(/(\d+)%/);
+      if (discMatch) discount = parseInt(discMatch[1], 10);
+    }
+
+    const { type, isSpare } = detectEquipmentType(name, sku);
+
+    items.push({
+      sku,
+      name,
+      size,
+      color,
+      quantity,
+      discount,
+      unitPriceAfterDiscount: Math.round(unitPriceAfterDiscount * 100) / 100,
+      serialNumber: "",
+      type,
+      isSpare,
+      skip: isSpare,
+    });
+  }
+
+  return { invoiceNumber, invoiceDate, deliveryDate, orderNumber, totalNet, totalGross, items };
+}
+
 function detectEquipmentType(name: string, sku: string): { type: string; isSpare: boolean } {
   const text = `${name} ${sku}`.toLowerCase();
   if (/bladder|bridle|chickenstick|ersatzteil|spare|strut|screw|bolt|pump hose/i.test(text)) {
@@ -756,7 +867,9 @@ export async function registerRoutes(
     if (!req.file) return res.status(400).json({ message: "No PDF uploaded" });
     try {
       const data = await parsePdfBuffer(req.file.buffer);
-      const parsed = parsePdfInvoice(data.text);
+      // Auto-detect supplier format from PDF content
+      const isDuotone = /boards.and.more|B&M\/B2B/i.test(data.text);
+      const parsed = isDuotone ? parseDuotoneInvoice(data.text) : parsePdfInvoice(data.text);
 
       // Check for duplicate serials in DB
       const allSerial = parsed.items
