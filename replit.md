@@ -32,21 +32,25 @@ client/src/
   components/
     layout.tsx        - Main layout with nav (header + bottom tabs)
     condition-badge.tsx - Condition/status badge components
+  components/
+    barcode-scanner.tsx - html5-qrcode modal scanner with manual fallback
   pages/
     login.tsx         - Login page
     dashboard.tsx     - Dashboard with stats
-    equipment-list.tsx - Equipment list with filters
+    equipment-list.tsx - Equipment list with filters, scan button, photo thumbnails
     equipment-detail.tsx - Equipment detail with tabs (photos, condition, repairs, transfers)
-    equipment-form.tsx - Add equipment form (admin only)
+    equipment-form.tsx - Add equipment form (admin only); serial pre-fill via ?serial= URL param
     transfers.tsx     - Transfer management
     stations.tsx      - Station management (admin)
+    station-detail.tsx - Station detail with inventory check button + past reports
+    inventory-check.tsx - Inventory check workflow (checklist, scanner, progress)
     users-page.tsx    - User management (admin)
     activity.tsx      - Activity log (admin)
     settings.tsx      - Settings + CSV import
 ```
 
 ## Database Tables
-stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log
+stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items
 
 ## Equipment Types
 kite, board, foil, wing, bar_lines, wetsuit, harness, helmet_safety
@@ -62,10 +66,25 @@ Each uses a JSONB column `type_specific_fields` for type-specific attributes.
 - Condition rating history (1-5 scale)
 - Repair logging
 - Equipment transfers between stations
-- Photo upload (stored in /uploads)
+- Photo upload via Replit Object Storage (presigned URL flow; mobile: Take Photo + Library buttons)
+- Photo lightbox viewer with uploader name + timestamp
+- Photo thumbnails on equipment list cards
+- Barcode/QR scanner (html5-qrcode, in nav header + equipment list; scan → detail or pre-fill new form)
+- Inventory Check Mode: station checklist, progress bar, condition stars, repair/missing flags, auto-check on scan
+- Inventory reports per station (admin: past checks history)
 - CSV import for bulk equipment
 - Activity logging
 - Role-based access control (financial data hidden from managers)
 
-## File Upload
-Photos stored in /uploads directory, served via static route.
+## Object Storage
+Photos uploaded via Replit Object Storage presigned URL flow:
+1. Client GETs upload URL from /api/equipment/:id/photos/upload-url
+2. Client PUTs file directly to presigned URL
+3. Client POSTs {url} to /api/equipment/:id/photos to save metadata
+Served via /objects/:path proxy route.
+
+## Inventory Check Flow
+POST /api/stations/:id/inventory-checks → creates check + items for all station equipment
+GET /api/inventory-checks/:id → returns {check, items, equipment}
+PATCH /api/inventory-checks/:id/items/:equipmentId → update checked/condition/flags
+PATCH /api/inventory-checks/:id/complete → mark completed

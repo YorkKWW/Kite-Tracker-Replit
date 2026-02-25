@@ -19,7 +19,11 @@ export default function EquipmentFormPage() {
   const { toast } = useToast();
   const { data: stationsList } = useQuery<Station[]>({ queryKey: ["/api/stations"] });
 
-  const [serialNumber, setSerialNumber] = useState("");
+  const prefillSerial = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("serial") || ""
+    : "";
+
+  const [serialNumber, setSerialNumber] = useState(prefillSerial);
   const [type, setType] = useState("kite");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");

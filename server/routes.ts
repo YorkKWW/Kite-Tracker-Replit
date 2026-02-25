@@ -7,6 +7,10 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { z } from "zod";
+import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
+
+const objectStorage = new ObjectStorageService();
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -44,6 +48,7 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   setupAuth(app);
+  registerObjectStorageRoutes(app);
 
   app.use("/uploads", (req, res, next) => {
     const filePath = path.join(uploadDir, path.basename(req.path));
@@ -142,6 +147,24 @@ export async function registerRoutes(
     res.json({ message: "Deleted" });
   });
 
+  app.get("/api/equipment/scan", requireAuth, async (req, res) => {
+    const serial = req.query.serial as string;
+    if (!serial) return res.status(400).json({ message: "serial param required" });
+    const item = await storage.getEquipmentBySerial(serial);
+    if (!item) return res.status(404).json({ message: "Equipment not found" });
+    const user = req.user as any;
+    if (user.role === "manager" && item.currentStationId !== user.assignedStationId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    res.json(item);
+  });
+
+  app.post("/api/equipment/first-photos", requireAuth, async (req, res) => {
+    const ids: number[] = req.body.ids || [];
+    const map = await storage.getFirstPhotos(ids);
+    res.json(map);
+  });
+
   app.get("/api/equipment", requireAuth, async (req, res) => {
     const user = req.user as any;
     const filters: any = {};
@@ -165,7 +188,9 @@ export async function registerRoutes(
   });
 
   app.get("/api/equipment/:id", requireAuth, async (req, res) => {
-    const item = await storage.getEquipment(parseInt(req.params.id));
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(404).json({ message: "Equipment not found" });
+    const item = await storage.getEquipment(id);
     if (!item) return res.status(404).json({ message: "Equipment not found" });
 
     const user = req.user as any;
@@ -365,18 +390,33 @@ export async function registerRoutes(
     res.json(photosList);
   });
 
-  app.post("/api/equipment/:id/photos", requireAuth, upload.single("photo"), async (req, res) => {
+  app.get("/api/equipment/:id/photos/upload-url", requireAuth, async (req, res) => {
+    const equipmentId = parseInt(req.params.id);
+    if (!(await checkEquipmentAccess(req, equipmentId))) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    try {
+      const uploadURL = await objectStorage.getObjectEntityUploadURL();
+      const objectPath = objectStorage.normalizeObjectEntityPath(uploadURL);
+      res.json({ uploadURL, objectPath });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to get upload URL: " + err.message });
+    }
+  });
+
+  app.post("/api/equipment/:id/photos", requireAuth, async (req, res) => {
     const user = req.user as any;
     const equipmentId = parseInt(req.params.id);
     if (!(await checkEquipmentAccess(req, equipmentId))) {
       return res.status(403).json({ message: "Access denied" });
     }
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+    const { url, caption } = req.body;
+    if (!url) return res.status(400).json({ message: "url is required" });
     const photo = await storage.createPhoto({
       equipmentId,
-      url: `/uploads/${req.file.filename}`,
+      url,
       uploadedBy: user.id,
-      caption: req.body.caption || null,
+      caption: caption || null,
     });
     res.json(photo);
   });
@@ -384,6 +424,78 @@ export async function registerRoutes(
   app.delete("/api/photos/:id", requireAuth, async (req, res) => {
     await storage.deletePhoto(parseInt(req.params.id));
     res.json({ message: "Deleted" });
+  });
+
+  app.post("/api/stations/:id/inventory-checks", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const stationId = parseInt(req.params.id);
+    if (user.role === "manager" && user.assignedStationId !== stationId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const equipmentList = await storage.getAllEquipment({ stationId });
+    const check = await storage.createInventoryCheck({
+      stationId,
+      startedBy: user.id,
+      status: "in_progress",
+      totalItems: equipmentList.length,
+    });
+    for (const eq of equipmentList) {
+      await storage.upsertInventoryCheckItem({ checkId: check.id, equipmentId: eq.id });
+    }
+    res.json(check);
+  });
+
+  app.get("/api/stations/:id/inventory-checks", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const stationId = parseInt(req.params.id);
+    if (user.role === "manager" && user.assignedStationId !== stationId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const checks = await storage.getInventoryChecks(stationId);
+    res.json(checks);
+  });
+
+  app.get("/api/inventory-checks/:id", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const check = await storage.getInventoryCheck(parseInt(req.params.id));
+    if (!check) return res.status(404).json({ message: "Not found" });
+    if (user.role === "manager" && user.assignedStationId !== check.stationId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const items = await storage.getInventoryCheckItems(check.id);
+    const equipmentIds = items.map(i => i.equipmentId);
+    const equipmentList = equipmentIds.length > 0 ? await storage.getAllEquipment({ stationId: check.stationId }) : [];
+    res.json({ check, items, equipment: equipmentList });
+  });
+
+  app.patch("/api/inventory-checks/:id/complete", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const check = await storage.getInventoryCheck(parseInt(req.params.id));
+    if (!check) return res.status(404).json({ message: "Not found" });
+    if (user.role === "manager" && user.assignedStationId !== check.stationId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const updated = await storage.completeInventoryCheck(check.id);
+    res.json(updated);
+  });
+
+  app.patch("/api/inventory-checks/:id/items/:equipmentId", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const checkId = parseInt(req.params.id);
+    const equipmentId = parseInt(req.params.equipmentId);
+    const check = await storage.getInventoryCheck(checkId);
+    if (!check) return res.status(404).json({ message: "Not found" });
+    if (user.role === "manager" && user.assignedStationId !== check.stationId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const item = await storage.upsertInventoryCheckItem({
+      checkId,
+      equipmentId,
+      ...req.body,
+      checkedAt: req.body.checked ? new Date() : undefined,
+      checkedBy: req.body.checked ? user.id : undefined,
+    });
+    res.json(item);
   });
 
   app.get("/api/activity", requireAdmin, async (req, res) => {

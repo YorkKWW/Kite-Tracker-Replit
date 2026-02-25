@@ -2,6 +2,7 @@ import { eq, and, desc, ilike, or, sql, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   stations, users, equipment, conditionRatings, repairs, transfers, photos, activityLog,
+  inventoryChecks, inventoryCheckItems,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -10,6 +11,8 @@ import {
   type Transfer, type InsertTransfer,
   type Photo, type InsertPhoto,
   type ActivityLog, type InsertActivityLog,
+  type InventoryCheck, type InsertInventoryCheck,
+  type InventoryCheckItem, type InsertInventoryCheckItem,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -54,6 +57,7 @@ export interface IStorage {
   cancelTransfer(id: number): Promise<Transfer | undefined>;
 
   getPhotos(equipmentId: number): Promise<Photo[]>;
+  getFirstPhotos(equipmentIds: number[]): Promise<Record<number, string>>;
   createPhoto(photo: InsertPhoto): Promise<Photo>;
   deletePhoto(id: number): Promise<void>;
 
@@ -66,6 +70,13 @@ export interface IStorage {
     needsAttention: number;
     inTransfer: number;
   }>;
+
+  createInventoryCheck(check: InsertInventoryCheck): Promise<InventoryCheck>;
+  getInventoryChecks(stationId: number): Promise<InventoryCheck[]>;
+  getInventoryCheck(id: number): Promise<InventoryCheck | undefined>;
+  completeInventoryCheck(id: number): Promise<InventoryCheck | undefined>;
+  getInventoryCheckItems(checkId: number): Promise<InventoryCheckItem[]>;
+  upsertInventoryCheckItem(data: Partial<InsertInventoryCheckItem> & { checkId: number; equipmentId: number }): Promise<InventoryCheckItem>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -290,6 +301,20 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(photos.uploadedAt));
   }
 
+  async getFirstPhotos(equipmentIds: number[]): Promise<Record<number, string>> {
+    if (equipmentIds.length === 0) return {};
+    const rows = await db.select().from(photos)
+      .where(inArray(photos.equipmentId, equipmentIds))
+      .orderBy(desc(photos.uploadedAt));
+    const result: Record<number, string> = {};
+    for (const row of rows) {
+      if (!result[row.equipmentId]) {
+        result[row.equipmentId] = row.url;
+      }
+    }
+    return result;
+  }
+
   async createPhoto(photo: InsertPhoto): Promise<Photo> {
     const [created] = await db.insert(photos).values(photo).returning();
     return created;
@@ -308,6 +333,50 @@ export class DatabaseStorage implements IStorage {
   async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
     const [created] = await db.insert(activityLog).values(log).returning();
     return created;
+  }
+
+  async createInventoryCheck(check: InsertInventoryCheck): Promise<InventoryCheck> {
+    const [created] = await db.insert(inventoryChecks).values(check).returning();
+    return created;
+  }
+
+  async getInventoryChecks(stationId: number): Promise<InventoryCheck[]> {
+    return db.select().from(inventoryChecks)
+      .where(eq(inventoryChecks.stationId, stationId))
+      .orderBy(desc(inventoryChecks.startedAt));
+  }
+
+  async getInventoryCheck(id: number): Promise<InventoryCheck | undefined> {
+    const [check] = await db.select().from(inventoryChecks).where(eq(inventoryChecks.id, id));
+    return check;
+  }
+
+  async completeInventoryCheck(id: number): Promise<InventoryCheck | undefined> {
+    const [updated] = await db.update(inventoryChecks)
+      .set({ status: "completed", completedAt: new Date() })
+      .where(eq(inventoryChecks.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getInventoryCheckItems(checkId: number): Promise<InventoryCheckItem[]> {
+    return db.select().from(inventoryCheckItems)
+      .where(eq(inventoryCheckItems.checkId, checkId));
+  }
+
+  async upsertInventoryCheckItem(data: Partial<InsertInventoryCheckItem> & { checkId: number; equipmentId: number }): Promise<InventoryCheckItem> {
+    const existing = await db.select().from(inventoryCheckItems)
+      .where(and(eq(inventoryCheckItems.checkId, data.checkId), eq(inventoryCheckItems.equipmentId, data.equipmentId)));
+    if (existing.length > 0) {
+      const [updated] = await db.update(inventoryCheckItems)
+        .set(data)
+        .where(and(eq(inventoryCheckItems.checkId, data.checkId), eq(inventoryCheckItems.equipmentId, data.equipmentId)))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(inventoryCheckItems).values(data as InsertInventoryCheckItem).returning();
+      return created;
+    }
   }
 
   async getDashboardStats(stationId?: number) {

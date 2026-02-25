@@ -16,7 +16,7 @@ import { ConditionBadge, StatusBadge } from "@/components/condition-badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Star, Wrench, ArrowLeftRight, Camera,
-  Upload, Trash2, MapPin, Calendar, Hash,
+  Upload, Trash2, MapPin, Calendar, Hash, X, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import type { Equipment, Station, ConditionRating, Repair, Transfer, Photo } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS, TYPE_SPECIFIC_FIELDS } from "@shared/schema";
@@ -208,25 +208,44 @@ function InfoCard({ icon, label, value }: { icon: React.ReactNode; label: string
 
 function PhotosSection({ equipmentId, photos }: { equipmentId: number; photos: Photo[] }) {
   const { toast } = useToast();
+  const { data: uploaderInfo } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ["/api/users"],
+  });
   const [uploading, setUploading] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const getUserName = (userId: number) =>
+    uploaderInfo?.find((u) => u.id === userId)?.name || `User #${userId}`;
+
+  const handleUpload = async (file: File) => {
     if (!file) return;
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("photo", file);
-      const res = await fetch(`/api/equipment/${equipmentId}/photos`, {
-        method: "POST",
-        body: formData,
+      const urlRes = await fetch(`/api/equipment/${equipmentId}/photos/upload-url`, {
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Upload failed");
+      if (!urlRes.ok) throw new Error("Could not get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "image/jpeg" },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error("Upload to storage failed");
+
+      await fetch(`/api/equipment/${equipmentId}/photos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ url: objectPath }),
+      });
+
       toast({ title: "Photo uploaded" });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment", equipmentId.toString(), "photos"] });
-    } catch {
-      toast({ title: "Upload failed", variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment/first-photos"] });
+    } catch (err: any) {
+      toast({ title: "Upload failed: " + err.message, variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -236,24 +255,60 @@ function PhotosSection({ equipmentId, photos }: { equipmentId: number; photos: P
     mutationFn: (photoId: number) => apiRequest("DELETE", `/api/photos/${photoId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment", equipmentId.toString(), "photos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment/first-photos"] });
       toast({ title: "Photo deleted" });
     },
   });
 
+  const lightboxPhoto = lightboxIndex !== null ? photos[lightboxIndex] : null;
+
   return (
     <>
-      <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed rounded-md cursor-pointer text-muted-foreground transition-colors" data-testid="button-upload-photo">
-        <Upload className="h-5 w-5" />
-        <span className="text-sm">{uploading ? "Uploading..." : "Upload Photo"}</span>
-        <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
-      </label>
+      <div className="flex gap-2">
+        <label className="flex-1 flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-md cursor-pointer text-muted-foreground transition-colors" data-testid="button-upload-photo">
+          <Camera className="h-4 w-4" />
+          <span className="text-sm">{uploading ? "Uploading..." : "Take Photo"}</span>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ""; }}
+            disabled={uploading}
+          />
+        </label>
+        <label className="flex-1 flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-md cursor-pointer text-muted-foreground transition-colors" data-testid="button-choose-photo">
+          <Upload className="h-4 w-4" />
+          <span className="text-sm">Library</span>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ""; }}
+            disabled={uploading}
+          />
+        </label>
+      </div>
+
       {photos.length === 0 ? (
         <p className="text-center text-muted-foreground text-sm py-8">No photos yet</p>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {photos.map((p) => (
+          {photos.map((p, idx) => (
             <div key={p.id} className="relative group rounded-md overflow-hidden">
-              <img src={p.url} alt={p.caption || "Equipment photo"} className="w-full h-40 object-cover" data-testid={`img-photo-${p.id}`} />
+              <img
+                src={p.url}
+                alt={p.caption || "Equipment photo"}
+                className="w-full h-36 object-cover cursor-pointer"
+                onClick={() => setLightboxIndex(idx)}
+                data-testid={`img-photo-${p.id}`}
+              />
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                <p className="text-[10px] text-white leading-tight">{getUserName(p.uploadedBy)}</p>
+                <p className="text-[10px] text-white/70">
+                  {p.uploadedAt ? new Date(p.uploadedAt).toLocaleDateString() : ""}
+                </p>
+              </div>
               <button
                 onClick={() => deleteMutation.mutate(p.id)}
                 className="absolute top-2 right-2 p-1.5 rounded-md bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -263,6 +318,53 @@ function PhotosSection({ equipmentId, photos }: { equipmentId: number; photos: P
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {lightboxPhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+          onClick={() => setLightboxIndex(null)}
+        >
+          <button
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white"
+            onClick={() => setLightboxIndex(null)}
+            data-testid="button-close-lightbox"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          {lightboxIndex !== null && lightboxIndex > 0 && (
+            <button
+              className="absolute left-4 p-2 rounded-full bg-white/10 text-white"
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex - 1); }}
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+          )}
+          {lightboxIndex !== null && lightboxIndex < photos.length - 1 && (
+            <button
+              className="absolute right-4 p-2 rounded-full bg-white/10 text-white"
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex + 1); }}
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          )}
+          <img
+            src={lightboxPhoto.url}
+            alt={lightboxPhoto.caption || "Photo"}
+            className="max-w-full max-h-full object-contain rounded-md"
+            onClick={(e) => e.stopPropagation()}
+            data-testid="img-lightbox"
+          />
+          <div className="absolute bottom-4 left-0 right-0 text-center">
+            <p className="text-white text-sm">{getUserName(lightboxPhoto.uploadedBy)}</p>
+            <p className="text-white/60 text-xs">
+              {lightboxPhoto.uploadedAt ? new Date(lightboxPhoto.uploadedAt).toLocaleString() : ""}
+            </p>
+            {lightboxIndex !== null && (
+              <p className="text-white/40 text-xs mt-1">{lightboxIndex + 1} / {photos.length}</p>
+            )}
+          </div>
         </div>
       )}
     </>

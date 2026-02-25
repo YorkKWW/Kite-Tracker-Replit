@@ -45,6 +45,11 @@ export const repairStatusEnum = pgEnum("repair_status", [
   "completed",
 ]);
 
+export const inventoryCheckStatusEnum = pgEnum("inventory_check_status", [
+  "in_progress",
+  "completed",
+]);
+
 export const stations = pgTable("stations", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -151,6 +156,29 @@ export const activityLog = pgTable("activity_log", {
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
+export const inventoryChecks = pgTable("inventory_checks", {
+  id: serial("id").primaryKey(),
+  stationId: integer("station_id").notNull().references(() => stations.id),
+  startedBy: integer("started_by").notNull().references(() => users.id),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  status: inventoryCheckStatusEnum("status").notNull().default("in_progress"),
+  totalItems: integer("total_items").notNull().default(0),
+});
+
+export const inventoryCheckItems = pgTable("inventory_check_items", {
+  id: serial("id").primaryKey(),
+  checkId: integer("check_id").notNull().references(() => inventoryChecks.id),
+  equipmentId: integer("equipment_id").notNull().references(() => equipment.id),
+  checked: integer("checked").notNull().default(0),
+  conditionRating: integer("condition_rating"),
+  needsRepair: integer("needs_repair").notNull().default(0),
+  missing: integer("missing").notNull().default(0),
+  notes: text("notes"),
+  checkedAt: timestamp("checked_at"),
+  checkedBy: integer("checked_by").references(() => users.id),
+});
+
 export const insertStationSchema = createInsertSchema(stations).omit({ id: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertEquipmentSchema = createInsertSchema(equipment).omit({ id: true, createdAt: true });
@@ -159,6 +187,8 @@ export const insertRepairSchema = createInsertSchema(repairs).omit({ id: true, d
 export const insertTransferSchema = createInsertSchema(transfers).omit({ id: true, initiatedAt: true, confirmedAt: true, confirmedBy: true, status: true });
 export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true, uploadedAt: true });
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({ id: true, timestamp: true });
+export const insertInventoryCheckSchema = createInsertSchema(inventoryChecks).omit({ id: true, startedAt: true, completedAt: true });
+export const insertInventoryCheckItemSchema = createInsertSchema(inventoryCheckItems).omit({ id: true });
 
 export type InsertStation = z.infer<typeof insertStationSchema>;
 export type Station = typeof stations.$inferSelect;
@@ -183,6 +213,12 @@ export type Photo = typeof photos.$inferSelect;
 
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLog.$inferSelect;
+
+export type InsertInventoryCheck = z.infer<typeof insertInventoryCheckSchema>;
+export type InventoryCheck = typeof inventoryChecks.$inferSelect;
+
+export type InsertInventoryCheckItem = z.infer<typeof insertInventoryCheckItemSchema>;
+export type InventoryCheckItem = typeof inventoryCheckItems.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email(),

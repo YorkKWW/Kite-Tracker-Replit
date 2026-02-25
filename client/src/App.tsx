@@ -13,6 +13,7 @@ import EquipmentFormPage from "@/pages/equipment-form";
 import TransfersPage from "@/pages/transfers";
 import StationsPage from "@/pages/stations";
 import StationDetailPage from "@/pages/station-detail";
+import InventoryCheckPage from "@/pages/inventory-check";
 import UsersPage from "@/pages/users-page";
 import ActivityPage from "@/pages/activity";
 import SettingsPage from "@/pages/settings";
@@ -44,6 +45,7 @@ function AuthenticatedRouter() {
         <Route path="/transfers" component={TransfersPage} />
         {isAdmin && <Route path="/stations" component={StationsPage} />}
         <Route path="/stations/:id" component={StationDetailPage} />
+        <Route path="/inventory-check/:id" component={InventoryCheckPage} />
         {isAdmin && <Route path="/users" component={UsersPage} />}
         {isAdmin && <Route path="/activity" component={ActivityPage} />}
         <Route path="/settings" component={SettingsPage} />

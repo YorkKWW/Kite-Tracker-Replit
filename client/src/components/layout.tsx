@@ -14,8 +14,10 @@ import {
   Users,
   MapPin,
   FileText,
+  ScanLine,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BarcodeScanner } from "@/components/barcode-scanner";
 
 interface LayoutProps {
   children: ReactNode;
@@ -23,8 +25,23 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { user, logout, isAdmin } = useAuth();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  const handleScan = async (code: string) => {
+    try {
+      const res = await fetch(`/api/equipment/scan?serial=${encodeURIComponent(code)}`, { credentials: "include" });
+      if (res.ok) {
+        const item = await res.json();
+        navigate(`/equipment/${item.id}`);
+      } else {
+        navigate(`/equipment/new?serial=${encodeURIComponent(code)}`);
+      }
+    } catch {
+      navigate(`/equipment/new?serial=${encodeURIComponent(code)}`);
+    }
+  };
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -70,7 +87,16 @@ export default function Layout({ children }: LayoutProps) {
             ))}
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setScannerOpen(true)}
+              title="Scan equipment"
+              data-testid="button-scan"
+            >
+              <ScanLine className="h-5 w-5" />
+            </Button>
             <span className="text-sm text-muted-foreground hidden sm:inline" data-testid="text-user-info">
               {user?.name} ({user?.role})
             </span>
@@ -112,6 +138,8 @@ export default function Layout({ children }: LayoutProps) {
           </nav>
         )}
       </header>
+
+      <BarcodeScanner open={scannerOpen} onClose={() => setScannerOpen(false)} onScan={handleScan} />
 
       <main className="pb-20 md:pb-6">{children}</main>
 

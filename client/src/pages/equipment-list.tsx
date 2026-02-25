@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConditionBadge, StatusBadge } from "@/components/condition-badge";
-import { Plus, Search, Package, SlidersHorizontal } from "lucide-react";
+import { Plus, Search, Package, SlidersHorizontal, ScanLine } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
+import { BarcodeScanner } from "@/components/barcode-scanner";
 
 export default function EquipmentListPage() {
   const { isAdmin } = useAuth();
@@ -19,6 +20,8 @@ export default function EquipmentListPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [stationFilter, setStationFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [, navigate] = useLocation();
 
   const buildQuery = () => {
     const params = new URLSearchParams();
@@ -48,6 +51,37 @@ export default function EquipmentListPage() {
     return stationsList?.find((s) => s.id === id)?.name || `Station ${id}`;
   };
 
+  const equipmentIds = equipment?.map((e) => e.id) || [];
+  const { data: firstPhotos } = useQuery<Record<number, string>>({
+    queryKey: ["/api/equipment/first-photos", equipmentIds.join(",")],
+    queryFn: async () => {
+      if (equipmentIds.length === 0) return {};
+      const res = await fetch("/api/equipment/first-photos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ids: equipmentIds }),
+      });
+      if (!res.ok) return {};
+      return res.json();
+    },
+    enabled: equipmentIds.length > 0,
+  });
+
+  const handleScan = async (code: string) => {
+    try {
+      const res = await fetch(`/api/equipment/scan?serial=${encodeURIComponent(code)}`, { credentials: "include" });
+      if (res.ok) {
+        const item = await res.json();
+        navigate(`/equipment/${item.id}`);
+      } else {
+        navigate(`/equipment/new?serial=${encodeURIComponent(code)}`);
+      }
+    } catch {
+      navigate(`/equipment/new?serial=${encodeURIComponent(code)}`);
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
       <div className="flex items-center justify-between gap-1 flex-wrap">
@@ -64,6 +98,8 @@ export default function EquipmentListPage() {
         )}
       </div>
 
+      <BarcodeScanner open={scannerOpen} onClose={() => setScannerOpen(false)} onScan={handleScan} />
+
       <div className="space-y-3">
         <div className="flex gap-2">
           <div className="relative flex-1">
@@ -76,6 +112,15 @@ export default function EquipmentListPage() {
               data-testid="input-search"
             />
           </div>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => setScannerOpen(true)}
+            title="Scan barcode"
+            data-testid="button-scan-equipment"
+          >
+            <ScanLine className="h-4 w-4" />
+          </Button>
           <Button
             variant="secondary"
             size="icon"
@@ -152,27 +197,39 @@ export default function EquipmentListPage() {
           {equipment.map((item) => (
             <Link key={item.id} href={`/equipment/${item.id}`}>
               <Card className="hover-elevate cursor-pointer transition-all" data-testid={`card-equipment-${item.id}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-1 mb-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-mono text-xs text-muted-foreground mb-1" data-testid={`text-serial-${item.id}`}>
-                        {item.serialNumber}
-                      </p>
-                      <p className="font-semibold truncate">
-                        {item.brand} {item.model}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {EQUIPMENT_TYPE_LABELS[item.type] || item.type}
-                      </p>
+                <CardContent className="p-0 overflow-hidden">
+                  {firstPhotos?.[item.id] && (
+                    <div className="h-32 overflow-hidden">
+                      <img
+                        src={firstPhotos[item.id]}
+                        alt={`${item.brand} ${item.model}`}
+                        className="w-full h-full object-cover"
+                        data-testid={`img-thumbnail-${item.id}`}
+                      />
                     </div>
-                    <ConditionBadge rating={item.conditionRating} compact />
-                  </div>
-                  <div className="flex items-center justify-between gap-1 flex-wrap">
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <MapPinIcon className="h-3 w-3" />
-                      {getStationName(item.currentStationId)}
-                    </span>
-                    <StatusBadge status={item.status} />
+                  )}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-1 mb-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-mono text-xs text-muted-foreground mb-1" data-testid={`text-serial-${item.id}`}>
+                          {item.serialNumber}
+                        </p>
+                        <p className="font-semibold truncate">
+                          {item.brand} {item.model}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {EQUIPMENT_TYPE_LABELS[item.type] || item.type}
+                        </p>
+                      </div>
+                      <ConditionBadge rating={item.conditionRating} compact />
+                    </div>
+                    <div className="flex items-center justify-between gap-1 flex-wrap">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <MapPinIcon className="h-3 w-3" />
+                        {getStationName(item.currentStationId)}
+                      </span>
+                      <StatusBadge status={item.status} />
+                    </div>
                   </div>
                 </CardContent>
               </Card>

@@ -1,17 +1,19 @@
 import { useState } from "react";
-import { useRoute, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useRoute, Link, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Package, Wrench, ArrowLeftRight, Wind,
   ChevronDown, ChevronUp, Layers, Link2, Shirt, Shield,
-  Star, MapPin,
+  Star, MapPin, ClipboardCheck, ClipboardList, Loader2,
 } from "lucide-react";
-import type { Equipment, Station } from "@shared/schema";
+import type { Equipment, Station, InventoryCheck } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -227,8 +229,10 @@ function OtherCategory({ items, stationId }: { items: Equipment[]; stationId: nu
 // ─── Main page ───────────────────────────────────────────────────
 export default function StationDetailPage() {
   const [, params] = useRoute("/stations/:id");
+  const [, navigate] = useLocation();
   const stationId = parseInt(params?.id || "0");
   const { isAdmin } = useAuth();
+  const { toast } = useToast();
 
   const { data: stationsList, isLoading: loadingStations } = useQuery<Station[]>({
     queryKey: ["/api/stations"],
@@ -240,6 +244,27 @@ export default function StationDetailPage() {
       const res = await fetch(`/api/equipment?stationId=${stationId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       return res.json();
+    },
+  });
+
+  const { data: pastChecks } = useQuery<InventoryCheck[]>({
+    queryKey: ["/api/stations", stationId.toString(), "inventory-checks"],
+    queryFn: async () => {
+      const res = await fetch(`/api/stations/${stationId}/inventory-checks`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const startCheckMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/stations/${stationId}/inventory-checks`),
+    onSuccess: async (res) => {
+      const check = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/stations", stationId.toString(), "inventory-checks"] });
+      navigate(`/inventory-check/${check.id}`);
+    },
+    onError: () => {
+      toast({ title: "Failed to start inventory check", variant: "destructive" });
     },
   });
 
@@ -323,13 +348,13 @@ export default function StationDetailPage() {
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-5">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <Link href={isAdmin ? "/stations" : "/"}>
           <Button variant="ghost" size="icon" data-testid="button-back-station">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <div>
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4 text-primary" />
             <h1 className="text-xl md:text-2xl font-bold" data-testid="text-station-detail-name">
@@ -342,6 +367,21 @@ export default function StationDetailPage() {
             </p>
           )}
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0 gap-1.5"
+          onClick={() => startCheckMutation.mutate()}
+          disabled={startCheckMutation.isPending}
+          data-testid="button-start-inventory-check"
+        >
+          {startCheckMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <ClipboardList className="h-4 w-4" />
+          )}
+          <span className="hidden sm:inline">Inventory Check</span>
+        </Button>
       </div>
 
       {/* Summary stats */}
@@ -548,13 +588,55 @@ export default function StationDetailPage() {
       )}
 
       {/* Quick link to full list */}
-      <div className="pt-2 pb-4">
+      <div className="pt-2">
         <Link href={`/equipment?stationId=${stationId}`}>
           <Button variant="secondary" className="w-full" data-testid="button-view-all-equipment">
             View all {allEquipment.length} items as list
           </Button>
         </Link>
       </div>
+
+      {/* Past inventory checks */}
+      {pastChecks && pastChecks.length > 0 && (
+        <div className="pb-4 space-y-3">
+          <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+            Inventory Reports
+          </h2>
+          {pastChecks.map((ic) => (
+            <Link key={ic.id} href={`/inventory-check/${ic.id}`}>
+              <Card className="hover-elevate cursor-pointer transition-all" data-testid={`card-inventory-check-${ic.id}`}>
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div className={cn(
+                    "p-2 rounded-md shrink-0",
+                    ic.status === "completed" ? "bg-green-500/10" : "bg-primary/10"
+                  )}>
+                    {ic.status === "completed"
+                      ? <ClipboardCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      : <ClipboardList className="h-4 w-4 text-primary" />
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">
+                        {new Date(ic.startedAt!).toLocaleDateString()}
+                      </span>
+                      <Badge
+                        variant={ic.status === "completed" ? "default" : "secondary"}
+                        className="text-[10px]"
+                      >
+                        {ic.status === "completed" ? "Completed" : "In Progress"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {ic.totalItems} items · {new Date(ic.startedAt!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
