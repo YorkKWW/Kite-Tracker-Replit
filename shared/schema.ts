@@ -73,6 +73,7 @@ export const equipment = pgTable("equipment", {
   type: equipmentTypeEnum("type").notNull(),
   brand: text("brand").notNull(),
   model: text("model").notNull(),
+  purchaseDate: timestamp("purchase_date"),
   yearOfPurchase: integer("year_of_purchase"),
   currentStationId: integer("current_station_id").references(() => stations.id),
   status: equipmentStatusEnum("status").notNull().default("active"),

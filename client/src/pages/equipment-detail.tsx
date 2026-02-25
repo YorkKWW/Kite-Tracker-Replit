@@ -96,7 +96,15 @@ export default function EquipmentDetailPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <InfoCard icon={<Hash className="h-4 w-4" />} label="Type" value={EQUIPMENT_TYPE_LABELS[item.type] || item.type} />
         <InfoCard icon={<MapPin className="h-4 w-4" />} label="Station" value={getStationName(item.currentStationId)} />
-        <InfoCard icon={<Calendar className="h-4 w-4" />} label="Year" value={item.yearOfPurchase?.toString() || "N/A"} />
+        <InfoCard
+          icon={<Calendar className="h-4 w-4" />}
+          label="Purchased"
+          value={
+            (item as any).purchaseDate
+              ? new Date((item as any).purchaseDate).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+              : item.yearOfPurchase?.toString() || "N/A"
+          }
+        />
         <InfoCard icon={<Star className="h-4 w-4" />} label="Condition" value={`${item.conditionRating}/5`} />
       </div>
 

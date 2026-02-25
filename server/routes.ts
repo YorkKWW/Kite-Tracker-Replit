@@ -803,9 +803,18 @@ export async function registerRoutes(
       itemCount: toImport.length,
     });
 
-    const year = invoiceDate
-      ? parseInt(invoiceDate.split(".").pop() || new Date().getFullYear().toString(), 10)
-      : new Date().getFullYear();
+    // Parse German date format DD.MM.YYYY from delivery or invoice date
+    const parseDateDE = (s: string | null | undefined): Date | null => {
+      if (!s) return null;
+      const parts = s.split(".");
+      if (parts.length === 3) {
+        const d = new Date(`${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`);
+        if (!isNaN(d.getTime())) return d;
+      }
+      return null;
+    };
+    const parsedDate = parseDateDE(deliveryDate) || parseDateDE(invoiceDate);
+    const year = parsedDate ? parsedDate.getFullYear() : new Date().getFullYear();
 
     let imported = 0;
     const errors: string[] = [];
@@ -817,6 +826,7 @@ export async function registerRoutes(
           type: item.type,
           brand: brand || item.brand || "Unknown",
           model: item.name || "Unknown",
+          purchaseDate: parsedDate,
           yearOfPurchase: year,
           currentStationId: null,
           status: "active",

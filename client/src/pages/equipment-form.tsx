@@ -28,6 +28,7 @@ export default function EquipmentFormPage() {
   const [type, setType] = useState("kite");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
+  const [purchaseDate, setPurchaseDate] = useState("");
   const [yearOfPurchase, setYearOfPurchase] = useState(new Date().getFullYear().toString());
   const [currentStationId, setCurrentStationId] = useState("");
   const [status, setStatus] = useState("active");
@@ -46,7 +47,10 @@ export default function EquipmentFormPage() {
         type,
         brand,
         model,
-        yearOfPurchase: yearOfPurchase ? parseInt(yearOfPurchase) : null,
+        purchaseDate: purchaseDate ? new Date(purchaseDate).toISOString() : null,
+        yearOfPurchase: purchaseDate
+          ? new Date(purchaseDate).getFullYear()
+          : yearOfPurchase ? parseInt(yearOfPurchase) : null,
         currentStationId: currentStationId ? parseInt(currentStationId) : null,
         status,
         conditionRating: parseInt(conditionRating),
@@ -131,8 +135,8 @@ export default function EquipmentFormPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Year of Purchase</Label>
-              <Input type="number" value={yearOfPurchase} onChange={(e) => setYearOfPurchase(e.target.value)} data-testid="input-year" />
+              <Label>Date of Purchase</Label>
+              <Input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} data-testid="input-purchase-date" />
             </div>
             <div className="space-y-2">
               <Label>Station</Label>
