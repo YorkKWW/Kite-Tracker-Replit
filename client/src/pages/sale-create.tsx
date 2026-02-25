@@ -95,7 +95,7 @@ export default function SaleCreatePage() {
     const priceSuggestion = equip.currentValue && parseFloat(equip.currentValue) > 0
       ? { label: "Suggested (current value)", value: parseFloat(equip.currentValue).toFixed(2) }
       : equip.purchasePrice && parseFloat(equip.purchasePrice) > 0
-        ? { label: "Reference (purchase price)", value: parseFloat(equip.purchasePrice).toFixed(2) }
+        ? { label: "Reference (purchase price, net)", value: parseFloat(equip.purchasePrice).toFixed(2) }
         : null;
     setItems((prev) => [
       ...prev,
