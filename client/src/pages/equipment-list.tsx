@@ -97,6 +97,8 @@ export default function EquipmentListPage() {
         case "brand":     av = a.brand.toLowerCase(); bv = b.brand.toLowerCase(); break;
         case "model":     av = a.model.toLowerCase(); bv = b.model.toLowerCase(); break;
         case "year":      av = a.yearOfPurchase ?? 0; bv = b.yearOfPurchase ?? 0; break;
+        case "size":      av = getSizeValue(a); bv = getSizeValue(b); break;
+        case "sku":       av = (a.sku || "").toLowerCase(); bv = (b.sku || "").toLowerCase(); break;
         case "station":   av = getStationName(a.currentStationId); bv = getStationName(b.currentStationId); break;
         case "condition": av = a.conditionRating; bv = b.conditionRating; break;
         case "status":    av = a.status; bv = b.status; break;
@@ -216,9 +218,9 @@ export default function EquipmentListPage() {
                 <SortTh col="type"      label="Type"    sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="w-12 pl-3 pr-2 py-2.5" />
                 <SortTh col="brand"     label="Brand"   sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5" />
                 <SortTh col="model"     label="Model"   sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5" />
-                <th className="px-2 py-2.5 text-left font-medium text-muted-foreground w-16">Size</th>
+                <SortTh col="size"      label="Size"    sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 w-16" />
                 <SortTh col="year"      label="Year"    sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 hidden md:table-cell w-16" />
-                <th className="px-2 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">SKU</th>
+                <SortTh col="sku"       label="SKU"     sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 hidden md:table-cell" />
                 <th className="px-2 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Serial</th>
                 <SortTh col="station"   label="Location" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 hidden lg:table-cell" />
                 <SortTh col="condition" label="Cond"     sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 w-16" />
@@ -294,6 +296,22 @@ function getSizeBadge(item: Equipment): string | null {
       return f.size ? String(f.size) : null;
     default:
       return null;
+  }
+}
+
+function getSizeValue(item: Equipment): number | string {
+  const f = (item.typeSpecificFields || {}) as Record<string, any>;
+  switch (item.type) {
+    case "kite":
+    case "wing":
+    case "board":
+    case "foilboard":
+      return f.size != null && f.size !== "" ? Number(f.size) : 0;
+    case "harness":
+    case "wetsuit":
+      return f.size ? String(f.size) : "";
+    default:
+      return 0;
   }
 }
 
