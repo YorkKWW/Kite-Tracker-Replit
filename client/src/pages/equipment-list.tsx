@@ -96,6 +96,7 @@ export default function EquipmentListPage() {
         case "type":      av = EQUIPMENT_TYPE_LABELS[a.type] || a.type; bv = EQUIPMENT_TYPE_LABELS[b.type] || b.type; break;
         case "brand":     av = a.brand.toLowerCase(); bv = b.brand.toLowerCase(); break;
         case "model":     av = a.model.toLowerCase(); bv = b.model.toLowerCase(); break;
+        case "year":      av = a.yearOfPurchase ?? 0; bv = b.yearOfPurchase ?? 0; break;
         case "station":   av = getStationName(a.currentStationId); bv = getStationName(b.currentStationId); break;
         case "condition": av = a.conditionRating; bv = b.conditionRating; break;
         case "status":    av = a.status; bv = b.status; break;
@@ -216,6 +217,7 @@ export default function EquipmentListPage() {
                 <SortTh col="brand"     label="Brand"   sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5" />
                 <SortTh col="model"     label="Model"   sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5" />
                 <th className="px-2 py-2.5 text-left font-medium text-muted-foreground w-16">Size</th>
+                <SortTh col="year"      label="Year"    sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 hidden md:table-cell w-16" />
                 <th className="px-2 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">SKU</th>
                 <th className="px-2 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Serial</th>
                 <SortTh col="station"   label="Location" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 hidden lg:table-cell" />
@@ -248,6 +250,9 @@ export default function EquipmentListPage() {
                           {size}
                         </span>
                       )}
+                    </td>
+                    <td className="px-2 py-2.5 text-xs text-muted-foreground hidden md:table-cell w-16" data-testid={`text-year-${item.id}`}>
+                      {item.yearOfPurchase || ""}
                     </td>
                     <td className="px-2 py-2.5 font-mono text-xs text-muted-foreground hidden md:table-cell whitespace-nowrap" data-testid={`text-sku-${item.id}`}>
                       {item.sku || ""}
