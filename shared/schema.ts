@@ -83,6 +83,8 @@ export const equipment = pgTable("equipment", {
   currentValue: decimal("current_value", { precision: 10, scale: 2 }),
   salePrice: decimal("sale_price", { precision: 10, scale: 2 }),
   typeSpecificFields: jsonb("type_specific_fields").$type<Record<string, any>>(),
+  invoiceId: integer("invoice_id"),
+  invoiceReference: text("invoice_reference"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -180,6 +182,27 @@ export const inventoryCheckItems = pgTable("inventory_check_items", {
   checkedBy: integer("checked_by").references(() => users.id),
 });
 
+export const suppliers = pgTable("suppliers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  color: text("color").notNull().default("#6366f1"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const invoices = pgTable("invoices", {
+  id: serial("id").primaryKey(),
+  supplierId: integer("supplier_id").notNull().references(() => suppliers.id),
+  invoiceNumber: text("invoice_number").notNull(),
+  invoiceDate: text("invoice_date"),
+  deliveryDate: text("delivery_date"),
+  orderNumber: text("order_number"),
+  totalNet: decimal("total_net", { precision: 10, scale: 2 }),
+  totalGross: decimal("total_gross", { precision: 10, scale: 2 }),
+  importedAt: timestamp("imported_at").defaultNow(),
+  importedBy: integer("imported_by").references(() => users.id),
+  itemCount: integer("item_count"),
+});
+
 export const insertStationSchema = createInsertSchema(stations).omit({ id: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertEquipmentSchema = createInsertSchema(equipment).omit({ id: true, createdAt: true });
@@ -190,6 +213,8 @@ export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true, upl
 export const insertActivityLogSchema = createInsertSchema(activityLog).omit({ id: true, timestamp: true });
 export const insertInventoryCheckSchema = createInsertSchema(inventoryChecks).omit({ id: true, startedAt: true, completedAt: true });
 export const insertInventoryCheckItemSchema = createInsertSchema(inventoryCheckItems).omit({ id: true });
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, createdAt: true });
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, importedAt: true });
 
 export type InsertStation = z.infer<typeof insertStationSchema>;
 export type Station = typeof stations.$inferSelect;
@@ -220,6 +245,12 @@ export type InventoryCheck = typeof inventoryChecks.$inferSelect;
 
 export type InsertInventoryCheckItem = z.infer<typeof insertInventoryCheckItemSchema>;
 export type InventoryCheckItem = typeof inventoryCheckItems.$inferSelect;
+
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+export type Supplier = typeof suppliers.$inferSelect;
+
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type Invoice = typeof invoices.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email(),

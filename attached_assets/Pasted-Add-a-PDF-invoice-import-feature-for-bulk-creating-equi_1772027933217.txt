@@ -1,0 +1,43 @@
+Add a PDF invoice import feature for bulk-creating equipment from supplier invoices. Here's exactly how it should work:
+Step 1: Select supplier
+
+Add an "Import Invoice" button in the admin area (only visible to admin)
+First screen: select or create a supplier. Start with these suppliers: Core, North, Duotone, Eleveight. Admin can add more later.
+Each supplier has a name and optionally a logo/color for visual identification
+
+Step 2: Upload PDF
+
+Upload a PDF invoice file
+The system parses the PDF and extracts line items
+For each line item, extract: SKU (text in square brackets like [KXR809BBN]), product name, size (from parentheses like "9.0"), color (from parentheses like "Black/Black"), serial number(s) (the alphanumeric code on the line below the description, e.g. "KXR809BBA5101201"), quantity, unit price (Einzelpreis), discount percentage, final price after discount (Betrag)
+IMPORTANT: When quantity is more than 1, there are multiple serial numbers separated by commas. Each serial number becomes a separate equipment item. Example: quantity 3 with serials "RSE4PRND100760O39, RSE4PRND100871O39, RSE4PRND100889O39" creates 3 separate items.
+Also extract invoice metadata: invoice number, invoice date, delivery date, order number
+
+Step 3: Review and confirm
+
+Show a preview table of all parsed items
+Auto-detect equipment type based on product name (e.g. "XR8" = Kite, "Sensor 4 Pro" = Bar)
+For each item show: SKU, product name, serial number, detected type, size, purchase price (= Betrag / quantity = net price after discount)
+Let admin confirm or edit each field before importing
+Flag items that look like spare parts (Bladder, Bridle, Chickenstick, Ersatzteil) and mark them as "skip" by default — only import actual equipment (Kites, Bars, Boards, Wings, Foils, Harnesses, Wetsuits, Helmets). Admin can override this.
+Flag duplicate serial numbers if they already exist in the database
+
+Step 4: Import
+
+On confirmation, create equipment items in the database
+Set brand to the selected supplier name (e.g. "Core")
+Set purchase price to the net price after discount (Betrag divided by quantity)
+Set status to "Active"
+Set station to NULL (unassigned / warehouse) — admin assigns to stations later
+Store the invoice reference (invoice number + date) on each imported item for traceability
+Set year to the year from the invoice date
+Set condition to 5 (like new)
+
+Technical approach:
+
+Use a PDF parsing library (pdf-parse or pdf.js) server-side to extract text from the uploaded PDF
+Parse the text with regex patterns to identify line items, SKUs in brackets, serial numbers, prices
+The parsing needs to handle German number format (1.529,00 = one thousand five hundred twenty nine)
+Store invoice records in a separate invoices table for reference
+
+Important: This is admin-only functionality. Station managers cannot see or use the invoice import.

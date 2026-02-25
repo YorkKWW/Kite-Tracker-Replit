@@ -12,6 +12,130 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 
 const objectStorage = new ObjectStorageService();
 
+const uploadPdf = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === "application/pdf" || file.originalname.toLowerCase().endsWith(".pdf")) {
+      return cb(null, true);
+    }
+    cb(new Error("Only PDF files are allowed"));
+  },
+});
+
+function parseGermanNumber(s: string): number {
+  return parseFloat(s.replace(/\./g, "").replace(",", "."));
+}
+
+function detectEquipmentType(name: string, sku: string): { type: string; isSpare: boolean } {
+  const text = `${name} ${sku}`.toLowerCase();
+  if (/bladder|bridle|chickenstick|ersatzteil|spare|strut|screw|bolt|pump hose/i.test(text)) {
+    return { type: "kite", isSpare: true };
+  }
+  if (/\bkite\b|xr\d|gts\d|nexus|rebel|evo|delta|freeride|air pro|foil kite|kap\d|kxr|kgts|knex/i.test(text)) {
+    return { type: "kite", isSpare: false };
+  }
+  if (/\bbar\b|sensor|navigator|control bar|rse\d|click bar|trust bar/i.test(text)) {
+    return { type: "bar_lines", isSpare: false };
+  }
+  if (/\bboard\b|twintip|directional|foilboard/i.test(text)) {
+    return { type: "board", isSpare: false };
+  }
+  if (/\bfoil\b|hydrofoil|wingfoil|wing foil/i.test(text)) {
+    return { type: "foil", isSpare: false };
+  }
+  if (/\bwing\b/i.test(text)) {
+    return { type: "wing", isSpare: false };
+  }
+  if (/harness|seat harness/i.test(text)) {
+    return { type: "harness", isSpare: false };
+  }
+  if (/wetsuit|neoprene/i.test(text)) {
+    return { type: "wetsuit", isSpare: false };
+  }
+  if (/helmet|impact vest|safety/i.test(text)) {
+    return { type: "helmet_safety", isSpare: false };
+  }
+  return { type: "kite", isSpare: false };
+}
+
+function parsePdfInvoice(text: string) {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+
+  const invoiceNumber = text.match(/Rechnungsnummer\s+(RE\/[\d\/]+)/)?.[1]
+    || text.match(/Invoice\s*(?:Number|No\.?)[:\s]+([\w\/\-]+)/i)?.[1] || "";
+  const invoiceDate = text.match(/Rechnungsdatum\s+([\d.]+)/)?.[1]
+    || text.match(/Invoice\s*Date[:\s]+([\d.\/\-]+)/i)?.[1] || "";
+  const deliveryDate = text.match(/Lieferdatum\s+([\d.]+)/)?.[1]
+    || text.match(/Delivery\s*Date[:\s]+([\d.\/\-]+)/i)?.[1] || "";
+  const orderNumber = text.match(/Auftragsnummer[^\d]*([\w]+)/)?.[1]
+    || text.match(/Order\s*(?:Number|No\.?)[:\s]+([\w\-]+)/i)?.[1] || "";
+  const totalNet = text.match(/Nettobetrag\s+([\d.,]+)\s*€/)?.[1] || "";
+  const totalGross = text.match(/Gesamt\s+([\d.,]+)\s*€/)?.[1] || "";
+
+  const items: any[] = [];
+  const productLineRe = /^\[([A-Z0-9]+)\]\s+(.+?)\s{2,}(\d+)\s+([\d.]+,\d{2})\s+(\d+)%\s+([\d.]+,\d{2})\s*€?$/;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(productLineRe);
+    if (!match) continue;
+
+    const [, sku, rawName, qtyStr, , discountStr, totalStr] = match;
+    const quantity = parseInt(qtyStr, 10);
+    const total = parseGermanNumber(totalStr);
+    const discount = parseInt(discountStr, 10);
+    const unitPriceAfterDiscount = quantity > 0 ? total / quantity : total;
+
+    const sizeMatch = rawName.match(/\(([0-9.]+)/);
+    const colorMatch = rawName.match(/,\s*([^)]+)\)/);
+    const size = sizeMatch?.[1]?.trim() || "";
+    const color = colorMatch?.[1]?.trim() || "";
+    const name = rawName.replace(/\s*\([^)]*\)\s*/, "").trim();
+
+    let serials: string[] = [];
+    for (let j = i + 1; j <= Math.min(i + 5, lines.length - 1); j++) {
+      const nxt = lines[j];
+      if (/^\[/.test(nxt)) break;
+      if (/Nettobetrag|Gesamt|UPS|Zahlungs|Lieferadresse/.test(nxt)) break;
+      const serialMatch = nxt.match(/^([A-Z0-9]{6,}(?:,\s*[A-Z0-9]{6,})*)$/);
+      if (serialMatch) {
+        serials = serialMatch[1].split(",").map((s) => s.trim()).filter(Boolean);
+        break;
+      }
+    }
+
+    if (serials.length === 0) serials = [""];
+    const { type, isSpare } = detectEquipmentType(name, sku);
+
+    for (const serial of serials) {
+      items.push({
+        sku,
+        name,
+        size,
+        color,
+        quantity,
+        discount,
+        unitPriceAfterDiscount: Math.round(unitPriceAfterDiscount * 100) / 100,
+        serialNumber: serial,
+        type,
+        isSpare,
+        skip: isSpare,
+      });
+    }
+  }
+
+  return {
+    invoiceNumber,
+    invoiceDate,
+    deliveryDate,
+    orderNumber,
+    totalNet: totalNet ? parseGermanNumber(totalNet) : null,
+    totalGross: totalGross ? parseGermanNumber(totalGross) : null,
+    items,
+  };
+}
+
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -569,6 +693,115 @@ export async function registerRoutes(
     } catch (err: any) {
       res.status(400).json({ message: `Import failed: ${err.message}` });
     }
+  });
+
+  // ─── Suppliers ───────────────────────────────────────────────────────────────
+  app.get("/api/suppliers", requireAuth, async (_req, res) => {
+    res.json(await storage.getAllSuppliers());
+  });
+
+  app.post("/api/suppliers", requireAdmin, async (req, res) => {
+    const { name, color } = req.body;
+    if (!name) return res.status(400).json({ message: "name required" });
+    try {
+      const supplier = await storage.createSupplier({ name, color: color || "#6366f1" });
+      res.json(supplier);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  // ─── Invoice: Parse PDF ───────────────────────────────────────────────────────
+  app.post("/api/invoices/parse", requireAdmin, uploadPdf.single("pdf"), async (req, res) => {
+    if (!req.file) return res.status(400).json({ message: "No PDF uploaded" });
+    try {
+      const pdfParse = (await import("pdf-parse")).default;
+      const data = await pdfParse(req.file.buffer);
+      const parsed = parsePdfInvoice(data.text);
+
+      // Check for duplicate serials in DB
+      const allSerial = parsed.items
+        .map((i: any) => i.serialNumber)
+        .filter(Boolean);
+      const existingSerials = new Set<string>();
+      for (const s of allSerial) {
+        const found = await storage.getEquipmentBySerial(s);
+        if (found) existingSerials.add(s);
+      }
+
+      const items = parsed.items.map((item: any) => ({
+        ...item,
+        isDuplicate: existingSerials.has(item.serialNumber),
+      }));
+
+      res.json({ ...parsed, items });
+    } catch (err: any) {
+      res.status(400).json({ message: `PDF parse failed: ${err.message}` });
+    }
+  });
+
+  // ─── Invoice: Confirm Import ──────────────────────────────────────────────────
+  app.post("/api/invoices/confirm", requireAdmin, async (req, res) => {
+    const {
+      supplierId, invoiceNumber, invoiceDate, deliveryDate, orderNumber,
+      totalNet, totalGross, items, brand,
+    } = req.body;
+    const user = req.user as any;
+
+    if (!supplierId || !items || !Array.isArray(items)) {
+      return res.status(400).json({ message: "supplierId and items required" });
+    }
+
+    const toImport = items.filter((i: any) => !i.skip);
+    if (toImport.length === 0) return res.status(400).json({ message: "No items to import" });
+
+    const invoice = await storage.createInvoice({
+      supplierId,
+      invoiceNumber: invoiceNumber || "N/A",
+      invoiceDate: invoiceDate || null,
+      deliveryDate: deliveryDate || null,
+      orderNumber: orderNumber || null,
+      totalNet: totalNet?.toString() || null,
+      totalGross: totalGross?.toString() || null,
+      importedBy: user.id,
+      itemCount: toImport.length,
+    });
+
+    const year = invoiceDate
+      ? parseInt(invoiceDate.split(".").pop() || new Date().getFullYear().toString(), 10)
+      : new Date().getFullYear();
+
+    let imported = 0;
+    const errors: string[] = [];
+    for (const item of toImport) {
+      try {
+        await storage.createEquipment({
+          serialNumber: item.serialNumber || `IMPORT-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+          sku: item.sku || null,
+          type: item.type,
+          brand: brand || item.brand || "Unknown",
+          model: item.name || "Unknown",
+          yearOfPurchase: year,
+          currentStationId: null,
+          status: "active",
+          conditionRating: 5,
+          purchasePrice: item.unitPriceAfterDiscount?.toString() || null,
+          typeSpecificFields: { size: item.size || "", color: item.color || "" },
+          invoiceId: invoice.id,
+          invoiceReference: invoiceNumber || null,
+        });
+        imported++;
+      } catch (err: any) {
+        errors.push(`${item.serialNumber || item.sku}: ${err.message}`);
+      }
+    }
+
+    res.json({ invoiceId: invoice.id, imported, errors });
+  });
+
+  // ─── Invoice: List ────────────────────────────────────────────────────────────
+  app.get("/api/invoices", requireAdmin, async (_req, res) => {
+    res.json(await storage.getAllInvoices());
   });
 
   return httpServer;

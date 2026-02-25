@@ -126,6 +126,14 @@ export default function EquipmentDetailPage() {
                 </p>
               </div>
             </div>
+            {(item as any).invoiceReference && (
+              <div className="mt-3 pt-3 border-t">
+                <p className="text-xs text-muted-foreground">Imported from Invoice</p>
+                <p className="font-mono text-sm font-semibold" data-testid="text-invoice-ref">
+                  {(item as any).invoiceReference}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

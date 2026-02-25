@@ -15,6 +15,7 @@ import {
   MapPin,
   FileText,
   ScanLine,
+  FileUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -52,6 +53,7 @@ export default function Layout({ children }: LayoutProps) {
           { href: "/stations", label: "Stations", icon: MapPin },
           { href: "/users", label: "Users", icon: Users },
           { href: "/activity", label: "Activity", icon: FileText },
+          { href: "/invoice-import", label: "Import Invoice", icon: FileUp },
         ]
       : []),
     { href: "/settings", label: "Settings", icon: Settings },

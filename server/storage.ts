@@ -2,7 +2,7 @@ import { eq, and, desc, ilike, or, sql, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   stations, users, equipment, conditionRatings, repairs, transfers, photos, activityLog,
-  inventoryChecks, inventoryCheckItems,
+  inventoryChecks, inventoryCheckItems, suppliers, invoices,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -13,6 +13,8 @@ import {
   type ActivityLog, type InsertActivityLog,
   type InventoryCheck, type InsertInventoryCheck,
   type InventoryCheckItem, type InsertInventoryCheckItem,
+  type Supplier, type InsertSupplier,
+  type Invoice, type InsertInvoice,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -78,6 +80,14 @@ export interface IStorage {
   completeInventoryCheck(id: number): Promise<InventoryCheck | undefined>;
   getInventoryCheckItems(checkId: number): Promise<InventoryCheckItem[]>;
   upsertInventoryCheckItem(data: Partial<InsertInventoryCheckItem> & { checkId: number; equipmentId: number }): Promise<InventoryCheckItem>;
+
+  getAllSuppliers(): Promise<Supplier[]>;
+  createSupplier(s: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: number, data: Partial<InsertSupplier>): Promise<Supplier | undefined>;
+
+  getAllInvoices(): Promise<(Invoice & { supplierName: string })[]>;
+  getInvoice(id: number): Promise<Invoice | undefined>;
+  createInvoice(inv: InsertInvoice): Promise<Invoice>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -410,6 +420,39 @@ export class DatabaseStorage implements IStorage {
       needsAttention: allEquipment.filter((e) => e.conditionRating <= 2).length,
       inTransfer: allEquipment.filter((e) => e.status === "in_transfer").length,
     };
+  }
+
+  async getAllSuppliers(): Promise<Supplier[]> {
+    return db.select().from(suppliers).orderBy(suppliers.name);
+  }
+
+  async createSupplier(s: InsertSupplier): Promise<Supplier> {
+    const [created] = await db.insert(suppliers).values(s).returning();
+    return created;
+  }
+
+  async updateSupplier(id: number, data: Partial<InsertSupplier>): Promise<Supplier | undefined> {
+    const [updated] = await db.update(suppliers).set(data).where(eq(suppliers.id, id)).returning();
+    return updated;
+  }
+
+  async getAllInvoices(): Promise<(Invoice & { supplierName: string })[]> {
+    const rows = await db
+      .select({ invoice: invoices, supplierName: suppliers.name })
+      .from(invoices)
+      .innerJoin(suppliers, eq(invoices.supplierId, suppliers.id))
+      .orderBy(desc(invoices.importedAt));
+    return rows.map((r) => ({ ...r.invoice, supplierName: r.supplierName }));
+  }
+
+  async getInvoice(id: number): Promise<Invoice | undefined> {
+    const [inv] = await db.select().from(invoices).where(eq(invoices.id, id));
+    return inv;
+  }
+
+  async createInvoice(inv: InsertInvoice): Promise<Invoice> {
+    const [created] = await db.insert(invoices).values(inv).returning();
+    return created;
   }
 }
 

@@ -44,13 +44,14 @@ client/src/
     stations.tsx      - Station management (admin)
     station-detail.tsx - Station detail with inventory check button + past reports
     inventory-check.tsx - Inventory check workflow (checklist, scanner, progress)
+    invoice-import.tsx - 4-step PDF invoice import wizard (admin only)
     users-page.tsx    - User management (admin)
     activity.tsx      - Activity log (admin)
     settings.tsx      - Settings + CSV import
 ```
 
 ## Database Tables
-stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items
+stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices
 
 ## Equipment Types
 kite, board, foil, wing, bar_lines, wetsuit, harness, helmet_safety
