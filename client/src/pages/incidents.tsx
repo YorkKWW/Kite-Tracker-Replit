@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertTriangle, Plus, X, Upload, Camera, CheckCircle2, Clock,
-  Search, Filter, ChevronDown, ChevronUp, Image as ImageIcon, ScanLine,
+  Search, Filter, ChevronDown, ChevronUp, Image as ImageIcon, ScanLine, MapPin,
 } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
 import { Link } from "wouter";
@@ -217,7 +217,7 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
     canRepairOnSite: false,
     needsSpareParts: false,
     sparePartsNeeded: "",
-    stationId: stationId ?? (user as any)?.stationId ?? null,
+    stationId: stationId ?? (user as any)?.assignedStationId ?? null,
   });
 
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
@@ -530,9 +530,16 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
           </>
         )}
 
-        {form.stationId == null && stationsList && (
-          <div>
-            <Label className="text-sm font-medium">Location</Label>
+        <div>
+          <Label className="text-sm font-medium">Location</Label>
+          {form.stationId != null ? (
+            <div className="mt-1 flex items-center gap-2 rounded-md border px-3 py-2 bg-muted/40">
+              <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm font-medium">
+                {stationsList?.find(s => s.id === form.stationId)?.name ?? `Location #${form.stationId}`}
+              </span>
+            </div>
+          ) : stationsList ? (
             <Select value={form.stationId ? String(form.stationId) : ""} onValueChange={v => set("stationId", Number(v))}>
               <SelectTrigger className="mt-1" data-testid="select-damage-station">
                 <SelectValue placeholder="Select location…" />
@@ -541,8 +548,8 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
                 {stationsList.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-        )}
+          ) : null}
+        </div>
       </div>
 
       <div className="flex gap-2 pt-2">
@@ -582,7 +589,7 @@ export default function IncidentsPage() {
   const { data: equipment } = useQuery<Equipment[]>({ queryKey: ["/api/equipment"] });
 
   const preselectedEquipment = preselectedEquipmentId ? equipment?.find(e => e.id === preselectedEquipmentId) : undefined;
-  const preselectedStationId = preselectedEquipment?.currentStationId ?? (user as any)?.stationId ?? null;
+  const preselectedStationId = preselectedEquipment?.currentStationId ?? (user as any)?.assignedStationId ?? null;
 
   const filtered = (reports || []).filter(r => {
     if (filterStatus !== "all" && r.status !== filterStatus) return false;
