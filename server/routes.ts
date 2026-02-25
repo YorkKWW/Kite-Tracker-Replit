@@ -1289,104 +1289,104 @@ export async function registerRoutes(
   }
 
   function parsePriceListText(text: string): Array<{ sku: string; productName: string; retailPrice: string }> {
-    // Step 1: split text into candidate lines.
-    // PDFs often extract tables as very long lines with multiple spaces between columns,
-    // so we also break on runs of 2+ spaces to recover individual columns.
-    const rawLines = text.split(/\r?\n|\r/);
-    const lines: string[] = [];
-    for (const raw of rawLines) {
-      const trimmed = raw.trim();
-      if (!trimmed) continue;
-      if (trimmed.length > 80) {
-        // Split on 2+ consecutive spaces — often separates table columns in PDFs
-        const parts = trimmed.split(/  +/).map((p) => p.trim()).filter((p) => p.length > 2);
-        lines.push(...parts);
-      } else {
-        lines.push(trimmed);
-      }
-    }
+    // Regexes
+    // 13-digit EAN/GTIN barcode — used as a reliable column separator in manufacturer price lists
+    const EAN_RX = /\b(\d{13})\b/;
+    // German (1.529,00 or 529,00) or English (1529.00 / 1,529.00) price
+    const PRICE_RX = /(?<![0-9,.-])(\d{1,4}(?:[.,]\d{3})?[.,]\d{2})(?![0-9])/g;
+    // SKU: uppercase-starting alphanumeric token 3–25 chars
+    const SKU_RX = /\b([A-Z][A-Z0-9\-_.]{2,24})\b/;
 
-    // Step 2: price regex — finds German (1.529,00) or English (1529.00 / 1,529.00) prices
-    // anywhere in the line, not just at the end
-    const priceRx = /(?<![0-9,.-])(\d{1,4}(?:[.,]\d{3})?[.,]\d{2})(?![0-9])/g;
-    // SKU: an uppercase-starting token of 3–25 chars (letters, digits, dash, dot, underscore)
-    const skuRx = /\b([A-Z][A-Z0-9\-_.]{2,24})\b/;
+    // Blocklist — spare parts, fins, bags, pumps, leashes, accessories
+    const EXCLUDE_KEYWORDS = [
+      "spare", "part", "ersatz", "ersatzteil", "repair", "reparatur",
+      "bladder", "valve", "leading edge", "strut", "panel", "canopy",
+      "bridle", "pigtail", "knot", "pulley", "cleat", "screw",
+      "bolt", "nut", "washer", "connector", "adapter", "plug",
+      "fin", "finne", "thruster", "single tab", "us box",
+      "bag", "tasche", "cover", "case", "sock", "sleeve",
+      "pump", "pumpe", "inflation", "deflation",
+      "leash", "leine",
+      "shirt", "shorts", "glove", "handschuh", "lycra",
+      "rash guard", "rashguard", "sunscreen",
+      "sticker", "decal", "keyring", "key ring", "bottle", "book",
+      "manual", "gift", "voucher",
+      "stomp", "traction", "velcro", "foam", "rubber", "tape", "wax",
+    ];
 
     const items: Array<{ sku: string; productName: string; retailPrice: string }> = [];
     const seen = new Set<string>();
 
-    for (const line of lines) {
-      // Find every price-like number in the line
-      const priceMatches = [...line.matchAll(priceRx)];
-      if (priceMatches.length === 0) continue;
+    for (const raw of text.split(/\r?\n|\r/)) {
+      const line = raw.trim();
+      if (!line) continue;
 
-      // Use the last price found (retail price is usually rightmost)
-      const lastMatch = priceMatches[priceMatches.length - 1];
-      const price = normalisePrice(lastMatch[1]);
-      if (isNaN(price) || price < 200 || price > 100000) continue;
-
-      // Find the first SKU-like token in the line
-      const skuMatch = skuRx.exec(line);
-      if (!skuMatch) continue;
-      const sku = skuMatch[1];
-
-      // Extract product name: text between end of SKU token and start of the last price
-      const skuEnd = (skuMatch.index ?? 0) + sku.length;
-      const priceStart = lastMatch.index ?? line.length;
+      let sku = "";
       let productName = "";
-      if (priceStart > skuEnd) {
-        productName = line.slice(skuEnd, priceStart).replace(/\s+/g, " ").trim();
-      }
-      // Strip any leftover price-like numbers from the product name
-      productName = productName.replace(/\d{1,4}(?:[.,]\d{3})?[.,]\d{2}/g, "").replace(/\s+/g, " ").trim();
-      // If name is still empty or too short, use everything after the SKU
-      if (productName.length < 2) {
-        productName = line.slice(skuEnd).replace(/\s+/g, " ").trim();
-        productName = productName.replace(/\d{1,4}(?:[.,]\d{3})?[.,]\d{2}/g, "").replace(/[€$]\s*/g, "").trim();
-      }
-      if (productName.length < 2) continue;
+      let retailPrice = 0;
 
-      // Skip obvious header/total rows
-      const lc = line.toLowerCase();
+      // ── PRIMARY PATH: line contains a 13-digit EAN barcode ──────────
+      // Manufacturer format: <SKU> <Product Name> <EAN13> <dealer_price> <retail_price>
+      // The EAN is the clearest structural separator — everything before it is name, after it is prices.
+      const eanMatch = EAN_RX.exec(line);
+      if (eanMatch) {
+        const beforeEAN = line.slice(0, eanMatch.index).trim();
+        const afterEAN  = line.slice(eanMatch.index + 13).trim();
+
+        const skuMatch = SKU_RX.exec(beforeEAN);
+        if (!skuMatch) continue;
+        sku = skuMatch[1];
+        productName = beforeEAN.slice((skuMatch.index ?? 0) + sku.length).trim();
+        // Remove stray leading punctuation
+        productName = productName.replace(/^[\s\-–|:]+/, "").trim();
+        if (productName.length < 2) continue;
+
+        // Retail price is the last price appearing after the EAN
+        const afterPrices = [...afterEAN.matchAll(new RegExp(PRICE_RX.source, "g"))];
+        if (afterPrices.length === 0) continue;
+        retailPrice = normalisePrice(afterPrices[afterPrices.length - 1][1]);
+      } else {
+        // ── FALLBACK PATH: no EAN, try splitting on 2+ spaces ─────────
+        const segments = line.length > 80
+          ? line.split(/  +/).map((s) => s.trim()).filter((s) => s.length > 2)
+          : [line];
+
+        let found = false;
+        for (const seg of segments) {
+          const priceMatches = [...seg.matchAll(new RegExp(PRICE_RX.source, "g"))];
+          if (priceMatches.length === 0) continue;
+          const skuMatch = SKU_RX.exec(seg);
+          if (!skuMatch) continue;
+
+          sku = skuMatch[1];
+          const lastPrice = priceMatches[priceMatches.length - 1];
+          retailPrice = normalisePrice(lastPrice[1]);
+          const skuEnd = (skuMatch.index ?? 0) + sku.length;
+          productName = seg.slice(skuEnd, lastPrice.index ?? seg.length)
+            .replace(/\d{1,4}(?:[.,]\d{3})?[.,]\d{2}/g, "")
+            .replace(/\s+/g, " ").trim();
+          if (productName.length >= 2) { found = true; break; }
+        }
+        if (!found) continue;
+      }
+
+      // ── Filters ─────────────────────────────────────────────────────
+      // 1. Price must be ≥ €200 (main equipment; excludes all accessories / spare parts by price)
+      if (isNaN(retailPrice) || retailPrice < 200 || retailPrice > 100_000) continue;
+
+      // 2. Skip obvious header / total rows
       if (/^(total|summe|subtotal|mwst|vat|ust|price|preis|artikel|item|description|beschreibung|sku|ref)/i.test(sku)) continue;
-      if (/total|summe|subtotal/i.test(lc) && priceMatches.length === 1) continue;
 
-      // ── Category filter ────────────────────────────────────────────
-      // Keep only the 9 equipment types we track. Exclude spare parts,
-      // fins, bags, covers, pumps, leashes, and standalone accessories.
+      // 3. Keyword blocklist
       const combined = (productName + " " + sku).toLowerCase();
-
-      // Blocklist: keywords that clearly indicate excluded products
-      const EXCLUDE_KEYWORDS = [
-        // Spare parts & repair
-        "spare", "part", "ersatz", "ersatzteil", "repair", "reparatur",
-        "bladder", "valve", "leading edge", "strut", "panel", "canopy",
-        "bridle", "pigtail", "knot", "pulley", "depower", "cleat", "screw",
-        "bolt", "nut", "washer", "connector", "adapter", "plug", "cap",
-        // Fins
-        "fin", "finne", "thruster", "single tab", "us box",
-        // Bags & covers
-        "bag", "tasche", "cover", "case", "sock", "sleeve",
-        // Pumps
-        "pump", "pumpe", "inflation", "deflation",
-        // Leashes
-        "leash", "leine",
-        // Apparel / clothing (not wetsuits / harnesses)
-        "shirt", "shorts", "cap", "glove", "handschuh", "socks", "lycra",
-        "rash guard", "rashguard", "sunscreen", "sunblock",
-        // Other accessories
-        "sticker", "decal", "key ring", "keyring", "bottle", "book",
-        "manual", "gift", "voucher", "insurance", "mounting", "mount",
-        "carry", "strap", "rail", "pad", "stomp", "traction",
-        "velcro", "foam", "rubber", "tape", "wax",
-      ];
       if (EXCLUDE_KEYWORDS.some((kw) => combined.includes(kw))) continue;
 
-      const key = `${sku}:${price.toFixed(2)}`;
+      // 4. Deduplicate
+      const key = `${sku}:${retailPrice.toFixed(2)}`;
       if (seen.has(key)) continue;
       seen.add(key);
 
-      items.push({ sku, productName, retailPrice: price.toFixed(2) });
+      items.push({ sku, productName, retailPrice: retailPrice.toFixed(2) });
     }
 
     return items;
