@@ -21,6 +21,7 @@ import {
 import type { Equipment, Station } from "@shared/schema";
 import { Link } from "wouter";
 import { BarcodeScanner } from "@/components/barcode-scanner";
+import { cn } from "@/lib/utils";
 
 type DamageReport = {
   id: number;
@@ -776,28 +777,38 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
                   <Switch checked={form.canRepairOnSite} onCheckedChange={v => set("canRepairOnSite", v)} data-testid="switch-repair-onsite" />
                 </div>
 
-                <div className="flex items-center justify-between rounded-lg border p-3">
-                  <div>
-                    <p className="text-sm font-medium">Needs spare parts</p>
-                    <p className="text-xs text-muted-foreground">Requires ordering parts</p>
+                <div className={cn(
+                  "rounded-lg border p-3 transition-colors",
+                  form.needsSpareParts ? "border-orange-400 bg-orange-50 dark:bg-orange-950/20" : ""
+                )}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Needs spare parts</p>
+                      <p className="text-xs text-muted-foreground">Admin will be notified immediately</p>
+                    </div>
+                    <Switch checked={form.needsSpareParts} onCheckedChange={v => set("needsSpareParts", v)} data-testid="switch-needs-parts" />
                   </div>
-                  <Switch checked={form.needsSpareParts} onCheckedChange={v => set("needsSpareParts", v)} data-testid="switch-needs-parts" />
-                </div>
 
-                {form.needsSpareParts && (
-                  <div>
-                    <Label htmlFor="dr-parts" className="text-sm font-medium">Which spare parts?</Label>
-                    <Textarea
-                      id="dr-parts"
-                      className="mt-1"
-                      rows={2}
-                      placeholder="List the parts needed…"
-                      value={form.sparePartsNeeded}
-                      onChange={e => set("sparePartsNeeded", e.target.value)}
-                      data-testid="textarea-spare-parts"
-                    />
-                  </div>
-                )}
+                  {form.needsSpareParts && (
+                    <div className="mt-3">
+                      <Label htmlFor="dr-parts" className="text-sm font-medium text-orange-700 dark:text-orange-400">
+                        Which parts are needed? <span className="text-destructive">*</span>
+                      </Label>
+                      <Textarea
+                        id="dr-parts"
+                        className="mt-1 border-orange-300 focus:border-orange-400"
+                        rows={3}
+                        placeholder="z.B. Bladder 9m², Leading Edge Valve, Strut Tip…"
+                        value={form.sparePartsNeeded}
+                        onChange={e => set("sparePartsNeeded", e.target.value)}
+                        data-testid="textarea-spare-parts"
+                      />
+                      <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                        An e-mail and in-app notification will be sent to all admins.
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 {/* Financial assessment */}
                 <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
