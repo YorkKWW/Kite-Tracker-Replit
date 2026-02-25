@@ -311,6 +311,8 @@ export const damageReports = pgTable("damage_reports", {
   status: text("status").notNull().default("open"),
   adminNotified: boolean("admin_notified").notNull().default(false),
   repairId: integer("repair_id").references(() => repairs.id),
+  estimatedRepairCost: decimal("estimated_repair_cost", { precision: 10, scale: 2 }),
+  estimatedValueLoss: decimal("estimated_value_loss", { precision: 10, scale: 2 }),
 });
 
 export const damageReportPhotos = pgTable("damage_report_photos", {

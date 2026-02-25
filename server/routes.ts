@@ -1607,6 +1607,8 @@ export async function registerRoutes(
       needsSpareParts: z.boolean().default(false),
       sparePartsNeeded: z.string().optional().nullable(),
       stationId: z.number().optional().nullable(),
+      estimatedRepairCost: z.string().optional().nullable(),
+      estimatedValueLoss: z.string().optional().nullable(),
     });
 
     const parsed = schema.safeParse(req.body);

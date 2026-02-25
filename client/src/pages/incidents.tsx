@@ -218,9 +218,28 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
     needsSpareParts: false,
     sparePartsNeeded: "",
     stationId: stationId ?? (user as any)?.assignedStationId ?? null,
+    estimatedRepairCost: "",
+    estimatedValueLoss: "",
   });
 
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
+
+  const selectedEquipment = equipmentList?.find(e => e.id === form.equipmentId) ?? null;
+
+  const { data: priceInfo } = useQuery<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>({
+    queryKey: ["/api/price-lists/lookup", selectedEquipment?.sku, selectedEquipment?.model, (selectedEquipment?.typeSpecificFields as any)?.size],
+    queryFn: () => {
+      if (!selectedEquipment) return Promise.resolve(null);
+      const p = new URLSearchParams();
+      if (selectedEquipment.sku) p.set("sku", selectedEquipment.sku);
+      const size = (selectedEquipment.typeSpecificFields as any)?.size;
+      const name = [selectedEquipment.model, size != null ? String(size) : ""].filter(Boolean).join(" ");
+      if (name.length >= 3) p.set("name", name);
+      if (!p.toString()) return Promise.resolve(null);
+      return fetch(`/api/price-lists/lookup?${p}`, { credentials: "include" }).then(r => r.json());
+    },
+    enabled: !!selectedEquipment,
+  });
 
   const submitMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/damage-reports", {
@@ -230,6 +249,8 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
       customerName: form.customerName || null,
       bookingReference: form.bookingReference || null,
       sparePartsNeeded: form.needsSpareParts ? form.sparePartsNeeded : null,
+      estimatedRepairCost: form.estimatedRepairCost || null,
+      estimatedValueLoss: form.estimatedValueLoss || null,
     }),
     onSuccess: async (report: any) => {
       setPendingReportId(report.id);
@@ -525,6 +546,58 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
                     />
                   </div>
                 )}
+
+                {/* Financial assessment */}
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+                  <p className="text-sm font-semibold">Cost estimate</p>
+
+                  {/* Reference prices */}
+                  {selectedEquipment && (
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {priceInfo?.retailPrice && (
+                        <div className="rounded-md bg-background border px-2.5 py-1.5">
+                          <p className="text-muted-foreground">UVP (Listenpreis)</p>
+                          <p className="font-semibold text-sm mt-0.5">€ {parseFloat(priceInfo.retailPrice).toFixed(2)}</p>
+                        </div>
+                      )}
+                      {selectedEquipment.currentValue && (
+                        <div className="rounded-md bg-background border px-2.5 py-1.5">
+                          <p className="text-muted-foreground">Current value</p>
+                          <p className="font-semibold text-sm mt-0.5">€ {parseFloat(selectedEquipment.currentValue).toFixed(2)}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs font-medium">Repair cost (est.) €</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="mt-1 h-9"
+                        placeholder="0.00"
+                        value={form.estimatedRepairCost}
+                        onChange={e => set("estimatedRepairCost", e.target.value)}
+                        data-testid="input-repair-cost"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium">Wertminderung (est.) €</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="mt-1 h-9"
+                        placeholder="0.00"
+                        value={form.estimatedValueLoss}
+                        onChange={e => set("estimatedValueLoss", e.target.value)}
+                        data-testid="input-value-loss"
+                      />
+                    </div>
+                  </div>
+                </div>
               </>
             )}
           </>
