@@ -122,9 +122,7 @@ export default function SaleCreatePage() {
   const [customVatRate, setCustomVatRate] = useState("0");
   const [customVatNote, setCustomVatNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
-  const [paymentTerms, setPaymentTerms] = useState("14 Tage ohne Abzug");
   const [invoiceDate, setInvoiceDate] = useState(today());
-  const [deliveryDate, setDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
 
   const vatOption = VAT_OPTIONS.find((v) => v.value === vatType)!;
@@ -144,9 +142,7 @@ export default function SaleCreatePage() {
       apiRequest("POST", "/api/sales", {
         customerId: parseInt(customerId),
         invoiceDate,
-        deliveryDate: deliveryDate || undefined,
         paymentMethod,
-        paymentTerms,
         vatType,
         vatRate,
         vatNote,
@@ -437,14 +433,6 @@ export default function SaleCreatePage() {
             <div className="space-y-1.5">
               <Label className="text-xs">Invoice Date *</Label>
               <Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} data-testid="input-invoice-date" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Delivery Date</Label>
-              <Input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} data-testid="input-delivery-date" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Payment Terms</Label>
-              <Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} data-testid="input-payment-terms" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Payment Method</Label>
