@@ -1,0 +1,118 @@
+Build me a full-stack web application called KiteTracker — a material/equipment management system for kitesurf schools.
+I am not a developer. Build everything for me. Make all technical decisions. I will only make business decisions.
+
+What this app does
+I run multiple kitesurf schools at different locations worldwide (4–10 stations). My station managers need a mobile-friendly web app to:
+* Track all equipment with serial numbers
+* Rate equipment condition (1–5 scale)
+* Upload photos of equipment and damage
+* Log repairs
+* Transfer equipment between stations
+* Import existing equipment from Excel/CSV files
+I (the admin) need to see everything across all stations, including financial data that station managers must NOT see.
+
+Tech requirements
+* Full-stack web app, mobile-first (must work perfectly on iPhone Safari)
+* Use Replit's built-in PostgreSQL database (do NOT use external services like Supabase or Firebase)
+* Use Replit Auth or built-in authentication — keep it simple
+* Modern, clean UI — use a component library like shadcn/ui or similar
+* Language: English UI, but station/location names may contain German or Spanish characters
+
+User Roles
+1. Admin (me)
+* Sees ALL stations and ALL equipment
+* Can create, edit, and delete equipment
+* Can create users and assign them to stations
+* Sees ALL financial data (purchase price, current value, sale price, repair costs)
+* Sees all reports, transfer history, and activity logs
+* Can manage stations (add, edit, rename)
+2. Station Manager (6–15 users)
+* Sees ONLY their assigned station's equipment
+* Can rate equipment condition (1–5 scale)
+* Can upload photos
+* Can describe damage (text field)
+* Can initiate and confirm equipment transfers between stations
+* Can log repairs (description, cost, date)
+* CANNOT delete or create new equipment
+* CANNOT see any financial data (purchase price, current value, sale price)
+
+Equipment Types
+All types share a common set of fields plus type-specific fields.
+The 8 equipment types:
+1. Kites — Brand, Model, Size (m²), Year, Color
+2. Boards — Brand, Model, Size (cm), Type (TwinTip / Directional / Foilboard), Year
+3. Foils — Brand, Model, Mast Length (cm), Wing Size, Year
+4. Wings — Brand, Model, Size (m²), Year, Color
+5. Bars & Lines — Brand, Model, Line Length (m), Year, Compatible Kite Sizes
+6. Wetsuits — Brand, Model, Thickness (mm), Size (XS–XXL), Type (Full / Shorty / Top)
+7. Harnesses — Brand, Model, Size (XS–XXL), Type (Waist / Seat)
+8. Helmets & Safety Gear — Brand, Model, Size, Type (Helmet / Impact Vest / Other)
+Common fields for ALL types:
+* Serial Number (required, unique identifier — this is the KEY field)
+* Equipment Type (one of the 8 above)
+* Brand
+* Model
+* Year of Purchase
+* Current Station (which location it's at)
+* Status: Active / In Repair / Retired / Sold / In Transfer
+* Condition Rating: 1 (trash) to 5 (like new)
+* Last Inspection Date
+* Notes (free text)
+* Photos (multiple per item)
+* Financial (Admin only): Purchase Price (€), Current Estimated Value (€), Sale Price (€, if sold)
+
+Core Features — Build in this order
+Phase 1: Foundation
+1. Authentication & Roles — Login system with Admin and Station Manager roles
+2. Station Management — Admin can create stations (e.g., "Fuerteventura", "Tarifa", "Zanzibar")
+3. User Management — Admin can create station manager accounts and assign them to stations
+4. Dashboard — Overview showing: total equipment count, equipment per station, items needing attention (condition ≤ 2), items in transfer
+Phase 2: Equipment Management
+1. Add Equipment — Form to add new equipment, selecting type shows type-specific fields. Serial number is required and must be unique.
+2. Equipment List — Filterable, sortable table/cards showing all equipment. Filters: by station, by type, by status, by condition rating. Search by serial number, brand, or model.
+3. Equipment Detail Page — Shows all info, photo gallery, condition history, repair history, transfer history. Admin sees financial data, station managers don't.
+4. Condition Rating — Station managers can update condition (1–5) with date stamp. Keep history of all ratings over time.
+Phase 3: Operations
+1. Photo Upload — Upload multiple photos per equipment item. Show thumbnails in list, full gallery on detail page. Store in Replit's built-in storage.
+2. Repair Log — Log repairs: date, description, cost (admin-only field), status (pending/completed). Each equipment item has a repair history.
+3. Transfers — Station A initiates transfer → equipment shows "In Transfer" → Station B confirms receipt. Full transfer history: who sent it, who received it, when, from where to where.
+4. Excel/CSV Import — Admin can upload an Excel or CSV file to bulk-import equipment. Map columns to fields. Show preview before importing. Handle duplicates by serial number.
+Phase 4: Nice-to-have (build if time allows)
+1. QR Code Generation — Generate a QR code for each equipment item (linked to its detail page). Printable.
+2. Activity Log — Track who did what and when (equipment added, condition updated, transfer completed, etc.)
+3. Simple Reports — Equipment value per station, condition overview, items due for replacement (condition ≤ 2 and age > 2 years)
+
+Database Design Guidance
+* Use a single equipment table with a type column (enum) and a type_specific_fields JSONB column for the type-specific attributes. This is simpler than 8 separate tables.
+* stations table: id, name, location, country
+* users table: id, name, email, role (admin/manager), assigned_station_id
+* condition_ratings table: equipment_id, rating, rated_by, rated_at, notes
+* repairs table: equipment_id, description, cost, status, logged_by, date
+* transfers table: equipment_id, from_station, to_station, initiated_by, confirmed_by, initiated_at, confirmed_at, status
+* photos table: equipment_id, url/path, uploaded_by, uploaded_at, caption
+* activity_log table: user_id, action, equipment_id, details, timestamp
+
+UI Requirements
+* Mobile-first: Station managers use this on their phones, standing on a beach. Big tap targets, easy forms, fast loading.
+* Dashboard: Cards/tiles with key metrics, not a dense table
+* Equipment list: Card view on mobile, table view on desktop. Each card shows: photo thumbnail (if available), serial number, brand/model, condition badge (color-coded 1–5), station, status badge
+* Color coding for condition: 5=green, 4=light green, 3=yellow, 2=orange, 1=red
+* Navigation: Bottom tab bar on mobile (Dashboard, Equipment, Transfers, Settings)
+* Quick actions: From equipment list, one-tap to update condition or start transfer
+
+Important Rules
+1. Serial number is sacred — it's the primary identifier. Always prominently displayed.
+2. Financial data is admin-only — never show purchase price, value, or sale price to station managers. Not in lists, not in details, not in exports, nowhere.
+3. Keep it simple — station managers are not tech-savvy. Every screen should be obvious without training.
+4. Offline-awareness — if possible, show a clear indicator when offline. Don't let users lose data.
+5. No premature optimization — build it working first, we can optimize later.
+
+Sample Data
+After building the app, seed the database with sample data so I can immediately test:
+* 3 stations: "Fuerteventura", "Tarifa", "Zanzibar"
+* 1 admin user (email: admin@kitetracker.com, password: admin123)
+* 2 station managers (manager1@kitetracker.com for Fuerteventura, manager2@kitetracker.com for Tarifa)
+* 15–20 sample equipment items across all types and stations, with realistic brands (Duotone, North, Core, Cabrinha, Mystic, ION, Manera) and varying conditions
+* A few sample transfers and repairs in the history
+
+Start building now. Begin with Phase 1 (auth, stations, users, dashboard), then move to Phase 2, then Phase 3. Deploy after each phase so I can test as we go.
