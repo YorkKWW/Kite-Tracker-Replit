@@ -86,10 +86,11 @@ export default function DashboardPage() {
   ];
 
   const stations = stats?.equipmentPerStation ?? [];
-  const totalKites = stations.reduce((s, st) => s + st.kites, 0);
-  const totalWings = stations.reduce((s, st) => s + st.wings, 0);
-  const totalBoards = stations.reduce((s, st) => s + st.boards, 0);
-  const totalValue = stations.reduce((s, st) => s + st.totalValue, 0);
+  const itb = stats?.inTransferBreakdown;
+  const totalKites = stations.reduce((s, st) => s + st.kites, 0) + (itb?.kites ?? 0);
+  const totalWings = stations.reduce((s, st) => s + st.wings, 0) + (itb?.wings ?? 0);
+  const totalBoards = stations.reduce((s, st) => s + st.boards, 0) + (itb?.boards ?? 0);
+  const totalValue = stations.reduce((s, st) => s + st.totalValue, 0) + (itb?.totalValue ?? 0);
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
@@ -160,6 +161,9 @@ export default function DashboardPage() {
                 <span className="text-sm font-medium text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
                   <ArrowLeftRight className="h-3.5 w-3.5" />
                   In Transfer
+                  <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full px-1.5 py-0.5 font-semibold">
+                    {stats.inTransfer}
+                  </span>
                 </span>
                 <div className="flex items-center gap-4 shrink-0">
                   <StatPill value={stats.inTransferBreakdown.kites} color="blue" muted />
