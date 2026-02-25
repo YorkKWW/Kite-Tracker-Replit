@@ -261,7 +261,7 @@ export default function PriceListsPage() {
                           data-testid={`row-preview-${i}`}
                         >
                           <td className="px-2 py-1">
-                            <input type="checkbox" checked={!removedRows.has(i)} onChange={() => toggleRow(i)} className="h-3 w-3" />
+                            <input type="checkbox" checked={!removedRows.has(i)} onChange={() => toggleRow(i)} onClick={(e) => e.stopPropagation()} className="h-3 w-3" />
                           </td>
                           <td className="px-2 py-1 font-mono text-[10px]">{item.sku}</td>
                           <td className="px-2 py-1">{item.productName}</td>
