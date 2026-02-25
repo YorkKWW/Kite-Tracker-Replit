@@ -729,7 +729,7 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
           </div>
           <div>
             <Label htmlFor="dr-booking" className="text-sm font-medium">Booking ref</Label>
-            <Input id="dr-booking" className="mt-1" placeholder="z.B. BKWW-#1234" value={form.bookingReference} onChange={e => set("bookingReference", e.target.value)} data-testid="input-booking-reference" />
+            <Input id="dr-booking" className="mt-1" placeholder="e.g. BKWW-#1234" value={form.bookingReference} onChange={e => set("bookingReference", e.target.value)} data-testid="input-booking-reference" />
           </div>
         </div>
 
