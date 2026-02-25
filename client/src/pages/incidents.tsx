@@ -149,7 +149,7 @@ function InvoiceDialog({ report, open, onClose }: { report: DamageReport; open: 
           {customerType === "kww" && (
             <div>
               <Label className="text-xs font-medium">Booking Number <span className="text-destructive">*</span></Label>
-              <Input value={form.bookingNumber} onChange={e => set("bookingNumber", e.target.value)} placeholder="KWW-XXXX" className="mt-1" data-testid="input-booking-number" />
+              <Input value={form.bookingNumber} onChange={e => set("bookingNumber", e.target.value)} placeholder="BKWW-#1234" className="mt-1" data-testid="input-booking-number" />
             </div>
           )}
 
@@ -728,7 +728,7 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
           </div>
           <div>
             <Label htmlFor="dr-booking" className="text-sm font-medium">Booking ref</Label>
-            <Input id="dr-booking" className="mt-1" placeholder="e.g. BK-1234" value={form.bookingReference} onChange={e => set("bookingReference", e.target.value)} data-testid="input-booking-reference" />
+            <Input id="dr-booking" className="mt-1" placeholder="z.B. BKWW-#1234" value={form.bookingReference} onChange={e => set("bookingReference", e.target.value)} data-testid="input-booking-reference" />
           </div>
         </div>
 
