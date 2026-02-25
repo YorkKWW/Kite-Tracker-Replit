@@ -29,10 +29,12 @@ export default function DashboardPage() {
 
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard"],
+    staleTime: 0,
   });
 
   const { data: pendingTransfers } = useQuery<Transfer[]>({
     queryKey: ["/api/transfers", "?status=pending"],
+    staleTime: 0,
     queryFn: async () => {
       const res = await fetch("/api/transfers?status=pending", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
