@@ -1,0 +1,68 @@
+Add a "Sales" section to the app (admin only). This is for selling used equipment and generating invoices.
+Company Details (pre-fill in Settings, shown on every invoice):
+
+Company: KiteWorldWide GmbH
+Address: Steindamm 97, D-20099 Hamburg
+Registry: Amtsgericht Hamburg, HRB 105108
+Tax ID: 46/736/04728
+VAT ID: DE259606444
+Managing Director: York Neumann
+Phone: +49 40 2093 45090
+Website: www.kiteworldwide.com
+Bank: Commerzbank, IBAN: DE69 2004 0000 0898 2100 00, BIC: COBADEFFXXX, Account holder: KiteWorldWide GmbH
+These are mandatory legal details for German GmbH invoices and must appear on every generated invoice (typically in the footer area)
+Also allow uploading a company logo for the invoice header
+All company details editable in Settings
+
+Create Sale / Invoice:
+
+Select buyer: Create or select from saved customers. For each customer store: name, company name (optional), address, email, tax ID (optional — needed for B2B)
+Add items: Select multiple equipment items from the inventory to add to this invoice. For each item, the app pre-fills brand, model, serial number, SKU, size from the equipment record. Admin sets the sale price per item.
+VAT selection per invoice: Choose one of:
+
+19% MwSt (standard)
+0% MwSt with note "Differenzbesteuerung nach §25a UStG"
+0% MwSt with note "Kleinunternehmer nach §19 UStG"
+0% MwSt with note "Innergemeinschaftliche Lieferung nach §4 Nr. 1b UStG"
+Custom VAT rate and note
+
+
+Payment method selection per invoice:
+
+Bank Transfer ("Überweisung") — default. Shows on the invoice: bank name, IBAN, BIC, account holder, and "Verwendungszweck: [invoice number]"
+Cash ("Bar") — shows "Bezahlung: Bar erhalten" on the invoice. No bank details.
+PayPal — shows "Bezahlung per PayPal" and PayPal email (configurable in Settings)
+Credit Card ("Kreditkarte") — shows "Bezahlung per Kreditkarte"
+Only show bank details when payment method is Bank Transfer
+
+
+Invoice number: Auto-generated in format "Inv-KWS-2026-1001", incrementing the last 4 digits. Year updates automatically. Starting number configurable in Settings.
+Additional fields: Invoice date (default today), payment terms (default "14 Tage ohne Abzug"), optional notes/comments
+Preview: Show a preview of the invoice before generating
+Generate PDF: Create a professional PDF invoice with:
+
+Company logo and name at the top
+Sender line in small text: "KiteWorldWide GmbH | Steindamm 97 | D-20099 Hamburg"
+Buyer details block (name, address, tax ID if B2B)
+Invoice number, invoice date, delivery date, payment terms on the right side
+Table with line items: position number, description (brand + model + size), serial number, SKU, quantity, unit price, total
+Subtotal, VAT line (with selected rate and legal note), grand total
+Payment section based on selected method
+Footer with all mandatory GmbH details
+
+
+Download: PDF available for download
+
+After sale is confirmed:
+
+Update each sold equipment item's status to "Sold"
+Store the sale price on the equipment record
+Store the sale date and buyer reference
+The item stays in the database for history but is marked as sold
+Show sold items in a "Sales History" view with links to the generated invoices
+
+Sales overview page:
+
+List of all invoices with: invoice number, date, buyer name, number of items, total amount, payment method, PDF download link
+Filter by date range, buyer
+Total revenue summary

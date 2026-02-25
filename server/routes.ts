@@ -980,5 +980,300 @@ export async function registerRoutes(
     res.json(await storage.getAllInvoices());
   });
 
+  // ─── Company Settings ──────────────────────────────────────────────────────
+  app.get("/api/company-settings", requireAdmin, async (_req, res) => {
+    res.json(await storage.getCompanySettings());
+  });
+
+  app.put("/api/company-settings", requireAdmin, async (req, res) => {
+    const updated = await storage.updateCompanySettings(req.body);
+    res.json(updated);
+  });
+
+  // Logo upload for company settings
+  const uploadImage = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+  app.post("/api/company-settings/logo", requireAdmin, uploadImage.single("logo"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file" });
+      const uploadURL = await objectStorage.getObjectEntityUploadURL();
+      const objectPath = objectStorage.normalizeObjectEntityPath(uploadURL);
+      const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+      await fetch(uploadURL, { method: "PUT", body: blob, headers: { "Content-Type": req.file.mimetype } });
+      const publicUrl = `/api/object-storage/${objectPath}`;
+      await storage.updateCompanySettings({ logoUrl: publicUrl });
+      res.json({ logoUrl: publicUrl });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ─── Customers ────────────────────────────────────────────────────────────
+  app.get("/api/customers", requireAdmin, async (_req, res) => {
+    res.json(await storage.getAllCustomers());
+  });
+
+  app.post("/api/customers", requireAdmin, async (req, res) => {
+    const { name, companyName, address, email, taxId } = req.body;
+    if (!name || !address || !email) return res.status(400).json({ message: "name, address, email required" });
+    const customer = await storage.createCustomer({ name, companyName: companyName || null, address, email, taxId: taxId || null });
+    res.status(201).json(customer);
+  });
+
+  app.put("/api/customers/:id", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const updated = await storage.updateCustomer(id, req.body);
+    if (!updated) return res.status(404).json({ message: "Customer not found" });
+    res.json(updated);
+  });
+
+  // ─── Sales Invoices ───────────────────────────────────────────────────────
+  app.get("/api/sales", requireAdmin, async (_req, res) => {
+    res.json(await storage.getAllSalesInvoices());
+  });
+
+  app.get("/api/sales/next-number", requireAdmin, async (_req, res) => {
+    const settings = await storage.getCompanySettings();
+    const currentYear = new Date().getFullYear();
+    const year = settings.invoiceYear !== currentYear ? currentYear : settings.invoiceYear;
+    const nextNum = settings.invoiceYear !== currentYear ? 1001 : settings.invoiceNextNumber;
+    const numStr = String(nextNum).padStart(4, "0");
+    res.json({ invoiceNumber: `${settings.invoicePrefix}-${year}-${numStr}` });
+  });
+
+  app.get("/api/sales/:id", requireAdmin, async (req, res) => {
+    const sale = await storage.getSalesInvoice(parseInt(req.params.id));
+    if (!sale) return res.status(404).json({ message: "Not found" });
+    res.json(sale);
+  });
+
+  app.post("/api/sales", requireAdmin, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { customerId, invoiceDate, deliveryDate, paymentMethod, paymentTerms, vatType, vatRate, vatNote, notes, totalNet, totalVat, totalGross, items } = req.body;
+      if (!customerId || !invoiceDate || !items?.length) {
+        return res.status(400).json({ message: "customerId, invoiceDate, and items are required" });
+      }
+      const invoiceNumber = await storage.getNextInvoiceNumber();
+      const sale = await storage.createSalesInvoice(
+        {
+          invoiceNumber,
+          invoiceDate,
+          deliveryDate: deliveryDate || null,
+          customerId: parseInt(customerId),
+          paymentMethod: paymentMethod || "bank_transfer",
+          paymentTerms: paymentTerms || "14 Tage ohne Abzug",
+          vatType: vatType || "standard_19",
+          vatRate: (vatRate ?? "19.00").toString(),
+          vatNote: vatNote || null,
+          notes: notes || null,
+          totalNet: totalNet.toString(),
+          totalVat: totalVat.toString(),
+          totalGross: totalGross.toString(),
+          status: "draft",
+          createdBy: user.id,
+        },
+        items.map((item: any, idx: number) => ({
+          equipmentId: parseInt(item.equipmentId),
+          position: idx + 1,
+          description: item.description,
+          serialNumber: item.serialNumber || null,
+          sku: item.sku || null,
+          quantity: 1,
+          unitPrice: item.unitPrice.toString(),
+          total: item.unitPrice.toString(),
+        }))
+      );
+      res.status(201).json(sale);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/sales/:id/confirm", requireAdmin, async (req, res) => {
+    const sale = await storage.confirmSale(parseInt(req.params.id));
+    if (!sale) return res.status(404).json({ message: "Not found" });
+    res.json(sale);
+  });
+
+  // ─── Sales PDF Generation ─────────────────────────────────────────────────
+  app.get("/api/sales/:id/pdf", requireAdmin, async (req, res) => {
+    try {
+      const sale = await storage.getSalesInvoice(parseInt(req.params.id));
+      if (!sale) return res.status(404).json({ message: "Not found" });
+      const settings = await storage.getCompanySettings();
+
+      const PDFDocument = _require("pdfkit");
+      const doc = new PDFDocument({ size: "A4", margin: 50, info: { Title: `Rechnung ${sale.invoiceNumber}` } });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${sale.invoiceNumber}.pdf"`);
+      doc.pipe(res);
+
+      const pageW = 595.28;
+      const pageH = 841.89;
+      const margin = 50;
+      const contentW = pageW - margin * 2;
+
+      // ── Colours & fonts ──────────────────────────────────
+      const navy = "#1e3a5f";
+      const grey = "#6b7280";
+      const lightGrey = "#f3f4f6";
+      const black = "#111827";
+
+      // ── Header: Company name left + logo right ──────────
+      doc.fontSize(20).font("Helvetica-Bold").fillColor(navy).text(settings.companyName, margin, margin, { width: contentW * 0.65 });
+      doc.fontSize(8).font("Helvetica").fillColor(grey)
+        .text(`${settings.companyName} | ${settings.address}`, margin, margin + 28, { width: contentW });
+
+      // ── Horizontal rule ──────────────────────────────────
+      doc.moveTo(margin, margin + 42).lineTo(pageW - margin, margin + 42).strokeColor(navy).lineWidth(1.5).stroke();
+
+      let y = margin + 55;
+
+      // ── Recipient address block ──────────────────────────
+      doc.fontSize(7).font("Helvetica").fillColor(grey).text("Rechnung an:", margin, y);
+      y += 12;
+      doc.fontSize(10).font("Helvetica-Bold").fillColor(black);
+      if (sale.customer.companyName) {
+        doc.text(sale.customer.companyName, margin, y); y += 14;
+      }
+      doc.text(sale.customer.name, margin, y); y += 14;
+      doc.font("Helvetica").fontSize(9).fillColor(black);
+      sale.customer.address.split("\n").forEach((line) => { doc.text(line, margin, y); y += 13; });
+      if (sale.customer.email) { doc.text(sale.customer.email, margin, y); y += 13; }
+      if (sale.customer.taxId) { doc.text(`St-Nr.: ${sale.customer.taxId}`, margin, y); y += 13; }
+
+      // ── Invoice meta (right side) ─────────────────────────
+      const metaX = pageW - margin - 200;
+      const metaY = margin + 55;
+      const metaData = [
+        ["Rechnungsnummer:", sale.invoiceNumber],
+        ["Rechnungsdatum:", sale.invoiceDate],
+        ...(sale.deliveryDate ? [["Lieferdatum:", sale.deliveryDate]] : []),
+        ["Zahlungsbedingungen:", sale.paymentTerms],
+      ] as [string, string][];
+      let my = metaY;
+      for (const [label, val] of metaData) {
+        doc.fontSize(8).font("Helvetica").fillColor(grey).text(label, metaX, my, { width: 100, align: "right" });
+        doc.fontSize(8).font("Helvetica-Bold").fillColor(black).text(val, metaX + 105, my, { width: 95, align: "left" });
+        my += 14;
+      }
+
+      y = Math.max(y, my) + 20;
+
+      // ── "RECHNUNG" heading ────────────────────────────────
+      doc.fontSize(16).font("Helvetica-Bold").fillColor(navy).text("RECHNUNG", margin, y);
+      y += 30;
+
+      // ── Table header ──────────────────────────────────────
+      const colPos = margin;
+      const colDesc = margin + 30;
+      const colSerial = margin + 250;
+      const colSku = margin + 340;
+      const colQty = margin + 415;
+      const colPrice = margin + 445;
+      const colTotal = margin + 490;
+      const tableRight = pageW - margin;
+
+      doc.rect(margin, y, contentW, 18).fill(navy);
+      doc.fontSize(8).font("Helvetica-Bold").fillColor("#ffffff");
+      doc.text("Pos.", colPos, y + 5, { width: 25 });
+      doc.text("Beschreibung", colDesc, y + 5, { width: 185 });
+      doc.text("Seriennr.", colSerial, y + 5, { width: 85 });
+      doc.text("SKU", colSku, y + 5, { width: 70 });
+      doc.text("Menge", colQty, y + 5, { width: 40 });
+      doc.text("Einzelpreis", colPrice, y + 5, { width: 55, align: "right" });
+      doc.text("Gesamt", colTotal, y + 5, { width: tableRight - colTotal, align: "right" });
+      y += 20;
+
+      // ── Table rows ────────────────────────────────────────
+      for (const item of sale.items) {
+        const rowH = 18;
+        if (item.position % 2 === 0) {
+          doc.rect(margin, y, contentW, rowH).fill(lightGrey);
+        }
+        doc.fontSize(8).font("Helvetica").fillColor(black);
+        doc.text(String(item.position), colPos, y + 5, { width: 25 });
+        doc.text(item.description, colDesc, y + 5, { width: 185 });
+        doc.text(item.serialNumber || "—", colSerial, y + 5, { width: 85 });
+        doc.text(item.sku || "—", colSku, y + 5, { width: 70 });
+        doc.text(String(item.quantity), colQty, y + 5, { width: 40, align: "center" });
+        doc.text(`${parseFloat(item.unitPrice).toFixed(2)} €`, colPrice, y + 5, { width: 55, align: "right" });
+        doc.text(`${parseFloat(item.total).toFixed(2)} €`, colTotal, y + 5, { width: tableRight - colTotal, align: "right" });
+        y += rowH;
+      }
+
+      // ── Totals ────────────────────────────────────────────
+      y += 10;
+      doc.moveTo(margin + contentW * 0.55, y).lineTo(tableRight, y).strokeColor(grey).lineWidth(0.5).stroke();
+      y += 6;
+      const totX = margin + contentW * 0.55;
+      const totValX = tableRight - 80;
+      const vatRateNum = parseFloat(sale.vatRate);
+      const vatLabel = vatRateNum === 0 ? `MwSt. 0%` : `MwSt. ${vatRateNum}%`;
+      const totals: [string, string][] = [
+        ["Nettobetrag:", `${parseFloat(sale.totalNet).toFixed(2)} €`],
+        [vatLabel, `${parseFloat(sale.totalVat).toFixed(2)} €`],
+      ];
+      for (const [lbl, val] of totals) {
+        doc.fontSize(9).font("Helvetica").fillColor(grey).text(lbl, totX, y, { width: totValX - totX - 5, align: "right" });
+        doc.font("Helvetica").fillColor(black).text(val, totValX, y, { width: 80, align: "right" });
+        y += 14;
+      }
+      // Grand total
+      doc.rect(totX - 5, y - 2, tableRight - totX + 5, 20).fill(navy);
+      doc.fontSize(10).font("Helvetica-Bold").fillColor("#ffffff");
+      doc.text("Gesamtbetrag:", totX, y + 4, { width: totValX - totX - 5, align: "right" });
+      doc.text(`${parseFloat(sale.totalGross).toFixed(2)} €`, totValX, y + 4, { width: 80, align: "right" });
+      y += 30;
+
+      // VAT note if applicable
+      if (sale.vatNote) {
+        doc.fontSize(8).font("Helvetica-Oblique").fillColor(grey).text(`Hinweis: ${sale.vatNote}`, margin, y, { width: contentW });
+        y += 20;
+      }
+
+      // ── Payment section ────────────────────────────────────
+      y += 10;
+      doc.fontSize(10).font("Helvetica-Bold").fillColor(navy).text("Zahlungsinformationen", margin, y);
+      y += 16;
+      doc.fontSize(9).font("Helvetica").fillColor(black);
+      if (sale.paymentMethod === "bank_transfer") {
+        doc.text(`Bank: ${settings.bankName}`, margin, y); y += 13;
+        doc.text(`IBAN: ${settings.iban}`, margin, y); y += 13;
+        doc.text(`BIC: ${settings.bic}`, margin, y); y += 13;
+        doc.text(`Kontoinhaber: ${settings.accountHolder}`, margin, y); y += 13;
+        doc.text(`Verwendungszweck: ${sale.invoiceNumber}`, margin, y); y += 13;
+      } else if (sale.paymentMethod === "cash") {
+        doc.text("Bezahlung: Bar erhalten", margin, y); y += 13;
+      } else if (sale.paymentMethod === "paypal") {
+        doc.text(`Bezahlung per PayPal${settings.paypalEmail ? ` (${settings.paypalEmail})` : ""}`, margin, y); y += 13;
+      } else if (sale.paymentMethod === "credit_card") {
+        doc.text("Bezahlung per Kreditkarte", margin, y); y += 13;
+      }
+
+      if (sale.notes) {
+        y += 10;
+        doc.fontSize(9).font("Helvetica-Bold").fillColor(black).text("Anmerkungen:", margin, y); y += 13;
+        doc.font("Helvetica").fillColor(grey).text(sale.notes, margin, y, { width: contentW }); y += 20;
+      }
+
+      // ── Footer ─────────────────────────────────────────────
+      const footerY = pageH - 80;
+      doc.moveTo(margin, footerY).lineTo(pageW - margin, footerY).strokeColor(grey).lineWidth(0.5).stroke();
+      doc.fontSize(7).font("Helvetica").fillColor(grey);
+      const footerLine1 = `${settings.companyName} | ${settings.address} | Geschäftsführer: ${settings.managingDirector}`;
+      const footerLine2 = `Registergericht: ${settings.registry} | St-Nr.: ${settings.taxId} | USt-IdNr.: ${settings.vatId}`;
+      const footerLine3 = `Tel.: ${settings.phone} | Web: ${settings.website} | ${settings.bankName} | IBAN: ${settings.iban} | BIC: ${settings.bic}`;
+      doc.text(footerLine1, margin, footerY + 8, { width: contentW, align: "center" });
+      doc.text(footerLine2, margin, footerY + 20, { width: contentW, align: "center" });
+      doc.text(footerLine3, margin, footerY + 32, { width: contentW, align: "center" });
+
+      doc.end();
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   return httpServer;
 }

@@ -74,6 +74,12 @@ Each uses a JSONB column `type_specific_fields` for type-specific attributes.
 - Inventory Check Mode: station checklist, progress bar, condition stars, repair/missing flags, auto-check on scan
 - Inventory reports per station (admin: past checks history)
 - CSV import for bulk equipment
+- Invoice import: Core (PDF) + Duotone (PDF) supplier invoices with duplicate serial detection
+- Duplicate serial detection: both during invoice import (auto-skip + link) and manual entry (real-time check + confirm)
+- Sales section (admin only): create outgoing sales invoices, customer management, equipment selection, VAT/payment options
+- PDF invoice generation (pdfkit, server-side) with German GmbH legal footer
+- Company settings management (logo, bank details, invoice prefix, all GmbH required fields)
+- Sales overview with confirm/PDF download per invoice; confirming marks equipment as Sold
 - Activity logging
 - Role-based access control (financial data hidden from managers)
 

@@ -15,6 +15,8 @@ import StationsPage from "@/pages/stations";
 import StationDetailPage from "@/pages/station-detail";
 import InventoryCheckPage from "@/pages/inventory-check";
 import InvoiceImportPage from "@/pages/invoice-import";
+import SalesPage from "@/pages/sales";
+import SaleCreatePage from "@/pages/sale-create";
 import UsersPage from "@/pages/users-page";
 import ActivityPage from "@/pages/activity";
 import SettingsPage from "@/pages/settings";
@@ -50,6 +52,8 @@ function AuthenticatedRouter() {
         {isAdmin && <Route path="/users" component={UsersPage} />}
         {isAdmin && <Route path="/activity" component={ActivityPage} />}
         {isAdmin && <Route path="/invoice-import" component={InvoiceImportPage} />}
+        {isAdmin && <Route path="/sales/new" component={SaleCreatePage} />}
+        {isAdmin && <Route path="/sales" component={SalesPage} />}
         <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />
       </Switch>

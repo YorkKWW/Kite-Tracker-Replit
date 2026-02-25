@@ -9,6 +9,7 @@ import {
   jsonb,
   serial,
   pgEnum,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -205,6 +206,70 @@ export const invoices = pgTable("invoices", {
   itemCount: integer("item_count"),
 });
 
+export const companySettings = pgTable("company_settings", {
+  id: serial("id").primaryKey(),
+  companyName: text("company_name").notNull().default("KiteWorldWide GmbH"),
+  address: text("address").notNull().default("Steindamm 97, D-20099 Hamburg"),
+  registry: text("registry").notNull().default("Amtsgericht Hamburg, HRB 105108"),
+  taxId: text("tax_id").notNull().default("46/736/04728"),
+  vatId: text("vat_id").notNull().default("DE259606444"),
+  managingDirector: text("managing_director").notNull().default("York Neumann"),
+  phone: text("phone").notNull().default("+49 40 2093 45090"),
+  website: text("website").notNull().default("www.kiteworldwide.com"),
+  bankName: text("bank_name").notNull().default("Commerzbank"),
+  iban: text("iban").notNull().default("DE69 2004 0000 0898 2100 00"),
+  bic: text("bic").notNull().default("COBADEFFXXX"),
+  accountHolder: text("account_holder").notNull().default("KiteWorldWide GmbH"),
+  logoUrl: text("logo_url"),
+  paypalEmail: text("paypal_email"),
+  invoicePrefix: text("invoice_prefix").notNull().default("Inv-KWS"),
+  invoiceNextNumber: integer("invoice_next_number").notNull().default(1001),
+  invoiceYear: integer("invoice_year").notNull().default(2026),
+});
+
+export const customers = pgTable("customers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  companyName: text("company_name"),
+  address: text("address").notNull(),
+  email: text("email").notNull(),
+  taxId: text("tax_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const salesInvoices = pgTable("sales_invoices", {
+  id: serial("id").primaryKey(),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  invoiceDate: text("invoice_date").notNull(),
+  deliveryDate: text("delivery_date"),
+  customerId: integer("customer_id").notNull().references(() => customers.id),
+  paymentMethod: text("payment_method").notNull().default("bank_transfer"),
+  paymentTerms: text("payment_terms").notNull().default("14 Tage ohne Abzug"),
+  vatType: text("vat_type").notNull().default("standard_19"),
+  vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).notNull().default("19.00"),
+  vatNote: text("vat_note"),
+  notes: text("notes"),
+  totalNet: decimal("total_net", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  totalVat: decimal("total_vat", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  totalGross: decimal("total_gross", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  status: text("status").notNull().default("draft"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+export const saleItems = pgTable("sale_items", {
+  id: serial("id").primaryKey(),
+  saleId: integer("sale_id").notNull().references(() => salesInvoices.id),
+  equipmentId: integer("equipment_id").notNull().references(() => equipment.id),
+  position: integer("position").notNull().default(1),
+  description: text("description").notNull(),
+  serialNumber: text("serial_number"),
+  sku: text("sku"),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+});
+
 export const insertStationSchema = createInsertSchema(stations).omit({ id: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertEquipmentSchema = createInsertSchema(equipment).omit({ id: true, createdAt: true });
@@ -217,6 +282,10 @@ export const insertInventoryCheckSchema = createInsertSchema(inventoryChecks).om
 export const insertInventoryCheckItemSchema = createInsertSchema(inventoryCheckItems).omit({ id: true });
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, createdAt: true });
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, importedAt: true });
+export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({ id: true });
+export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true });
+export const insertSalesInvoiceSchema = createInsertSchema(salesInvoices).omit({ id: true, createdAt: true });
+export const insertSaleItemSchema = createInsertSchema(saleItems).omit({ id: true });
 
 export type InsertStation = z.infer<typeof insertStationSchema>;
 export type Station = typeof stations.$inferSelect;
@@ -253,6 +322,18 @@ export type Supplier = typeof suppliers.$inferSelect;
 
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type Invoice = typeof invoices.$inferSelect;
+
+export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
+export type CompanySettings = typeof companySettings.$inferSelect;
+
+export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
+export type Customer = typeof customers.$inferSelect;
+
+export type InsertSalesInvoice = z.infer<typeof insertSalesInvoiceSchema>;
+export type SalesInvoice = typeof salesInvoices.$inferSelect;
+
+export type InsertSaleItem = z.infer<typeof insertSaleItemSchema>;
+export type SaleItem = typeof saleItems.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email(),

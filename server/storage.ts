@@ -3,6 +3,7 @@ import { db } from "./db";
 import {
   stations, users, equipment, conditionRatings, repairs, transfers, photos, activityLog,
   inventoryChecks, inventoryCheckItems, suppliers, invoices,
+  companySettings, customers, salesInvoices, saleItems,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -15,6 +16,10 @@ import {
   type InventoryCheckItem, type InsertInventoryCheckItem,
   type Supplier, type InsertSupplier,
   type Invoice, type InsertInvoice,
+  type CompanySettings, type InsertCompanySettings,
+  type Customer, type InsertCustomer,
+  type SalesInvoice, type InsertSalesInvoice,
+  type SaleItem, type InsertSaleItem,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -88,6 +93,20 @@ export interface IStorage {
   getAllInvoices(): Promise<(Invoice & { supplierName: string })[]>;
   getInvoice(id: number): Promise<Invoice | undefined>;
   createInvoice(inv: InsertInvoice): Promise<Invoice>;
+
+  getCompanySettings(): Promise<CompanySettings>;
+  updateCompanySettings(data: Partial<InsertCompanySettings>): Promise<CompanySettings>;
+
+  getAllCustomers(): Promise<Customer[]>;
+  getCustomer(id: number): Promise<Customer | undefined>;
+  createCustomer(c: InsertCustomer): Promise<Customer>;
+  updateCustomer(id: number, data: Partial<InsertCustomer>): Promise<Customer | undefined>;
+
+  getAllSalesInvoices(): Promise<(SalesInvoice & { customerName: string; itemCount: number })[]>;
+  getSalesInvoice(id: number): Promise<(SalesInvoice & { customer: Customer; items: SaleItem[] }) | undefined>;
+  createSalesInvoice(inv: InsertSalesInvoice, items: Omit<InsertSaleItem, "saleId">[]): Promise<SalesInvoice>;
+  confirmSale(id: number): Promise<SalesInvoice | undefined>;
+  getNextInvoiceNumber(): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -468,6 +487,101 @@ export class DatabaseStorage implements IStorage {
   async createInvoice(inv: InsertInvoice): Promise<Invoice> {
     const [created] = await db.insert(invoices).values(inv).returning();
     return created;
+  }
+
+  async getCompanySettings(): Promise<CompanySettings> {
+    const [row] = await db.select().from(companySettings).where(eq(companySettings.id, 1));
+    if (row) return row;
+    const [created] = await db.insert(companySettings).values({ id: 1 } as any).returning();
+    return created;
+  }
+
+  async updateCompanySettings(data: Partial<InsertCompanySettings>): Promise<CompanySettings> {
+    const [updated] = await db.update(companySettings).set(data).where(eq(companySettings.id, 1)).returning();
+    return updated;
+  }
+
+  async getAllCustomers(): Promise<Customer[]> {
+    return db.select().from(customers).orderBy(customers.name);
+  }
+
+  async getCustomer(id: number): Promise<Customer | undefined> {
+    const [c] = await db.select().from(customers).where(eq(customers.id, id));
+    return c;
+  }
+
+  async createCustomer(c: InsertCustomer): Promise<Customer> {
+    const [created] = await db.insert(customers).values(c).returning();
+    return created;
+  }
+
+  async updateCustomer(id: number, data: Partial<InsertCustomer>): Promise<Customer | undefined> {
+    const [updated] = await db.update(customers).set(data).where(eq(customers.id, id)).returning();
+    return updated;
+  }
+
+  async getAllSalesInvoices(): Promise<(SalesInvoice & { customerName: string; itemCount: number })[]> {
+    const rows = await db
+      .select({ inv: salesInvoices, customerName: customers.name })
+      .from(salesInvoices)
+      .innerJoin(customers, eq(salesInvoices.customerId, customers.id))
+      .orderBy(desc(salesInvoices.createdAt));
+    const allItems = await db.select().from(saleItems);
+    return rows.map((r) => ({
+      ...r.inv,
+      customerName: r.customerName,
+      itemCount: allItems.filter((i) => i.saleId === r.inv.id).length,
+    }));
+  }
+
+  async getSalesInvoice(id: number): Promise<(SalesInvoice & { customer: Customer; items: SaleItem[] }) | undefined> {
+    const [row] = await db
+      .select({ inv: salesInvoices, customer: customers })
+      .from(salesInvoices)
+      .innerJoin(customers, eq(salesInvoices.customerId, customers.id))
+      .where(eq(salesInvoices.id, id));
+    if (!row) return undefined;
+    const items = await db.select().from(saleItems).where(eq(saleItems.saleId, id)).orderBy(saleItems.position);
+    return { ...row.inv, customer: row.customer, items };
+  }
+
+  async createSalesInvoice(inv: InsertSalesInvoice, itemsData: Omit<InsertSaleItem, "saleId">[]): Promise<SalesInvoice> {
+    const [created] = await db.insert(salesInvoices).values(inv).returning();
+    if (itemsData.length > 0) {
+      await db.insert(saleItems).values(itemsData.map((i) => ({ ...i, saleId: created.id })));
+    }
+    return created;
+  }
+
+  async confirmSale(id: number): Promise<SalesInvoice | undefined> {
+    const items = await db.select().from(saleItems).where(eq(saleItems.saleId, id));
+    for (const item of items) {
+      await db.update(equipment)
+        .set({ status: "sold", salePrice: item.unitPrice })
+        .where(eq(equipment.id, item.equipmentId));
+    }
+    const [updated] = await db.update(salesInvoices)
+      .set({ status: "confirmed" })
+      .where(eq(salesInvoices.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getNextInvoiceNumber(): Promise<string> {
+    const settings = await this.getCompanySettings();
+    const currentYear = new Date().getFullYear();
+    let nextNum = settings.invoiceNextNumber;
+    let year = settings.invoiceYear;
+    if (year !== currentYear) {
+      year = currentYear;
+      nextNum = 1001;
+    }
+    const numStr = String(nextNum).padStart(4, "0");
+    const invoiceNumber = `${settings.invoicePrefix}-${year}-${numStr}`;
+    await db.update(companySettings)
+      .set({ invoiceNextNumber: nextNum + 1, invoiceYear: year })
+      .where(eq(companySettings.id, 1));
+    return invoiceNumber;
   }
 }
 
