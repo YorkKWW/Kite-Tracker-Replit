@@ -9,6 +9,9 @@ import fs from "fs";
 import { z } from "zod";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
+import { createRequire } from "module";
+const _require = createRequire(import.meta.url);
+const pdfParse: (buffer: Buffer) => Promise<{ text: string }> = _require("pdf-parse");
 
 const objectStorage = new ObjectStorageService();
 
@@ -715,7 +718,6 @@ export async function registerRoutes(
   app.post("/api/invoices/parse", requireAdmin, uploadPdf.single("pdf"), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No PDF uploaded" });
     try {
-      const pdfParse = (await import("pdf-parse")).default;
       const data = await pdfParse(req.file.buffer);
       const parsed = parsePdfInvoice(data.text);
 
