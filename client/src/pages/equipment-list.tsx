@@ -63,6 +63,24 @@ export default function EquipmentListPage() {
     queryKey: ["/api/stations"],
   });
 
+  const equipmentIds = equipment?.map((e) => e.id) ?? [];
+  const { data: firstPhotos } = useQuery<Record<number, string>>({
+    queryKey: ["/api/equipment/first-photos", equipmentIds.join(",")],
+    queryFn: async () => {
+      if (!equipmentIds.length) return {};
+      const res = await fetch("/api/equipment/first-photos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ids: equipmentIds }),
+      });
+      if (!res.ok) return {};
+      return res.json();
+    },
+    enabled: equipmentIds.length > 0,
+    staleTime: 30000,
+  });
+
   const getStationName = (id: number | null) => {
     if (!id) return "—";
     return stationsList?.find((s) => s.id === id)?.name || `Station ${id}`;
@@ -215,7 +233,8 @@ export default function EquipmentListPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50 text-xs">
-                <SortTh col="type"      label="Type"    sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="w-12 pl-3 pr-2 py-2.5" />
+                <th className="w-9 pl-2 pr-1 py-2.5" />
+                <SortTh col="type"      label="Type"    sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="w-12 pl-1 pr-2 py-2.5" />
                 <SortTh col="brand"     label="Brand"   sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5" />
                 <SortTh col="model"     label="Model"   sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5" />
                 <SortTh col="size"      label="Size"    sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 w-16" />
@@ -239,7 +258,19 @@ export default function EquipmentListPage() {
                     onClick={() => navigate(`/equipment/${item.id}`)}
                     data-testid={`row-equipment-${item.id}`}
                   >
-                    <td className="pl-3 pr-2 py-2.5">
+                    <td className="pl-2 pr-1 py-1.5 w-9">
+                      {firstPhotos?.[item.id] ? (
+                        <img
+                          src={firstPhotos[item.id]}
+                          alt=""
+                          className="w-8 h-8 rounded object-cover shrink-0"
+                          data-testid={`img-thumbnail-${item.id}`}
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded bg-muted/50 shrink-0" />
+                      )}
+                    </td>
+                    <td className="pl-1 pr-2 py-2.5">
                       <span className={`inline-flex items-center justify-center rounded px-1.5 py-0.5 text-[10px] font-bold leading-none ${badge.cls}`}>
                         {badge.label}
                       </span>

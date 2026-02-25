@@ -1324,7 +1324,7 @@ export async function registerRoutes(
 
     // Kites — Core kite model families (product names don't contain "kite")
     if (/\bkite\b/.test(n)) return "kite";
-    if (/^(xr|pace|nexus|air|section|impact|rebel|bolt|soul|drift|velocity|neo|free|vibe|escape)\b/.test(n)) return "kite";
+    if (/^(xr|pace|nexus|air|section|impact|rebel|bolt|soul|drift|velocity|neo|free|vibe|escape)[\s\d]/.test(n)) return "kite";
 
     // Kiteboards / boards
     if (/\bboard\b|twintip|twin.tip|directional|waveboard/.test(n)) return "board";
