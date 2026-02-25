@@ -556,7 +556,7 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       {priceInfo?.retailPrice && (
                         <div className="rounded-md bg-background border px-2.5 py-1.5">
-                          <p className="text-muted-foreground">UVP (Listenpreis)</p>
+                          <p className="text-muted-foreground">UVP (Retail-Price)</p>
                           <p className="font-semibold text-sm mt-0.5">€ {parseFloat(priceInfo.retailPrice).toFixed(2)}</p>
                         </div>
                       )}
