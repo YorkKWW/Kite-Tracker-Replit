@@ -57,76 +57,81 @@ function convertDuotoneDate(raw: string): string {
 }
 
 function parseDuotoneInvoice(text: string) {
+  // pdf-parse extracts Duotone table rows across multiple lines:
+  //   L+0: "44240-3004 DTK-Kite Neo : 06.0 : C02:coral/light-grey SS24"
+  //   L+1: "LK/95030099"              ← tariff code (skip)
+  //   L+2: "1 pcs 1 020,00"           ← quantity + unit price
+  //   L+3: "40%"                      ← discount
+  //   L+4: "612,00 612,00"            ← discounted unit price + net total
   const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
 
   // ── Metadata ──────────────────────────────────────────────────────────────
   const invoiceNumber = text.match(/INVOICE\s+No[:\s]+([\w\-]+)/i)?.[1] || "";
-  const rawDate = text.match(/Date[:\s]+([\d]+-[A-Za-z]+-[\d]+)/i)?.[1] || "";
+  // Date appears as standalone "15-May-24" (separate line from "Date:" label)
+  const rawDate = text.match(/(\d{1,2}-[A-Za-z]{3}-\d{2,4})/)?.[1] || "";
   const invoiceDate = convertDuotoneDate(rawDate);
-  // Delivery date from "Del.note/date/ref.IDEL-007774/15.05.2024/..."
   const deliveryDate = text.match(/Del\.note\/date\/ref\.[^/]+\/([\d.]+)/i)?.[1] || "";
-  // Order number from "B&M/B2B order no.IOR-0031549/..."
   const orderNumber = text.match(/B&M\/B2B order no\.([\w\-]+)/i)?.[1] || "";
-  // Totals – appear as "Total Net Value EUR 5 194,20"
   const totalNetRaw = text.match(/Total Net Value\s+EUR\s+([\d\s.,]+)/i)?.[1]?.trim() || "";
   const totalGrossRaw = text.match(/Invoice Total\s+EUR\s+([\d\s.,]+)/i)?.[1]?.trim() || "";
   const totalNet = totalNetRaw ? parseDuotoneNumber(totalNetRaw) : null;
   const totalGross = totalGrossRaw ? parseDuotoneNumber(totalGrossRaw) : null;
 
   // ── Line items ────────────────────────────────────────────────────────────
-  // Format: "44240-3004  DTK-Kite Neo : 06.0 : C02:coral/light-grey  SS24  1 pcs  1 020,00  612,00  612,00"
-  // Next line: "LK/95030099   40%"
-  const skuRe = /^(\d{4,6}-\d{3,5})\s+/;
+  const skuLineRe = /^(\d{4,6}-\d{3,5})\s+(.+)\s+((?:SS|AW|FW)\d{2})\s*$/;
+  const qtyLineRe = /^(\d+)\s+pcs\s+([\d\s.,]+)\s*$/;
+  const discLineRe = /^(\d+)%\s*$/;
+  const priceLineRe = /^([\d.,]+)\s+([\d.,]+)\s*$/;
+
   const items: any[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const skuMatch = line.match(skuRe);
+    const skuMatch = lines[i].match(skuLineRe);
     if (!skuMatch) continue;
 
     const sku = skuMatch[1];
-    const rest = line.slice(skuMatch[0].length);
+    const description = skuMatch[2].trim();
 
-    // Split on "N pcs" to isolate description (+ season) from prices
-    const pcsIdx = rest.search(/\d+\s+pcs/);
-    if (pcsIdx < 0) continue;
+    // Scan the next 6 lines for qty, discount, and price data
+    let quantity = 1;
+    let discount = 0;
+    let discountedUnitPrice = 0;
+    let foundQty = false;
+    let foundPrice = false;
 
-    const descSection = rest.slice(0, pcsIdx).trim();
-    const afterPcs = rest.slice(pcsIdx);
+    for (let j = i + 1; j <= Math.min(i + 6, lines.length - 1); j++) {
+      if (!foundQty) {
+        const qtyMatch = lines[j].match(qtyLineRe);
+        if (qtyMatch) {
+          quantity = parseInt(qtyMatch[1], 10) || 1;
+          foundQty = true;
+          continue;
+        }
+      }
+      const discMatch = lines[j].match(discLineRe);
+      if (discMatch) {
+        discount = parseInt(discMatch[1], 10);
+        continue;
+      }
+      if (foundQty && !foundPrice) {
+        const priceMatch = lines[j].match(priceLineRe);
+        if (priceMatch) {
+          discountedUnitPrice = parseDuotoneNumber(priceMatch[1]);
+          foundPrice = true;
+          break;
+        }
+      }
+    }
 
-    // Quantity
-    const qtyMatch = afterPcs.match(/^(\d+)\s+pcs\s+(.*)/);
-    if (!qtyMatch) continue;
-    const quantity = parseInt(qtyMatch[1], 10) || 1;
-    const priceSection = qtyMatch[2];
+    if (!foundQty || !foundPrice) continue;
 
-    // Parse description: "DTK-Kite Neo : 06.0 : C02:coral/light-grey   SS24"
-    // Remove trailing season code (SS24, AW24, FW24, SS23 …)
-    const descClean = descSection.replace(/\s+(?:SS|AW|FW)\d{2}\s*$/, "").trim();
-    const descParts = descClean.split(":").map((s) => s.trim());
-    const name = descParts[0] || descClean;
+    // Parse description: "DTK-Kite Neo : 06.0 : C02:coral/light-grey"
+    const descParts = description.split(":").map((s) => s.trim());
+    const name = descParts[0] || description;
     const rawSize = descParts[1] || "";
-    // Normalize size: "06.0" → "6", "10.0" → "10"
     const size = rawSize ? (parseFloat(rawSize) || rawSize).toString() : "";
-    // Color: "C02:coral/light-grey" → strip leading code
     const colorRaw = descParts.slice(2).join(":").trim();
     const color = colorRaw.replace(/^[A-Z0-9]+:/, "").trim();
-
-    // Extract all European numbers from price section
-    // e.g. "     1 020,00        612,00        612,00"
-    const numMatches = [...priceSection.matchAll(/\b[\d][\d\s]*,\d{2}\b/g)];
-    // Net value is the last number (= purchase price)
-    const netValue = numMatches.length > 0
-      ? parseDuotoneNumber(numMatches[numMatches.length - 1][0])
-      : 0;
-    const unitPriceAfterDiscount = quantity > 0 ? netValue / quantity : netValue;
-
-    // Discount % on the following line (e.g. "LK/95030099   40%")
-    let discount = 0;
-    if (i + 1 < lines.length) {
-      const discMatch = lines[i + 1].match(/(\d+)%/);
-      if (discMatch) discount = parseInt(discMatch[1], 10);
-    }
 
     const { type, isSpare } = detectEquipmentType(name, sku);
 
@@ -137,7 +142,7 @@ function parseDuotoneInvoice(text: string) {
       color,
       quantity,
       discount,
-      unitPriceAfterDiscount: Math.round(unitPriceAfterDiscount * 100) / 100,
+      unitPriceAfterDiscount: Math.round(discountedUnitPrice * 100) / 100,
       serialNumber: "",
       type,
       isSpare,
