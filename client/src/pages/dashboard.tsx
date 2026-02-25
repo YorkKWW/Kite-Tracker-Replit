@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package, AlertTriangle, ArrowLeftRight, MapPin } from "lucide-react";
-import type { Transfer } from "@shared/schema";
+import type { Transfer, Station, Equipment } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 
 type StationStat = {
@@ -42,6 +42,23 @@ export default function DashboardPage() {
       return res.json();
     },
   });
+
+  const { data: stationsList } = useQuery<Station[]>({ queryKey: ["/api/stations"] });
+  const { data: allEquipment } = useQuery<Equipment[]>({
+    queryKey: ["/api/equipment"],
+    queryFn: async () => {
+      const res = await fetch("/api/equipment", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const getStationName = (id: number) =>
+    stationsList?.find((s) => s.id === id)?.name ?? `Station ${id}`;
+  const getEquipmentLabel = (id: number) => {
+    const e = allEquipment?.find((eq) => eq.id === id);
+    return e ? `${e.brand} ${e.model}` : `Equipment #${id}`;
+  };
 
   if (isLoading) {
     return (
@@ -254,7 +271,7 @@ export default function DashboardPage() {
                 data-testid={`card-transfer-${t.id}`}
               >
                 <span className="text-sm">
-                  Equipment #{t.equipmentId} : Station {t.fromStationId} → Station {t.toStationId}
+                  {getEquipmentLabel(t.equipmentId)} · {getStationName(t.fromStationId)} → {getStationName(t.toStationId)}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   {t.initiatedAt ? new Date(t.initiatedAt).toLocaleDateString() : ""}
