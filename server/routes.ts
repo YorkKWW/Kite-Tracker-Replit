@@ -1288,15 +1288,23 @@ export async function registerRoutes(
     return parseFloat(s);
   }
 
-  function parsePriceListText(text: string): Array<{ sku: string; productName: string; retailPrice: string }> {
-    // Regexes
-    // 13-digit EAN/GTIN barcode — used as a reliable column separator in manufacturer price lists
-    const EAN_RX = /\b(\d{13})\b/;
-    // German (1.529,00 or 529,00) or English (1529.00 / 1,529.00) price
-    const PRICE_RX = /(?<![0-9,.-])(\d{1,4}(?:[.,]\d{3})?[.,]\d{2})(?![0-9])/g;
-    // SKU: uppercase-starting alphanumeric token 3–25 chars
-    const SKU_RX = /\b([A-Z][A-Z0-9\-_.]{2,24})\b/;
+  // Parse a German price string that uses "." as thousands separator and no mandatory cents.
+  // Examples: "2.849 €" → 2849, "849 €" → 849, "2.139,50 €" → 2139.50
+  function parseEuroPrice(raw: string): number {
+    // Strip currency symbol and whitespace
+    let s = raw.replace(/[€\s]/g, "");
+    if (!s) return NaN;
+    // If there's a comma followed by 2 digits at the end → comma is decimal separator
+    if (/,\d{2}$/.test(s)) {
+      s = s.replace(/\./g, "").replace(",", ".");
+    } else {
+      // No decimal — just remove dots (thousands separators)
+      s = s.replace(/\./g, "");
+    }
+    return parseFloat(s);
+  }
 
+  function parsePriceListText(text: string): Array<{ sku: string; productName: string; retailPrice: string }> {
     // Blocklist — spare parts, fins, bags, pumps, leashes, accessories
     const EXCLUDE_KEYWORDS = [
       "spare", "part", "ersatz", "ersatzteil", "repair", "reparatur",
@@ -1314,75 +1322,56 @@ export async function registerRoutes(
       "stomp", "traction", "velcro", "foam", "rubber", "tape", "wax",
     ];
 
+    // Matches prices like "2.849 €", "849 €", "1.299,00 €"
+    const EURO_PRICE_RX = /(\d{1,2}\.\d{3}(?:,\d{2})?|\d{3,5}(?:,\d{2})?)\s*€/g;
+    // 12 or 13-digit product barcode (UPC-A or EAN-13)
+    const UPC_RX = /\b(\d{12,13})\b/g;
+
+    // Lines to skip regardless of content
+    const SKIP_LINE_RX = /^(CORE PRICE LIST|Dealer Price|Retail Price|page \d|-- \d|sales@|Purchase orders|Product Information|\+49|#\d+, valid)/i;
+
     const items: Array<{ sku: string; productName: string; retailPrice: string }> = [];
     const seen = new Set<string>();
 
     for (const raw of text.split(/\r?\n|\r/)) {
       const line = raw.trim();
-      if (!line) continue;
+      if (!line || SKIP_LINE_RX.test(line)) continue;
 
-      let sku = "";
-      let productName = "";
-      let retailPrice = 0;
+      // The Core/Duotone price list is TAB-delimited.
+      // Columns: ProductName [TAB] UPC1 [TAB] (UPC2) [TAB] DealerPrice€ [TAB] RetailPrice€
+      // Header rows (no price) are filtered by the price regex below.
+      const tabs = line.split("\t").map((c) => c.trim()).filter((c) => c.length > 0);
+      if (tabs.length < 2) continue;
 
-      // ── PRIMARY PATH: line contains a 13-digit EAN barcode ──────────
-      // Manufacturer format: <SKU> <Product Name> <EAN13> <dealer_price> <retail_price>
-      // The EAN is the clearest structural separator — everything before it is name, after it is prices.
-      const eanMatch = EAN_RX.exec(line);
-      if (eanMatch) {
-        const beforeEAN = line.slice(0, eanMatch.index).trim();
-        const afterEAN  = line.slice(eanMatch.index + 13).trim();
+      // Product name is always the first column
+      const productName = tabs[0];
+      if (!productName || productName.length < 3) continue;
 
-        const skuMatch = SKU_RX.exec(beforeEAN);
-        if (!skuMatch) continue;
-        sku = skuMatch[1];
-        productName = beforeEAN.slice((skuMatch.index ?? 0) + sku.length).trim();
-        // Remove stray leading punctuation
-        productName = productName.replace(/^[\s\-–|:]+/, "").trim();
-        if (productName.length < 2) continue;
+      // Find all € prices anywhere in the line
+      const euroPrices = [...line.matchAll(new RegExp(EURO_PRICE_RX.source, "g"))];
+      if (euroPrices.length === 0) continue;
 
-        // Retail price is the last price appearing after the EAN
-        const afterPrices = [...afterEAN.matchAll(new RegExp(PRICE_RX.source, "g"))];
-        if (afterPrices.length === 0) continue;
-        retailPrice = normalisePrice(afterPrices[afterPrices.length - 1][1]);
-      } else {
-        // ── FALLBACK PATH: no EAN, try splitting on 2+ spaces ─────────
-        const segments = line.length > 80
-          ? line.split(/  +/).map((s) => s.trim()).filter((s) => s.length > 2)
-          : [line];
-
-        let found = false;
-        for (const seg of segments) {
-          const priceMatches = [...seg.matchAll(new RegExp(PRICE_RX.source, "g"))];
-          if (priceMatches.length === 0) continue;
-          const skuMatch = SKU_RX.exec(seg);
-          if (!skuMatch) continue;
-
-          sku = skuMatch[1];
-          const lastPrice = priceMatches[priceMatches.length - 1];
-          retailPrice = normalisePrice(lastPrice[1]);
-          const skuEnd = (skuMatch.index ?? 0) + sku.length;
-          productName = seg.slice(skuEnd, lastPrice.index ?? seg.length)
-            .replace(/\d{1,4}(?:[.,]\d{3})?[.,]\d{2}/g, "")
-            .replace(/\s+/g, " ").trim();
-          if (productName.length >= 2) { found = true; break; }
-        }
-        if (!found) continue;
-      }
-
-      // ── Filters ─────────────────────────────────────────────────────
-      // 1. Price must be ≥ €200 (main equipment; excludes all accessories / spare parts by price)
+      // Retail price is the LAST € price on the line
+      const retailRaw = euroPrices[euroPrices.length - 1][1];
+      const retailPrice = parseEuroPrice(retailRaw);
       if (isNaN(retailPrice) || retailPrice < 200 || retailPrice > 100_000) continue;
 
-      // 2. Skip obvious header / total rows
-      if (/^(total|summe|subtotal|mwst|vat|ust|price|preis|artikel|item|description|beschreibung|sku|ref)/i.test(sku)) continue;
+      // Use first UPC found as the SKU (enables barcode lookup later)
+      // Fall back to product name slug if no barcode present
+      const upcMatches = [...line.matchAll(new RegExp(UPC_RX.source, "g"))];
+      const sku = upcMatches.length > 0
+        ? upcMatches[0][1]
+        : productName.replace(/\s+/g, "-").toUpperCase().slice(0, 24);
 
-      // 3. Keyword blocklist
-      const combined = (productName + " " + sku).toLowerCase();
-      if (EXCLUDE_KEYWORDS.some((kw) => combined.includes(kw))) continue;
+      // Skip obvious header/section rows
+      if (/^(total|summe|subtotal|mwst|vat|ust|dealer|retail|article|artikel)/i.test(productName)) continue;
 
-      // 4. Deduplicate
-      const key = `${sku}:${retailPrice.toFixed(2)}`;
+      // Keyword blocklist on product name
+      const lc = productName.toLowerCase();
+      if (EXCLUDE_KEYWORDS.some((kw) => lc.includes(kw))) continue;
+
+      // Deduplicate by product name + retail price
+      const key = `${productName}:${retailPrice.toFixed(0)}`;
       if (seen.has(key)) continue;
       seen.add(key);
 
