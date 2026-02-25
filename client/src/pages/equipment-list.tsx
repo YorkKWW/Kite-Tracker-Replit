@@ -229,7 +229,17 @@ export default function EquipmentListPage() {
                           {EQUIPMENT_TYPE_LABELS[item.type] || item.type}
                         </p>
                       </div>
-                      <ConditionBadge rating={item.conditionRating} compact />
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <ConditionBadge rating={item.conditionRating} compact />
+                        {getSizeBadge(item) && (
+                          <span
+                            className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 leading-none"
+                            data-testid={`badge-size-${item.id}`}
+                          >
+                            {getSizeBadge(item)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="space-y-1 mb-2 bg-muted/40 rounded-md p-2">
                       <div className="flex items-center gap-1.5">
@@ -263,6 +273,23 @@ export default function EquipmentListPage() {
       )}
     </div>
   );
+}
+
+function getSizeBadge(item: Equipment): string | null {
+  const f = (item.typeSpecificFields || {}) as Record<string, any>;
+  switch (item.type) {
+    case "kite":
+    case "wing":
+      return f.size != null ? `${f.size}m²` : null;
+    case "board":
+    case "foilboard":
+      return f.size != null ? `${f.size}cm` : null;
+    case "harness":
+    case "wetsuit":
+      return f.size ? String(f.size) : null;
+    default:
+      return null;
+  }
 }
 
 function MapPinIcon({ className }: { className?: string }) {
