@@ -1,0 +1,146 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { Plus, MapPin, Pencil, Trash2 } from "lucide-react";
+import type { Station } from "@shared/schema";
+
+export default function StationsPage() {
+  const { toast } = useToast();
+  const { data: stationsList, isLoading } = useQuery<Station[]>({ queryKey: ["/api/stations"] });
+  const [open, setOpen] = useState(false);
+  const [editStation, setEditStation] = useState<Station | null>(null);
+  const [name, setName] = useState("");
+  const [location, setLocation] = useState("");
+  const [country, setCountry] = useState("");
+
+  const openCreate = () => {
+    setEditStation(null);
+    setName("");
+    setLocation("");
+    setCountry("");
+    setOpen(true);
+  };
+
+  const openEdit = (s: Station) => {
+    setEditStation(s);
+    setName(s.name);
+    setLocation(s.location || "");
+    setCountry(s.country || "");
+    setOpen(true);
+  };
+
+  const createMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/stations", { name, location: location || null, country: country || null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
+      toast({ title: "Station created" });
+      setOpen(false);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/stations/${editStation!.id}`, { name, location: location || null, country: country || null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
+      toast({ title: "Station updated" });
+      setOpen(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/stations/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
+      toast({ title: "Station deleted" });
+    },
+  });
+
+  return (
+    <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between gap-1">
+        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-stations-title">Stations</h1>
+        <Button onClick={openCreate} data-testid="button-add-station">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Station
+        </Button>
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editStation ? "Edit Station" : "Add Station"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Name *</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Fuerteventura" data-testid="input-station-name" />
+            </div>
+            <div className="space-y-2">
+              <Label>Location</Label>
+              <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Corralejo" data-testid="input-station-location" />
+            </div>
+            <div className="space-y-2">
+              <Label>Country</Label>
+              <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Spain" data-testid="input-station-country" />
+            </div>
+            <Button
+              onClick={() => (editStation ? updateMutation.mutate() : createMutation.mutate())}
+              disabled={!name || createMutation.isPending || updateMutation.isPending}
+              className="w-full"
+              data-testid="button-save-station"
+            >
+              {editStation ? "Update Station" : "Create Station"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20" />)}
+        </div>
+      ) : !stationsList?.length ? (
+        <div className="text-center py-16">
+          <MapPin className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+          <h3 className="font-medium">No stations yet</h3>
+          <p className="text-sm text-muted-foreground mt-1">Add your first kitesurf station</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {stationsList.map((s) => (
+            <Card key={s.id} data-testid={`card-station-${s.id}`}>
+              <CardContent className="p-4 flex items-center justify-between gap-1">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-primary/10">
+                    <MapPin className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold" data-testid={`text-station-${s.id}`}>{s.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {[s.location, s.country].filter(Boolean).join(", ") || "No location"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(s)} data-testid={`button-edit-station-${s.id}`}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(s.id)} data-testid={`button-delete-station-${s.id}`}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

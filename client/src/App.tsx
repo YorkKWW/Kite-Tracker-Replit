@@ -3,16 +3,51 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/lib/auth";
+import Layout from "@/components/layout";
+import LoginPage from "@/pages/login";
+import DashboardPage from "@/pages/dashboard";
+import EquipmentListPage from "@/pages/equipment-list";
+import EquipmentDetailPage from "@/pages/equipment-detail";
+import EquipmentFormPage from "@/pages/equipment-form";
+import TransfersPage from "@/pages/transfers";
+import StationsPage from "@/pages/stations";
+import UsersPage from "@/pages/users-page";
+import ActivityPage from "@/pages/activity";
+import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
+import { Loader2 } from "lucide-react";
 
-function Router() {
+function AuthenticatedRouter() {
+  const { user, isLoading, isAdmin } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
   return (
-    <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
-      <Route component={NotFound} />
-    </Switch>
+    <Layout>
+      <Switch>
+        <Route path="/" component={DashboardPage} />
+        <Route path="/equipment" component={EquipmentListPage} />
+        <Route path="/equipment/new" component={EquipmentFormPage} />
+        <Route path="/equipment/:id" component={EquipmentDetailPage} />
+        <Route path="/transfers" component={TransfersPage} />
+        {isAdmin && <Route path="/stations" component={StationsPage} />}
+        {isAdmin && <Route path="/users" component={UsersPage} />}
+        {isAdmin && <Route path="/activity" component={ActivityPage} />}
+        <Route path="/settings" component={SettingsPage} />
+        <Route component={NotFound} />
+      </Switch>
+    </Layout>
   );
 }
 
@@ -20,8 +55,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        <AuthProvider>
+          <Toaster />
+          <AuthenticatedRouter />
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
