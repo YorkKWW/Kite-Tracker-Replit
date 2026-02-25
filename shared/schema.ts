@@ -263,7 +263,7 @@ export const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   kite: "Kites",
   board: "Kiteboards",
   wing: "Wings",
-  foilboard: "Foilboards",
+  foilboard: "Wing Foil Boards",
   foil: "Foils",
   bar_lines: "Bars",
   wetsuit: "Wetsuits",
