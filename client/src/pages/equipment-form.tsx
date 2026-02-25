@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import type { Station } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPE_SPECIFIC_FIELDS } from "@shared/schema";
+import { TYPES_WITHOUT_SERIAL } from "./equipment-list";
 import { Link } from "wouter";
 
 export default function EquipmentFormPage() {
@@ -39,10 +40,14 @@ export default function EquipmentFormPage() {
   const [salePrice, setSalePrice] = useState("");
   const [typeSpecific, setTypeSpecific] = useState<Record<string, any>>({});
 
+  const serialOptional = TYPES_WITHOUT_SERIAL.includes(type);
+
   const mutation = useMutation({
     mutationFn: () =>
       apiRequest("POST", "/api/equipment", {
-        serialNumber,
+        serialNumber: serialOptional && !serialNumber
+          ? `AUTO-${type.toUpperCase()}-${Date.now()}`
+          : serialNumber,
         sku: sku || null,
         type,
         brand,
@@ -96,11 +101,13 @@ export default function EquipmentFormPage() {
       <Card>
         <CardContent className="p-4 md:p-6 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Serial Number *</Label>
-              <Input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="DT-K-2024-001" data-testid="input-serial" />
-              <p className="text-xs text-muted-foreground">Unique item identifier (barcode/label)</p>
-            </div>
+            {!serialOptional && (
+              <div className="space-y-2">
+                <Label>Serial Number *</Label>
+                <Input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="DT-K-2024-001" data-testid="input-serial" />
+                <p className="text-xs text-muted-foreground">Unique item identifier (barcode/label)</p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>SKU</Label>
               <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="DT-REBEL-12-2024" data-testid="input-sku" />
@@ -232,7 +239,7 @@ export default function EquipmentFormPage() {
 
           <Button
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || !serialNumber || !brand || !model}
+            disabled={mutation.isPending || (!serialNumber && !serialOptional) || !brand || !model}
             className="w-full"
             data-testid="button-save-equipment"
           >
