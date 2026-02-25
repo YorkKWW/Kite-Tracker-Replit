@@ -1358,12 +1358,10 @@ export async function registerRoutes(
       const dealerRaw = euroPrices.length >= 2 ? euroPrices[euroPrices.length - 2][1] : null;
       const dealerPrice = dealerRaw ? parseEuroPrice(dealerRaw) : null;
 
-      // Use first UPC found as the SKU (enables barcode lookup later)
-      // Fall back to product name slug if no barcode present
+      // Only keep items that have a real 12/13-digit barcode — skip anything without one
       const upcMatches = [...line.matchAll(new RegExp(UPC_RX.source, "g"))];
-      const sku = upcMatches.length > 0
-        ? upcMatches[0][1]
-        : productName.replace(/\s+/g, "-").toUpperCase().slice(0, 24);
+      if (upcMatches.length === 0) continue;
+      const sku = upcMatches[0][1];
 
       // Skip obvious header/section rows
       if (/^(total|summe|subtotal|mwst|vat|ust|dealer|retail|article|artikel)/i.test(productName)) continue;
