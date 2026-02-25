@@ -25,7 +25,7 @@ import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
 function AuthenticatedRouter() {
-  const { user, isLoading, isAdmin } = useAuth();
+  const { user, isLoading, isAdmin, isHamburg } = useAuth();
 
   if (isLoading) {
     return (
@@ -44,18 +44,18 @@ function AuthenticatedRouter() {
       <Switch>
         <Route path="/" component={DashboardPage} />
         <Route path="/equipment" component={EquipmentListPage} />
-        <Route path="/equipment/new" component={EquipmentFormPage} />
+        {isHamburg && <Route path="/equipment/new" component={EquipmentFormPage} />}
         <Route path="/equipment/:id" component={EquipmentDetailPage} />
-        <Route path="/transfers" component={TransfersPage} />
+        {isHamburg && <Route path="/transfers" component={TransfersPage} />}
         {isAdmin && <Route path="/stations" component={StationsPage} />}
         <Route path="/stations/:id" component={StationDetailPage} />
         <Route path="/inventory-check/:id" component={InventoryCheckPage} />
         {isAdmin && <Route path="/users" component={UsersPage} />}
         {isAdmin && <Route path="/activity" component={ActivityPage} />}
-        {isAdmin && <Route path="/invoice-import" component={InvoiceImportPage} />}
-        {isAdmin && <Route path="/price-lists" component={PriceListsPage} />}
-        {isAdmin && <Route path="/sales/new" component={SaleCreatePage} />}
-        {isAdmin && <Route path="/sales" component={SalesPage} />}
+        {isHamburg && <Route path="/invoice-import" component={InvoiceImportPage} />}
+        {isHamburg && <Route path="/price-lists" component={PriceListsPage} />}
+        <Route path="/sales/new" component={SaleCreatePage} />
+        <Route path="/sales" component={SalesPage} />
         <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />
       </Switch>

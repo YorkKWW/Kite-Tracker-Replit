@@ -26,7 +26,7 @@ const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
 
 
 export default function EquipmentListPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isHamburg } = useAuth();
   const urlParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const [search, setSearch] = useState(urlParams.get("search") || "");
   const [typeFilter, setTypeFilter] = useState<string>(urlParams.get("type") || "all");
@@ -133,7 +133,7 @@ export default function EquipmentListPage() {
     <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
       <div className="flex items-center justify-between gap-1 flex-wrap">
         <h1 className="text-2xl font-bold tracking-tight" data-testid="text-equipment-title">Equipment</h1>
-        {isAdmin && (
+        {isHamburg && (
           <div className="flex gap-2">
             <Link href="/invoice-import">
               <Button variant="outline" size="sm" data-testid="button-import-invoice">
@@ -195,7 +195,7 @@ export default function EquipmentListPage() {
                 <SelectItem value="in_transfer">In Transfer</SelectItem>
               </SelectContent>
             </Select>
-            {isAdmin && (
+            {isHamburg && (
               <Select value={stationFilter} onValueChange={setStationFilter}>
                 <SelectTrigger data-testid="select-station-filter"><SelectValue placeholder="All Locations" /></SelectTrigger>
                 <SelectContent>

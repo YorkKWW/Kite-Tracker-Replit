@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, requireAuth, requireAdmin, hashPassword } from "./auth";
+import { setupAuth, requireAuth, requireAdmin, requireHamburg, hashPassword } from "./auth";
 import passport from "passport";
 import multer from "multer";
 import path from "path";
@@ -317,7 +317,7 @@ const upload = multer({
 
 async function checkEquipmentAccess(req: any, equipmentId: number): Promise<boolean> {
   const user = req.user as any;
-  if (user.role === "admin") return true;
+  if (user.role === "admin" || user.role === "manager") return true;
   const item = await storage.getEquipment(equipmentId);
   if (!item) return false;
   return item.currentStationId === user.assignedStationId;
@@ -433,7 +433,7 @@ export async function registerRoutes(
     const item = await storage.getEquipmentByCode(serial);
     if (!item) return res.status(404).json({ message: "Equipment not found" });
     const user = req.user as any;
-    if (user.role === "manager" && item.currentStationId !== user.assignedStationId) {
+    if (user.role === "station_lead" && item.currentStationId !== user.assignedStationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     res.json(item);
@@ -448,7 +448,7 @@ export async function registerRoutes(
   app.get("/api/equipment", requireAuth, async (req, res) => {
     const user = req.user as any;
     const filters: any = {};
-    if (user.role === "manager") {
+    if (user.role === "station_lead") {
       filters.stationId = user.assignedStationId;
     } else if (req.query.stationId) {
       filters.stationId = parseInt(req.query.stationId as string);
@@ -460,8 +460,8 @@ export async function registerRoutes(
 
     let items = await storage.getAllEquipment(filters);
 
-    if (user.role !== "admin") {
-      items = items.map(({ purchasePrice, currentValue, salePrice, ...rest }) => rest as any);
+    if (user.role === "station_lead") {
+      items = items.map(({ purchasePrice, salePrice, ...rest }) => rest as any);
     }
 
     res.json(items);
@@ -474,19 +474,19 @@ export async function registerRoutes(
     if (!item) return res.status(404).json({ message: "Equipment not found" });
 
     const user = req.user as any;
-    if (user.role === "manager" && item.currentStationId !== user.assignedStationId) {
+    if (user.role === "station_lead" && item.currentStationId !== user.assignedStationId) {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    if (user.role !== "admin") {
-      const { purchasePrice, currentValue, salePrice, ...safe } = item;
+    if (user.role === "station_lead") {
+      const { purchasePrice, salePrice, ...safe } = item;
       return res.json(safe);
     }
 
     res.json(item);
   });
 
-  app.post("/api/equipment", requireAdmin, async (req, res) => {
+  app.post("/api/equipment", requireHamburg, async (req, res) => {
     try {
       const item = await storage.createEquipment(req.body);
       await storage.createActivityLog({
@@ -504,13 +504,13 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/equipment/:id", requireAdmin, async (req, res) => {
+  app.patch("/api/equipment/:id", requireHamburg, async (req, res) => {
     const item = await storage.updateEquipment(parseInt(req.params.id), req.body);
     if (!item) return res.status(404).json({ message: "Equipment not found" });
     res.json(item);
   });
 
-  app.delete("/api/equipment/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/equipment/:id", requireHamburg, async (req, res) => {
     await storage.deleteEquipment(parseInt(req.params.id));
     await storage.createActivityLog({
       userId: (req.user as any).id,
@@ -557,7 +557,7 @@ export async function registerRoutes(
     }
     let repairsList = await storage.getRepairs(equipmentId);
     const user = req.user as any;
-    if (user.role !== "admin") {
+    if (user.role === "station_lead") {
       repairsList = repairsList.map(({ cost, ...rest }) => rest as any);
     }
     res.json(repairsList);
@@ -572,7 +572,7 @@ export async function registerRoutes(
     const repair = await storage.createRepair({
       equipmentId,
       description: req.body.description,
-      cost: user.role === "admin" ? req.body.cost : null,
+      cost: (user.role === "admin" || user.role === "manager") ? req.body.cost : null,
       status: req.body.status || "pending",
       loggedBy: user.id,
     });
@@ -588,7 +588,7 @@ export async function registerRoutes(
   app.patch("/api/repairs/:id", requireAuth, async (req, res) => {
     const user = req.user as any;
     const data = { ...req.body };
-    if (user.role !== "admin") {
+    if (user.role === "station_lead") {
       delete data.cost;
     }
     const repair = await storage.updateRepair(parseInt(req.params.id), data);
@@ -599,7 +599,7 @@ export async function registerRoutes(
   app.get("/api/transfers", requireAuth, async (req, res) => {
     const user = req.user as any;
     const filters: any = {};
-    if (user.role === "manager") {
+    if (user.role === "station_lead") {
       filters.stationId = user.assignedStationId;
     } else if (req.query.stationId) {
       filters.stationId = parseInt(req.query.stationId as string);
@@ -614,7 +614,7 @@ export async function registerRoutes(
     res.json(transfersList);
   });
 
-  app.post("/api/transfers", requireAuth, async (req, res) => {
+  app.post("/api/transfers", requireHamburg, async (req, res) => {
     const user = req.user as any;
     const transfer = await storage.createTransfer({
       equipmentId: req.body.equipmentId,
@@ -637,7 +637,7 @@ export async function registerRoutes(
     const existingTransfers = await storage.getTransfers({ status: "pending" });
     const existing = existingTransfers.find(t => t.id === transferId);
     if (!existing) return res.status(404).json({ message: "Transfer not found" });
-    if (user.role !== "admin" && user.assignedStationId !== existing.toStationId && user.assignedStationId !== existing.fromStationId) {
+    if (user.role === "station_lead" && user.assignedStationId !== existing.toStationId && user.assignedStationId !== existing.fromStationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     const transfer = await storage.confirmTransfer(transferId, user.id);
@@ -651,11 +651,8 @@ export async function registerRoutes(
     res.json(transfer);
   });
 
-  app.post("/api/transfers/:id/cancel", requireAuth, async (req, res) => {
+  app.post("/api/transfers/:id/cancel", requireHamburg, async (req, res) => {
     const user = req.user as any;
-    if (user.role !== "admin") {
-      return res.status(403).json({ message: "Only admin can cancel transfers" });
-    }
     const transfer = await storage.cancelTransfer(parseInt(req.params.id));
     if (!transfer) return res.status(404).json({ message: "Transfer not found" });
     res.json(transfer);
@@ -709,7 +706,7 @@ export async function registerRoutes(
   app.post("/api/stations/:id/inventory-checks", requireAuth, async (req, res) => {
     const user = req.user as any;
     const stationId = parseInt(req.params.id);
-    if (user.role === "manager" && user.assignedStationId !== stationId) {
+    if (user.role === "station_lead" && user.assignedStationId !== stationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     const equipmentList = await storage.getAllEquipment({ stationId });
@@ -728,7 +725,7 @@ export async function registerRoutes(
   app.get("/api/stations/:id/inventory-checks", requireAuth, async (req, res) => {
     const user = req.user as any;
     const stationId = parseInt(req.params.id);
-    if (user.role === "manager" && user.assignedStationId !== stationId) {
+    if (user.role === "station_lead" && user.assignedStationId !== stationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     const checks = await storage.getInventoryChecks(stationId);
@@ -739,7 +736,7 @@ export async function registerRoutes(
     const user = req.user as any;
     const check = await storage.getInventoryCheck(parseInt(req.params.id));
     if (!check) return res.status(404).json({ message: "Not found" });
-    if (user.role === "manager" && user.assignedStationId !== check.stationId) {
+    if (user.role === "station_lead" && user.assignedStationId !== check.stationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     const items = await storage.getInventoryCheckItems(check.id);
@@ -752,7 +749,7 @@ export async function registerRoutes(
     const user = req.user as any;
     const check = await storage.getInventoryCheck(parseInt(req.params.id));
     if (!check) return res.status(404).json({ message: "Not found" });
-    if (user.role === "manager" && user.assignedStationId !== check.stationId) {
+    if (user.role === "station_lead" && user.assignedStationId !== check.stationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     const updated = await storage.completeInventoryCheck(check.id);
@@ -765,7 +762,7 @@ export async function registerRoutes(
     const equipmentId = parseInt(req.params.equipmentId);
     const check = await storage.getInventoryCheck(checkId);
     if (!check) return res.status(404).json({ message: "Not found" });
-    if (user.role === "manager" && user.assignedStationId !== check.stationId) {
+    if (user.role === "station_lead" && user.assignedStationId !== check.stationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     const item = await storage.upsertInventoryCheckItem({
@@ -786,12 +783,12 @@ export async function registerRoutes(
 
   app.get("/api/dashboard", requireAuth, async (req, res) => {
     const user = req.user as any;
-    const stationId = user.role === "manager" ? user.assignedStationId : undefined;
+    const stationId = user.role === "station_lead" ? user.assignedStationId : undefined;
     const stats = await storage.getDashboardStats(stationId);
     res.json(stats);
   });
 
-  app.post("/api/equipment/import", requireAdmin, upload.single("file"), async (req, res) => {
+  app.post("/api/equipment/import", requireHamburg, upload.single("file"), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     try {
@@ -856,7 +853,7 @@ export async function registerRoutes(
     res.json(await storage.getAllSuppliers());
   });
 
-  app.post("/api/suppliers", requireAdmin, async (req, res) => {
+  app.post("/api/suppliers", requireHamburg, async (req, res) => {
     const { name, color } = req.body;
     if (!name) return res.status(400).json({ message: "name required" });
     try {
@@ -868,7 +865,7 @@ export async function registerRoutes(
   });
 
   // ─── Invoice: Parse PDF ───────────────────────────────────────────────────────
-  app.post("/api/invoices/parse", requireAdmin, uploadPdf.single("pdf"), async (req, res) => {
+  app.post("/api/invoices/parse", requireHamburg, uploadPdf.single("pdf"), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No PDF uploaded" });
     try {
       const data = await parsePdfBuffer(req.file.buffer);
@@ -903,7 +900,7 @@ export async function registerRoutes(
   });
 
   // ─── Invoice: Confirm Import ──────────────────────────────────────────────────
-  app.post("/api/invoices/confirm", requireAdmin, async (req, res) => {
+  app.post("/api/invoices/confirm", requireHamburg, async (req, res) => {
     const {
       supplierId, invoiceNumber, invoiceDate, deliveryDate, orderNumber,
       totalNet, totalGross, items, brand,
@@ -977,7 +974,7 @@ export async function registerRoutes(
   });
 
   // ─── Invoice: List ────────────────────────────────────────────────────────────
-  app.get("/api/invoices", requireAdmin, async (_req, res) => {
+  app.get("/api/invoices", requireHamburg, async (_req, res) => {
     res.json(await storage.getAllInvoices());
   });
 
@@ -1009,18 +1006,18 @@ export async function registerRoutes(
   });
 
   // ─── Customers ────────────────────────────────────────────────────────────
-  app.get("/api/customers", requireAdmin, async (_req, res) => {
+  app.get("/api/customers", requireAuth, async (_req, res) => {
     res.json(await storage.getAllCustomers());
   });
 
-  app.post("/api/customers", requireAdmin, async (req, res) => {
+  app.post("/api/customers", requireHamburg, async (req, res) => {
     const { name, companyName, address, email, taxId } = req.body;
     if (!name || !address || !email) return res.status(400).json({ message: "name, address, email required" });
     const customer = await storage.createCustomer({ name, companyName: companyName || null, address, email, taxId: taxId || null });
     res.status(201).json(customer);
   });
 
-  app.put("/api/customers/:id", requireAdmin, async (req, res) => {
+  app.put("/api/customers/:id", requireHamburg, async (req, res) => {
     const id = parseInt(req.params.id);
     const updated = await storage.updateCustomer(id, req.body);
     if (!updated) return res.status(404).json({ message: "Customer not found" });
@@ -1028,11 +1025,11 @@ export async function registerRoutes(
   });
 
   // ─── Sales Invoices ───────────────────────────────────────────────────────
-  app.get("/api/sales", requireAdmin, async (_req, res) => {
+  app.get("/api/sales", requireAuth, async (_req, res) => {
     res.json(await storage.getAllSalesInvoices());
   });
 
-  app.get("/api/sales/next-number", requireAdmin, async (_req, res) => {
+  app.get("/api/sales/next-number", requireAuth, async (_req, res) => {
     const settings = await storage.getCompanySettings();
     const currentYear = new Date().getFullYear();
     const year = settings.invoiceYear !== currentYear ? currentYear : settings.invoiceYear;
@@ -1041,13 +1038,13 @@ export async function registerRoutes(
     res.json({ invoiceNumber: `${settings.invoicePrefix}-${year}-${numStr}` });
   });
 
-  app.get("/api/sales/:id", requireAdmin, async (req, res) => {
+  app.get("/api/sales/:id", requireAuth, async (req, res) => {
     const sale = await storage.getSalesInvoice(parseInt(req.params.id));
     if (!sale) return res.status(404).json({ message: "Not found" });
     res.json(sale);
   });
 
-  app.post("/api/sales", requireAdmin, async (req, res) => {
+  app.post("/api/sales", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
       const { customerId, invoiceDate, deliveryDate, paymentMethod, paymentTerms, vatType, vatRate, vatNote, notes, totalNet, totalVat, totalGross, items } = req.body;
@@ -1090,14 +1087,14 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sales/:id/confirm", requireAdmin, async (req, res) => {
+  app.post("/api/sales/:id/confirm", requireAuth, async (req, res) => {
     const sale = await storage.confirmSale(parseInt(req.params.id));
     if (!sale) return res.status(404).json({ message: "Not found" });
     res.json(sale);
   });
 
   // ─── Sales PDF Generation ─────────────────────────────────────────────────
-  app.get("/api/sales/:id/pdf", requireAdmin, async (req, res) => {
+  app.get("/api/sales/:id/pdf", requireAuth, async (req, res) => {
     try {
       const sale = await storage.getSalesInvoice(parseInt(req.params.id));
       if (!sale) return res.status(404).json({ message: "Not found" });
@@ -1460,12 +1457,12 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/price-lists", requireAdmin, async (_req, res) => {
+  app.get("/api/price-lists", requireHamburg, async (_req, res) => {
     const lists = await storage.getAllPriceLists();
     res.json(lists);
   });
 
-  app.get("/api/price-lists/:id/items", requireAdmin, async (req, res) => {
+  app.get("/api/price-lists/:id/items", requireHamburg, async (req, res) => {
     const items = await storage.getPriceListItems(parseInt(req.params.id));
     res.json(items);
   });

@@ -140,11 +140,12 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="manager">Location Manager</SelectItem>
+                  <SelectItem value="manager">Hamburg Manager</SelectItem>
+                  <SelectItem value="station_lead">Station Lead</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {role === "manager" && (
+            {(role === "manager" || role === "station_lead") && (
               <div className="space-y-2">
                 <Label>Assigned Location</Label>
                 <Select value={stationId} onValueChange={setStationId}>
@@ -196,12 +197,12 @@ export default function UsersPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold" data-testid={`text-user-name-${u.id}`}>{u.name}</p>
                       <Badge variant="secondary" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
-                        {u.role === "admin" ? "Admin" : "Manager"}
+                        {u.role === "admin" ? "Admin" : u.role === "manager" ? "Hamburg Manager" : "Station Lead"}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{u.email}</p>
-                    {u.role === "manager" && (
-                      <p className="text-xs text-muted-foreground">Station: {getStationName(u.assignedStationId)}</p>
+                    {(u.role === "manager" || u.role === "station_lead") && (
+                      <p className="text-xs text-muted-foreground">Location: {getStationName(u.assignedStationId)}</p>
                     )}
                   </div>
                 </div>

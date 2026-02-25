@@ -24,7 +24,7 @@ import { EQUIPMENT_TYPE_LABELS, TYPE_SPECIFIC_FIELDS } from "@shared/schema";
 export default function EquipmentDetailPage() {
   const [, params] = useRoute("/equipment/:id");
   const id = params?.id;
-  const { isAdmin, user } = useAuth();
+  const { isHamburg, user } = useAuth();
   const { toast } = useToast();
 
   const { data: item, isLoading } = useQuery<Equipment>({
@@ -124,19 +124,20 @@ export default function EquipmentDetailPage() {
         <InfoCard icon={<Star className="h-4 w-4" />} label="Condition" value={`${item.conditionRating}/5`} />
       </div>
 
-      {isAdmin && (
-        <Card>
+      <Card>
           <CardHeader className="pb-2">
             <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Financial Data</h3>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs text-muted-foreground">Purchase Price</p>
-                <p className="font-semibold" data-testid="text-purchase-price">
-                  {item.purchasePrice ? `€${item.purchasePrice}` : "N/A"}
-                </p>
-              </div>
+            <div className={`grid gap-4 ${isHamburg ? "grid-cols-3" : "grid-cols-2"}`}>
+              {isHamburg && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Purchase Price</p>
+                  <p className="font-semibold" data-testid="text-purchase-price">
+                    {item.purchasePrice ? `€${item.purchasePrice}` : "N/A"}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="text-xs text-muted-foreground">Current Value</p>
                 <p className="font-semibold" data-testid="text-current-value">
@@ -167,7 +168,6 @@ export default function EquipmentDetailPage() {
             )}
           </CardContent>
         </Card>
-      )}
 
       {typeFields.length > 0 && (
         <Card>
@@ -225,7 +225,7 @@ export default function EquipmentDetailPage() {
         </TabsContent>
 
         <TabsContent value="repairs" className="mt-4 space-y-4">
-          <RepairsSection equipmentId={item.id} repairs={repairsData || []} isAdmin={isAdmin} />
+          <RepairsSection equipmentId={item.id} repairs={repairsData || []} isHamburg={isHamburg} />
         </TabsContent>
 
         <TabsContent value="transfers" className="mt-4 space-y-4">
@@ -235,6 +235,7 @@ export default function EquipmentDetailPage() {
             transfers={transfersData || []}
             stations={stationsList || []}
             getStationName={getStationName}
+            isHamburg={isHamburg}
           />
         </TabsContent>
       </Tabs>
@@ -509,11 +510,11 @@ function ConditionSection({ equipmentId, ratings }: { equipmentId: number; ratin
 function RepairsSection({
   equipmentId,
   repairs,
-  isAdmin,
+  isHamburg,
 }: {
   equipmentId: number;
   repairs: Repair[];
-  isAdmin: boolean;
+  isHamburg: boolean;
 }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -525,7 +526,7 @@ function RepairsSection({
     mutationFn: () =>
       apiRequest("POST", `/api/equipment/${equipmentId}/repairs`, {
         description: desc,
-        cost: isAdmin && cost ? cost : null,
+        cost: isHamburg && cost ? cost : null,
         status,
       }),
     onSuccess: () => {
@@ -564,7 +565,7 @@ function RepairsSection({
               <Label>Description</Label>
               <Textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Describe the repair..." data-testid="input-repair-description" />
             </div>
-            {isAdmin && (
+            {isHamburg && (
               <div className="space-y-2">
                 <Label>Cost (€)</Label>
                 <Input type="number" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0.00" data-testid="input-repair-cost" />
@@ -601,7 +602,7 @@ function RepairsSection({
                     <p className="text-sm font-medium">{r.description}</p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <StatusBadge status={r.status === "completed" ? "active" : "in_repair"} />
-                      {isAdmin && r.cost && <span className="text-xs text-muted-foreground">€{r.cost}</span>}
+                      {isHamburg && r.cost && <span className="text-xs text-muted-foreground">€{r.cost}</span>}
                       <span className="text-xs text-muted-foreground">
                         {r.date ? new Date(r.date).toLocaleDateString() : ""}
                       </span>
@@ -633,12 +634,14 @@ function TransfersSection({
   transfers,
   stations,
   getStationName,
+  isHamburg,
 }: {
   equipmentId: number;
   currentStationId: number | null;
   transfers: Transfer[];
   stations: Station[];
   getStationName: (id: number | null) => string;
+  isHamburg: boolean;
 }) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -676,6 +679,7 @@ function TransfersSection({
 
   return (
     <>
+      {isHamburg && (
       <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button data-testid="button-initiate-transfer">
@@ -714,6 +718,7 @@ function TransfersSection({
             </div>
           </DialogContent>
         </Dialog>
+      )}
 
       {transfers.length === 0 ? (
         <p className="text-center text-muted-foreground text-sm py-8">No transfers recorded</p>

@@ -95,3 +95,14 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   }
   next();
 }
+
+export function requireHamburg(req: Request, res: Response, next: NextFunction) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+  const role = (req.user as any).role;
+  if (role !== "admin" && role !== "manager") {
+    return res.status(403).json({ message: "Hamburg office access required" });
+  }
+  next();
+}

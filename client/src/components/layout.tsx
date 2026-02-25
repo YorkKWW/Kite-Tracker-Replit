@@ -27,7 +27,7 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isHamburg, isStationLead } = useAuth();
   const [location, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -49,15 +49,19 @@ export default function Layout({ children }: LayoutProps) {
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/equipment", label: "Equipment", icon: Package },
-    { href: "/transfers", label: "Transfers", icon: ArrowLeftRight },
+    ...(isHamburg ? [{ href: "/transfers", label: "Transfers", icon: ArrowLeftRight }] : []),
+    { href: "/sales", label: "Sales", icon: ShoppingCart },
+    ...(isHamburg
+      ? [
+          { href: "/price-lists", label: "Price Lists", icon: Tag },
+          { href: "/invoice-import", label: "Import Invoice", icon: FileUp },
+        ]
+      : []),
     ...(isAdmin
       ? [
           { href: "/stations", label: "Locations", icon: MapPin },
-          { href: "/sales", label: "Sales", icon: ShoppingCart },
-          { href: "/price-lists", label: "Price Lists", icon: Tag },
           { href: "/users", label: "Users", icon: Users },
           { href: "/activity", label: "Activity", icon: FileText },
-          { href: "/invoice-import", label: "Import Invoice", icon: FileUp },
         ]
       : []),
     { href: "/settings", label: "Settings", icon: Settings },
