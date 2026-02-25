@@ -111,6 +111,7 @@ export interface IStorage {
   getAllSalesInvoices(): Promise<(SalesInvoice & { customerName: string; itemCount: number })[]>;
   getSalesInvoice(id: number): Promise<(SalesInvoice & { customer: Customer; items: SaleItem[] }) | undefined>;
   createSalesInvoice(inv: InsertSalesInvoice, items: Omit<InsertSaleItem, "saleId">[]): Promise<SalesInvoice>;
+  updateSalesInvoice(id: number, data: Partial<SalesInvoice>): Promise<SalesInvoice | undefined>;
   confirmSale(id: number): Promise<SalesInvoice | undefined>;
   getNextInvoiceNumber(): Promise<string>;
 
@@ -123,8 +124,8 @@ export interface IStorage {
   lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>;
   lookupRetailPriceByName(name: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>;
 
-  getAllDamageReports(): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[] })[]>;
-  getDamageReport(id: number): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[] }) | undefined>;
+  getAllDamageReports(): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[]; invoiceId?: number; invoiceNumber?: string; invoicePdfUrl?: string })[]>;
+  getDamageReport(id: number): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[]; invoiceId?: number; invoiceNumber?: string; invoicePdfUrl?: string }) | undefined>;
   getDamageReportsByEquipment(equipmentId: number): Promise<(DamageReport & { reporterName: string; photos: DamageReportPhoto[] })[]>;
   createDamageReport(report: InsertDamageReport): Promise<DamageReport>;
   updateDamageReport(id: number, data: Partial<DamageReport>): Promise<DamageReport | undefined>;
@@ -660,6 +661,11 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async updateSalesInvoice(id: number, data: Partial<SalesInvoice>): Promise<SalesInvoice | undefined> {
+    const [updated] = await db.update(salesInvoices).set(data).where(eq(salesInvoices.id, id)).returning();
+    return updated;
+  }
+
   async confirmSale(id: number): Promise<SalesInvoice | undefined> {
     const items = await db.select().from(saleItems).where(eq(saleItems.saleId, id));
     for (const item of items) {
@@ -775,18 +781,21 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  private async enrichDamageReports(reports: DamageReport[]): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[] })[]> {
+  private async enrichDamageReports(reports: DamageReport[]): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[]; invoiceId?: number; invoiceNumber?: string; invoicePdfUrl?: string })[]> {
     if (!reports.length) return [];
     const equipIds = [...new Set(reports.map(r => r.equipmentId))];
     const userIds = [...new Set(reports.map(r => r.reportedBy))];
     const stationIds = [...new Set(reports.map(r => r.stationId).filter(Boolean))] as number[];
     const reportIds = reports.map(r => r.id);
 
-    const [equips, reportUsers, reportStations, allPhotos] = await Promise.all([
+    const [equips, reportUsers, reportStations, allPhotos, linkedInvoices] = await Promise.all([
       db.select({ id: equipment.id, brand: equipment.brand, model: equipment.model }).from(equipment).where(inArray(equipment.id, equipIds)),
       db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, userIds)),
       stationIds.length ? db.select({ id: stations.id, name: stations.name }).from(stations).where(inArray(stations.id, stationIds)) : Promise.resolve([]),
       db.select().from(damageReportPhotos).where(inArray(damageReportPhotos.damageReportId, reportIds)).orderBy(damageReportPhotos.uploadedAt),
+      db.select({ id: salesInvoices.id, invoiceNumber: salesInvoices.invoiceNumber, damageReportId: salesInvoices.damageReportId, pdfUrl: salesInvoices.pdfUrl })
+        .from(salesInvoices)
+        .where(inArray(salesInvoices.damageReportId, reportIds)),
     ]);
 
     const equipMap = Object.fromEntries(equips.map(e => [e.id, `${e.brand} ${e.model}`]));
@@ -797,6 +806,10 @@ export class DatabaseStorage implements IStorage {
       if (!photoMap[p.damageReportId]) photoMap[p.damageReportId] = [];
       photoMap[p.damageReportId].push(p);
     }
+    const invoiceMap: Record<number, { id: number; invoiceNumber: string; pdfUrl: string | null }> = {};
+    for (const inv of linkedInvoices) {
+      if (inv.damageReportId) invoiceMap[inv.damageReportId] = { id: inv.id, invoiceNumber: inv.invoiceNumber, pdfUrl: inv.pdfUrl ?? null };
+    }
 
     return reports.map(r => ({
       ...r,
@@ -804,6 +817,9 @@ export class DatabaseStorage implements IStorage {
       reporterName: userMap[r.reportedBy] ?? "Unknown",
       stationName: r.stationId ? stationMap[r.stationId] : undefined,
       photos: photoMap[r.id] ?? [],
+      invoiceId: invoiceMap[r.id]?.id,
+      invoiceNumber: invoiceMap[r.id]?.invoiceNumber,
+      invoicePdfUrl: invoiceMap[r.id]?.pdfUrl ?? undefined,
     }));
   }
 

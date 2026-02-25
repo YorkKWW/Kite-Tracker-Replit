@@ -7,7 +7,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { z } from "zod";
-import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
+import { randomUUID } from "crypto";
+import { ObjectStorageService, objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
@@ -1568,6 +1569,14 @@ export async function registerRoutes(
 
   // ─── Damage Reports ────────────────────────────────────────────────────────
 
+  app.get("/api/damage-reports/open-count", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    if (!["admin", "manager"].includes(user.role)) return res.json({ count: 0 });
+    const reports = await storage.getAllDamageReports();
+    const openCount = reports.filter(r => r.status === "open").length;
+    res.json({ count: openCount });
+  });
+
   app.get("/api/damage-reports", requireAuth, async (req, res) => {
     const user = req.user as any;
     const reports = await storage.getAllDamageReports();
@@ -1739,6 +1748,283 @@ export async function registerRoutes(
       uploadedBy: user.id,
     });
     res.json(photo);
+  });
+
+  // ─── Damage Report Invoice Generation ────────────────────────────────────────
+  app.post("/api/damage-reports/:id/invoice", requireHamburg, async (req, res) => {
+    try {
+      const reportId = parseInt(req.params.id);
+      const user = req.user as any;
+
+      const bodySchema = z.object({
+        customerType: z.enum(["kww", "external"]),
+        customerName: z.string().min(1),
+        companyName: z.string().optional().nullable(),
+        address: z.string().min(1),
+        email: z.string().email().optional().nullable().or(z.literal("")),
+        taxId: z.string().optional().nullable(),
+        bookingNumber: z.string().optional().nullable(),
+        repairCost: z.string().optional().nullable(),
+        valueLoss: z.string().optional().nullable(),
+        vatType: z.string().default("standard_19"),
+        paymentMethod: z.string().default("bank_transfer"),
+        notes: z.string().optional().nullable(),
+      });
+
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Validation error", errors: parsed.error.errors });
+      const body = parsed.data;
+
+      if (body.customerType === "kww" && !body.bookingNumber) {
+        return res.status(400).json({ message: "Booking number is required for KiteWorldWide customers" });
+      }
+
+      const report = await storage.getDamageReport(reportId);
+      if (!report) return res.status(404).json({ message: "Damage report not found" });
+
+      const eq = await storage.getEquipment(report.equipmentId);
+      const eqLabel = eq ? `${eq.brand} ${eq.model}${eq.serialNumber ? ` (${eq.serialNumber})` : ""}` : `Equipment #${report.equipmentId}`;
+
+      const settings = await storage.getCompanySettings();
+      const invoiceNumber = await storage.getNextInvoiceNumber();
+      const today = new Date().toISOString().split("T")[0];
+
+      const repairCostNum = parseFloat(body.repairCost || "0") || 0;
+      const valueLossNum = parseFloat(body.valueLoss || "0") || 0;
+      const vatRateNum = body.vatType === "standard_19" ? 19 : body.vatType === "reduced_7" ? 7 : 0;
+      const totalNet = repairCostNum + valueLossNum;
+      const totalVat = Math.round(totalNet * vatRateNum) / 100;
+      const totalGross = totalNet + totalVat;
+
+      const vatNote = vatRateNum === 0 ? "Gemäß §19 UStG wird keine Umsatzsteuer berechnet." : undefined;
+
+      const notesParts: string[] = [];
+      if (body.customerType === "kww" && body.bookingNumber) notesParts.push(`KiteWorldWide Buchung: ${body.bookingNumber}`);
+      if (body.notes) notesParts.push(body.notes);
+      notesParts.push(`Damage Report #${reportId} | Equipment: ${eqLabel}`);
+
+      const customer = await storage.createCustomer({
+        name: body.customerName,
+        companyName: body.companyName || null,
+        address: body.address,
+        email: body.email || "not-provided@kitetracker.com",
+        taxId: body.taxId || null,
+      });
+
+      const saleItems: { position: number; description: string; serialNumber?: string; sku?: string; quantity: number; unitPrice: string; total: string; equipmentId?: number }[] = [];
+      let pos = 1;
+      if (repairCostNum > 0) {
+        saleItems.push({ position: pos++, description: `Repair Cost – ${eqLabel}`, quantity: 1, unitPrice: repairCostNum.toFixed(2), total: repairCostNum.toFixed(2), equipmentId: report.equipmentId });
+      }
+      if (valueLossNum > 0) {
+        saleItems.push({ position: pos++, description: `Value Reduction – ${eqLabel}`, quantity: 1, unitPrice: valueLossNum.toFixed(2), total: valueLossNum.toFixed(2), equipmentId: report.equipmentId });
+      }
+      if (saleItems.length === 0) {
+        saleItems.push({ position: 1, description: `Damage costs – ${eqLabel}`, quantity: 1, unitPrice: "0.00", total: "0.00", equipmentId: report.equipmentId });
+      }
+
+      const invoice = await storage.createSalesInvoice({
+        invoiceNumber,
+        invoiceDate: today,
+        customerId: customer.id,
+        paymentMethod: body.paymentMethod,
+        paymentTerms: "14 Tage ohne Abzug",
+        vatType: body.vatType,
+        vatRate: vatRateNum.toFixed(2),
+        vatNote: vatNote || null,
+        notes: notesParts.join(" | ") || null,
+        totalNet: totalNet.toFixed(2),
+        totalVat: totalVat.toFixed(2),
+        totalGross: totalGross.toFixed(2),
+        status: "confirmed",
+        createdBy: user.id,
+        damageReportId: reportId,
+        customerType: body.customerType,
+      } as any, saleItems as any);
+
+      // ── Generate PDF ──────────────────────────────────────────────────────
+      const PDFDocument = _require("pdfkit");
+      const chunks: Buffer[] = [];
+      const doc = new PDFDocument({ size: "A4", margin: 50, info: { Title: `Damage Invoice ${invoiceNumber}` } });
+      doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+
+      await new Promise<void>((resolve) => {
+        doc.on("end", resolve);
+
+        const pageW = 595.28, pageH = 841.89, margin = 50, contentW = pageW - margin * 2;
+        const navy = "#1e3a5f", grey = "#6b7280", lightGrey = "#f3f4f6", black = "#111827", red = "#dc2626";
+
+        // ── Company header ──
+        doc.fontSize(20).font("Helvetica-Bold").fillColor(navy).text(settings.companyName, margin, margin, { width: contentW * 0.65 });
+        doc.fontSize(8).font("Helvetica").fillColor(grey).text(`${settings.companyName} | ${settings.address}`, margin, margin + 28, { width: contentW });
+        doc.moveTo(margin, margin + 42).lineTo(pageW - margin, margin + 42).strokeColor(navy).lineWidth(1.5).stroke();
+
+        let y = margin + 55;
+
+        // ── Customer address block ──
+        doc.fontSize(7).font("Helvetica").fillColor(grey).text("Invoice to:", margin, y); y += 12;
+        doc.fontSize(10).font("Helvetica-Bold").fillColor(black);
+        if (customer.companyName) { doc.text(customer.companyName, margin, y); y += 14; }
+        doc.text(customer.name, margin, y); y += 14;
+        doc.font("Helvetica").fontSize(9).fillColor(black);
+        customer.address.split("\n").forEach((line: string) => { doc.text(line, margin, y); y += 13; });
+        if (customer.email && customer.email !== "not-provided@kitetracker.com") { doc.text(customer.email, margin, y); y += 13; }
+        if (customer.taxId) { doc.text(`Tax No.: ${customer.taxId}`, margin, y); y += 13; }
+
+        // ── Invoice meta ──
+        const metaX = pageW - margin - 200, metaY = margin + 55;
+        const metaRows: [string, string][] = [
+          ["Invoice No.:", invoiceNumber],
+          ["Invoice Date:", today],
+          ["Type:", body.customerType === "kww" ? "KiteWorldWide Customer" : "External Customer"],
+        ];
+        if (body.customerType === "kww" && body.bookingNumber) metaRows.push(["Booking No.:", body.bookingNumber]);
+        let my = metaY;
+        for (const [lbl, val] of metaRows) {
+          doc.fontSize(8).font("Helvetica").fillColor(grey).text(lbl, metaX, my, { width: 105, align: "right" });
+          doc.fontSize(8).font("Helvetica-Bold").fillColor(black).text(val, metaX + 110, my, { width: 85, align: "left" });
+          my += 14;
+        }
+
+        y = Math.max(y, my) + 18;
+
+        // ── "DAMAGE INVOICE" heading ──
+        doc.fontSize(16).font("Helvetica-Bold").fillColor(red).text("DAMAGE INVOICE", margin, y);
+        y += 10;
+        doc.fontSize(9).font("Helvetica").fillColor(grey).text(`Damage Report #${reportId}`, margin, y);
+        y += 28;
+
+        // ── Damage reference box ──
+        doc.rect(margin, y, contentW, 70).fill("#fef2f2").stroke("#fecaca");
+        doc.fillColor(black).fontSize(8).font("Helvetica-Bold").text("Damaged Equipment:", margin + 10, y + 8);
+        doc.font("Helvetica").text(eqLabel, margin + 10, y + 20, { width: contentW - 20 });
+        doc.font("Helvetica-Bold").text("Incident description:", margin + 10, y + 33);
+        doc.font("Helvetica").text(report.howItHappened, margin + 10, y + 45, { width: contentW - 20, ellipsis: true });
+        y += 82;
+
+        // ── Retail Price reference (if available) ──
+        if (eq?.retailPrice) {
+          doc.fontSize(8).font("Helvetica-Oblique").fillColor(grey).text(`Reference Retail-Price (UVP): ${parseFloat(eq.retailPrice).toFixed(2)} €  ·  Current value based on age and condition — for reference only.`, margin, y, { width: contentW });
+          y += 18;
+        }
+        y += 8;
+
+        // ── Table header ──
+        const colPos = margin, colDesc = margin + 30, colQty = margin + 355, colPrice = margin + 390, colTotal = margin + 445;
+        const tableRight = pageW - margin;
+
+        doc.rect(margin, y, contentW, 18).fill(navy);
+        doc.fontSize(8).font("Helvetica-Bold").fillColor("#ffffff");
+        doc.text("Pos.", colPos, y + 5, { width: 25 });
+        doc.text("Description", colDesc, y + 5, { width: 290 });
+        doc.text("Qty", colQty, y + 5, { width: 30, align: "center" });
+        doc.text("Unit Price", colPrice, y + 5, { width: 60, align: "right" });
+        doc.text("Total", colTotal, y + 5, { width: tableRight - colTotal, align: "right" });
+        y += 20;
+
+        for (const item of saleItems) {
+          if (item.position % 2 === 0) doc.rect(margin, y, contentW, 18).fill(lightGrey);
+          doc.fontSize(8).font("Helvetica").fillColor(black);
+          doc.text(String(item.position), colPos, y + 5, { width: 25 });
+          doc.text(item.description, colDesc, y + 5, { width: 290 });
+          doc.text("1", colQty, y + 5, { width: 30, align: "center" });
+          doc.text(`${parseFloat(item.unitPrice).toFixed(2)} €`, colPrice, y + 5, { width: 60, align: "right" });
+          doc.text(`${parseFloat(item.total).toFixed(2)} €`, colTotal, y + 5, { width: tableRight - colTotal, align: "right" });
+          y += 18;
+        }
+
+        // ── Totals ──
+        y += 10;
+        doc.moveTo(margin + contentW * 0.55, y).lineTo(tableRight, y).strokeColor(grey).lineWidth(0.5).stroke();
+        y += 6;
+        const totX = margin + contentW * 0.55, totValX = tableRight - 80;
+        const vatLabel = vatRateNum === 0 ? "VAT 0%" : `VAT ${vatRateNum}%`;
+        const totals: [string, string][] = [
+          ["Net amount:", `${totalNet.toFixed(2)} €`],
+          [vatLabel, `${totalVat.toFixed(2)} €`],
+        ];
+        for (const [lbl, val] of totals) {
+          doc.fontSize(9).font("Helvetica").fillColor(grey).text(lbl, totX, y, { width: totValX - totX - 5, align: "right" });
+          doc.font("Helvetica").fillColor(black).text(val, totValX, y, { width: 80, align: "right" }); y += 14;
+        }
+        doc.rect(totX - 5, y - 2, tableRight - totX + 5, 20).fill(navy);
+        doc.fontSize(10).font("Helvetica-Bold").fillColor("#ffffff");
+        doc.text("Total amount:", totX, y + 4, { width: totValX - totX - 5, align: "right" });
+        doc.text(`${totalGross.toFixed(2)} €`, totValX, y + 4, { width: 80, align: "right" });
+        y += 30;
+
+        if (vatNote) {
+          doc.fontSize(8).font("Helvetica-Oblique").fillColor(grey).text(`Note: ${vatNote}`, margin, y, { width: contentW }); y += 20;
+        }
+
+        // ── Payment section ──
+        y += 10;
+        doc.fontSize(10).font("Helvetica-Bold").fillColor(navy).text("Payment Information", margin, y); y += 16;
+        doc.fontSize(9).font("Helvetica").fillColor(black);
+        if (body.paymentMethod === "bank_transfer") {
+          doc.text(`Bank: ${settings.bankName}`, margin, y); y += 13;
+          doc.text(`IBAN: ${settings.iban}`, margin, y); y += 13;
+          doc.text(`BIC: ${settings.bic}`, margin, y); y += 13;
+          doc.text(`Account holder: ${settings.accountHolder}`, margin, y); y += 13;
+          doc.text(`Reference: ${invoiceNumber}`, margin, y); y += 13;
+        } else if (body.paymentMethod === "cash") {
+          doc.text("Payment: Cash received", margin, y); y += 13;
+        }
+
+        if (notesParts.length > 0) {
+          y += 10;
+          doc.fontSize(9).font("Helvetica-Bold").fillColor(black).text("Notes:", margin, y); y += 13;
+          doc.font("Helvetica").fillColor(grey).text(notesParts.join("\n"), margin, y, { width: contentW }); y += 20;
+        }
+
+        // ── Footer ──
+        const footerY = pageH - 80;
+        doc.moveTo(margin, footerY).lineTo(pageW - margin, footerY).strokeColor(grey).lineWidth(0.5).stroke();
+        doc.fontSize(7).font("Helvetica").fillColor(grey);
+        doc.text(`${settings.companyName} | ${settings.address} | Managing Director: ${settings.managingDirector}`, margin, footerY + 8, { width: contentW, align: "center" });
+        doc.text(`Registry: ${settings.registry} | Tax No.: ${settings.taxId} | VAT ID: ${settings.vatId}`, margin, footerY + 20, { width: contentW, align: "center" });
+        doc.text(`Phone: ${settings.phone} | Web: ${settings.website} | ${settings.bankName} | IBAN: ${settings.iban} | BIC: ${settings.bic}`, margin, footerY + 32, { width: contentW, align: "center" });
+
+        doc.end();
+      });
+
+      const pdfBuffer = Buffer.concat(chunks);
+
+      // ── Upload PDF to object storage ──
+      let pdfUrl: string | null = null;
+      try {
+        const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+        if (privateDir) {
+          const uuid = randomUUID();
+          const fullPath = `${privateDir}/invoices/${uuid}.pdf`;
+          const parts = (fullPath.startsWith("/") ? fullPath.slice(1) : fullPath).split("/");
+          const bucketName = parts[0];
+          const objectName = parts.slice(1).join("/");
+          const bucket = objectStorageClient.bucket(bucketName);
+          const file = bucket.file(objectName);
+          await file.save(pdfBuffer, { contentType: "application/pdf", metadata: { cacheControl: "private, max-age=3600" } });
+          let entityDir = privateDir.endsWith("/") ? privateDir : privateDir + "/";
+          const entityId = `invoices/${uuid}.pdf`;
+          pdfUrl = `/objects/${entityId}`;
+          await storage.updateSalesInvoice(invoice.id, { pdfUrl });
+        }
+      } catch (uploadErr) {
+        console.error("PDF upload to object storage failed:", uploadErr);
+      }
+
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "damage_invoice_created",
+        equipmentId: report.equipmentId,
+        stationId: report.stationId ?? undefined,
+        details: `Damage invoice ${invoiceNumber} generated for ${eqLabel} — ${totalGross.toFixed(2)} €`,
+      });
+
+      res.json({ ...invoice, pdfUrl });
+    } catch (err: any) {
+      console.error("Damage invoice error:", err);
+      res.status(500).json({ message: err.message });
+    }
   });
 
   return httpServer;

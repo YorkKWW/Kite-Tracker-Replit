@@ -240,58 +240,6 @@ export const customers = pgTable("customers", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const salesInvoices = pgTable("sales_invoices", {
-  id: serial("id").primaryKey(),
-  invoiceNumber: text("invoice_number").notNull().unique(),
-  invoiceDate: text("invoice_date").notNull(),
-  deliveryDate: text("delivery_date"),
-  customerId: integer("customer_id").notNull().references(() => customers.id),
-  paymentMethod: text("payment_method").notNull().default("bank_transfer"),
-  paymentTerms: text("payment_terms").notNull().default("14 Tage ohne Abzug"),
-  vatType: text("vat_type").notNull().default("standard_19"),
-  vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).notNull().default("19.00"),
-  vatNote: text("vat_note"),
-  notes: text("notes"),
-  totalNet: decimal("total_net", { precision: 10, scale: 2 }).notNull().default("0.00"),
-  totalVat: decimal("total_vat", { precision: 10, scale: 2 }).notNull().default("0.00"),
-  totalGross: decimal("total_gross", { precision: 10, scale: 2 }).notNull().default("0.00"),
-  status: text("status").notNull().default("draft"),
-  createdAt: timestamp("created_at").defaultNow(),
-  createdBy: integer("created_by").references(() => users.id),
-});
-
-export const saleItems = pgTable("sale_items", {
-  id: serial("id").primaryKey(),
-  saleId: integer("sale_id").notNull().references(() => salesInvoices.id),
-  equipmentId: integer("equipment_id").notNull().references(() => equipment.id),
-  position: integer("position").notNull().default(1),
-  description: text("description").notNull(),
-  serialNumber: text("serial_number"),
-  sku: text("sku"),
-  quantity: integer("quantity").notNull().default(1),
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
-});
-
-export const priceLists = pgTable("price_lists", {
-  id: serial("id").primaryKey(),
-  supplier: text("supplier").notNull(),
-  uploadedAt: timestamp("uploaded_at").defaultNow(),
-  itemCount: integer("item_count").notNull().default(0),
-  isActive: boolean("is_active").notNull().default(true),
-  uploadedBy: integer("uploaded_by").references(() => users.id),
-});
-
-export const priceListItems = pgTable("price_list_items", {
-  id: serial("id").primaryKey(),
-  priceListId: integer("price_list_id").notNull().references(() => priceLists.id, { onDelete: "cascade" }),
-  sku: text("sku").notNull(),
-  productName: text("product_name").notNull(),
-  retailPrice: decimal("retail_price", { precision: 10, scale: 2 }).notNull(),
-  dealerPrice: decimal("dealer_price", { precision: 10, scale: 2 }),
-  productType: text("product_type"),
-});
-
 export const damageReports = pgTable("damage_reports", {
   id: serial("id").primaryKey(),
   equipmentId: integer("equipment_id").notNull().references(() => equipment.id),
@@ -321,6 +269,61 @@ export const damageReportPhotos = pgTable("damage_report_photos", {
   url: text("url").notNull(),
   uploadedBy: integer("uploaded_by").notNull().references(() => users.id),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export const salesInvoices = pgTable("sales_invoices", {
+  id: serial("id").primaryKey(),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  invoiceDate: text("invoice_date").notNull(),
+  deliveryDate: text("delivery_date"),
+  customerId: integer("customer_id").notNull().references(() => customers.id),
+  paymentMethod: text("payment_method").notNull().default("bank_transfer"),
+  paymentTerms: text("payment_terms").notNull().default("14 Tage ohne Abzug"),
+  vatType: text("vat_type").notNull().default("standard_19"),
+  vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).notNull().default("19.00"),
+  vatNote: text("vat_note"),
+  notes: text("notes"),
+  totalNet: decimal("total_net", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  totalVat: decimal("total_vat", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  totalGross: decimal("total_gross", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  status: text("status").notNull().default("draft"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+  damageReportId: integer("damage_report_id").references(() => damageReports.id),
+  pdfUrl: text("pdf_url"),
+  customerType: text("customer_type"),
+});
+
+export const saleItems = pgTable("sale_items", {
+  id: serial("id").primaryKey(),
+  saleId: integer("sale_id").notNull().references(() => salesInvoices.id),
+  equipmentId: integer("equipment_id").references(() => equipment.id),
+  position: integer("position").notNull().default(1),
+  description: text("description").notNull(),
+  serialNumber: text("serial_number"),
+  sku: text("sku"),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const priceLists = pgTable("price_lists", {
+  id: serial("id").primaryKey(),
+  supplier: text("supplier").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  itemCount: integer("item_count").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  uploadedBy: integer("uploaded_by").references(() => users.id),
+});
+
+export const priceListItems = pgTable("price_list_items", {
+  id: serial("id").primaryKey(),
+  priceListId: integer("price_list_id").notNull().references(() => priceLists.id, { onDelete: "cascade" }),
+  sku: text("sku").notNull(),
+  productName: text("product_name").notNull(),
+  retailPrice: decimal("retail_price", { precision: 10, scale: 2 }).notNull(),
+  dealerPrice: decimal("dealer_price", { precision: 10, scale: 2 }),
+  productType: text("product_type"),
 });
 
 export const insertStationSchema = createInsertSchema(stations).omit({ id: true });

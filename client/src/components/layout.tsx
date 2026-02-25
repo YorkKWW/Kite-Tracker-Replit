@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -69,6 +70,14 @@ export default function Layout({ children }: LayoutProps) {
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
+  const { data: openCountData } = useQuery<{ count: number }>({
+    queryKey: ["/api/damage-reports/open-count"],
+    staleTime: 0,
+    refetchInterval: 60000,
+    enabled: isHamburg || isAdmin,
+  });
+  const openDamageCount = openCountData?.count ?? 0;
+
   const isActive = (href: string) => {
     if (href === "/") return location === "/";
     return location.startsWith(href);
@@ -89,11 +98,16 @@ export default function Layout({ children }: LayoutProps) {
                 <Button
                   variant={isActive(item.href) ? "secondary" : "ghost"}
                   size="sm"
-                  className={cn("gap-2")}
+                  className={cn("gap-2 relative")}
                   data-testid={`link-nav-${item.label.toLowerCase()}`}
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
+                  {item.href === "/incidents" && openDamageCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center" data-testid="badge-open-incidents">
+                      {openDamageCount > 9 ? "9+" : openDamageCount}
+                    </span>
+                  )}
                 </Button>
               </Link>
             ))}
@@ -138,12 +152,17 @@ export default function Layout({ children }: LayoutProps) {
               <Link key={item.href} href={item.href}>
                 <Button
                   variant={isActive(item.href) ? "secondary" : "ghost"}
-                  className="w-full justify-start gap-3"
+                  className="w-full justify-start gap-3 relative"
                   onClick={() => setMobileMenuOpen(false)}
                   data-testid={`link-mobile-nav-${item.label.toLowerCase()}`}
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
+                  {item.href === "/incidents" && openDamageCount > 0 && (
+                    <span className="ml-auto h-5 min-w-[20px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                      {openDamageCount > 9 ? "9+" : openDamageCount}
+                    </span>
+                  )}
                 </Button>
               </Link>
             ))}

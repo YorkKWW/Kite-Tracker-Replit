@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   AlertTriangle, Plus, X, Upload, Camera, CheckCircle2, Clock,
   Search, Filter, ChevronDown, ChevronUp, Image as ImageIcon, ScanLine, MapPin,
+  Receipt, ExternalLink, FileDown,
 } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
 import { Link } from "wouter";
@@ -42,6 +43,11 @@ type DamageReport = {
   equipmentLabel: string;
   stationName?: string;
   photos: { id: number; url: string; uploadedAt: string | null }[];
+  estimatedRepairCost: string | null;
+  estimatedValueLoss: string | null;
+  invoiceId?: number;
+  invoiceNumber?: string;
+  invoicePdfUrl?: string;
 };
 
 function formatDate(ts: string | null) {
@@ -64,8 +70,182 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
+function InvoiceDialog({ report, open, onClose }: { report: DamageReport; open: boolean; onClose: () => void }) {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [customerType, setCustomerType] = useState<"kww" | "external">(
+    report.bookingReference ? "kww" : "external"
+  );
+  const [form, setForm] = useState({
+    customerName: report.customerName || "",
+    companyName: "",
+    address: "",
+    email: "",
+    taxId: "",
+    bookingNumber: report.bookingReference || "",
+    repairCost: report.estimatedRepairCost ? parseFloat(report.estimatedRepairCost).toFixed(2) : "",
+    valueLoss: report.estimatedValueLoss ? parseFloat(report.estimatedValueLoss).toFixed(2) : "",
+    vatType: "standard_19",
+    paymentMethod: "bank_transfer",
+    notes: "",
+  });
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const invoiceMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/damage-reports/${report.id}/invoice`, {
+      customerType,
+      ...form,
+    }),
+    onSuccess: async (res: any) => {
+      const data = await res.json();
+      toast({ title: `Invoice ${data.invoiceNumber} generated`, description: "Saved under Sales." });
+      queryClient.invalidateQueries({ queryKey: ["/api/damage-reports"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
+      onClose();
+      navigate(`/sales`);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message || "Failed to generate invoice", variant: "destructive" });
+    },
+  });
+
+  const totalNet = (parseFloat(form.repairCost || "0") || 0) + (parseFloat(form.valueLoss || "0") || 0);
+  const vatRate = form.vatType === "standard_19" ? 0.19 : form.vatType === "reduced_7" ? 0.07 : 0;
+  const totalGross = totalNet * (1 + vatRate);
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Receipt className="h-5 w-5 text-primary" />
+            Generate Damage Invoice
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="text-xs text-muted-foreground bg-muted/40 rounded p-3 mb-2">
+          <p className="font-medium text-foreground mb-1">{report.equipmentLabel}</p>
+          <p className="line-clamp-2">{report.howItHappened}</p>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <Label className="text-xs font-medium">Customer Type</Label>
+            <div className="flex gap-2 mt-1">
+              {(["kww", "external"] as const).map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setCustomerType(t)}
+                  data-testid={`button-customer-type-${t}`}
+                  className={`flex-1 py-2 rounded-md text-sm font-medium border transition-colors ${customerType === t ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-muted"}`}
+                >
+                  {t === "kww" ? "KiteWorldWide" : "External Customer"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {customerType === "kww" && (
+            <div>
+              <Label className="text-xs font-medium">Booking Number <span className="text-destructive">*</span></Label>
+              <Input value={form.bookingNumber} onChange={e => set("bookingNumber", e.target.value)} placeholder="KWW-XXXX" className="mt-1" data-testid="input-booking-number" />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <Label className="text-xs font-medium">Customer Name <span className="text-destructive">*</span></Label>
+              <Input value={form.customerName} onChange={e => set("customerName", e.target.value)} placeholder="Full name" className="mt-1" data-testid="input-customer-name" />
+            </div>
+            <div className="col-span-2">
+              <Label className="text-xs font-medium">Company Name</Label>
+              <Input value={form.companyName} onChange={e => set("companyName", e.target.value)} placeholder="Optional" className="mt-1" data-testid="input-company-name" />
+            </div>
+            <div className="col-span-2">
+              <Label className="text-xs font-medium">Address <span className="text-destructive">*</span></Label>
+              <Textarea value={form.address} onChange={e => set("address", e.target.value)} placeholder={"Street & Nr.\nCity, ZIP\nCountry"} rows={3} className="mt-1" data-testid="input-address" />
+            </div>
+            <div>
+              <Label className="text-xs font-medium">Email</Label>
+              <Input value={form.email} onChange={e => set("email", e.target.value)} placeholder="Optional" className="mt-1" data-testid="input-email" />
+            </div>
+            <div>
+              <Label className="text-xs font-medium">Tax ID / VAT No.</Label>
+              <Input value={form.taxId} onChange={e => set("taxId", e.target.value)} placeholder="Optional" className="mt-1" data-testid="input-tax-id" />
+            </div>
+          </div>
+
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Invoice Line Items</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-medium">Repair Cost (€)</Label>
+                <Input type="number" min="0" step="0.01" value={form.repairCost} onChange={e => set("repairCost", e.target.value)} placeholder="0.00" className="mt-1" data-testid="input-invoice-repair-cost" />
+              </div>
+              <div>
+                <Label className="text-xs font-medium">Value Reduction (€)</Label>
+                <Input type="number" min="0" step="0.01" value={form.valueLoss} onChange={e => set("valueLoss", e.target.value)} placeholder="0.00" className="mt-1" data-testid="input-invoice-value-loss" />
+              </div>
+            </div>
+            <div className="mt-3 p-2 bg-muted/40 rounded text-xs text-muted-foreground space-y-0.5">
+              <div className="flex justify-between"><span>Net total:</span><span className="font-medium text-foreground">{totalNet.toFixed(2)} €</span></div>
+              <div className="flex justify-between"><span>VAT ({form.vatType === "standard_19" ? "19%" : form.vatType === "reduced_7" ? "7%" : "0%"}):</span><span className="font-medium text-foreground">{(totalNet * vatRate).toFixed(2)} €</span></div>
+              <div className="flex justify-between font-semibold text-foreground border-t pt-1 mt-1"><span>Gross total:</span><span>{totalGross.toFixed(2)} €</span></div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs font-medium">VAT Rate</Label>
+              <Select value={form.vatType} onValueChange={v => set("vatType", v)}>
+                <SelectTrigger className="mt-1" data-testid="select-vat-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standard_19">19% (Standard)</SelectItem>
+                  <SelectItem value="reduced_7">7% (Reduced)</SelectItem>
+                  <SelectItem value="none">0% (No VAT)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs font-medium">Payment Method</Label>
+              <Select value={form.paymentMethod} onValueChange={v => set("paymentMethod", v)}>
+                <SelectTrigger className="mt-1" data-testid="select-payment-method"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="paypal">PayPal</SelectItem>
+                  <SelectItem value="credit_card">Credit Card</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs font-medium">Additional Notes</Label>
+            <Textarea value={form.notes} onChange={e => set("notes", e.target.value)} placeholder="Optional additional notes" rows={2} className="mt-1" data-testid="input-invoice-notes" />
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-4 pt-3 border-t">
+          <Button variant="outline" className="flex-1" onClick={onClose} data-testid="button-cancel-invoice">Cancel</Button>
+          <Button
+            className="flex-1"
+            onClick={() => invoiceMutation.mutate()}
+            disabled={invoiceMutation.isPending || !form.customerName.trim() || !form.address.trim() || (customerType === "kww" && !form.bookingNumber.trim())}
+            data-testid="button-generate-invoice"
+          >
+            {invoiceMutation.isPending ? "Generating…" : "Generate Invoice"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ReportCard({ report, isHamburg }: { report: DamageReport; isHamburg: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const statusMutation = useMutation({
@@ -77,6 +257,7 @@ function ReportCard({ report, isHamburg }: { report: DamageReport; isHamburg: bo
   });
 
   return (
+    <>
     <Card className={`border-l-4 ${report.totalLoss ? "border-l-red-600" : report.repairable ? "border-l-orange-400" : "border-l-yellow-400"}`} data-testid={`card-damage-report-${report.id}`}>
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
@@ -87,6 +268,13 @@ function ReportCard({ report, isHamburg }: { report: DamageReport; isHamburg: bo
               {!report.totalLoss && !report.repairable && <span className="text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-2 py-0.5 rounded-full">Not Repairable</span>}
               <StatusPill status={report.status} />
               {report.repairId && <span className="text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-2 py-0.5 rounded-full">Repair #{report.repairId}</span>}
+              {report.invoiceNumber && (
+                <Link href="/sales">
+                  <span className="text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full flex items-center gap-1 cursor-pointer hover:opacity-80">
+                    <Receipt className="h-3 w-3" /> {report.invoiceNumber}
+                  </span>
+                </Link>
+              )}
             </div>
             <Link href={`/equipment/${report.equipmentId}`}>
               <p className="font-semibold text-sm hover:text-primary transition-colors" data-testid={`text-damage-equipment-${report.id}`}>{report.equipmentLabel}</p>
@@ -149,6 +337,32 @@ function ReportCard({ report, isHamburg }: { report: DamageReport; isHamburg: bo
               )}
             </div>
 
+            {(report.estimatedRepairCost || report.estimatedValueLoss) && (
+              <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-lg p-3">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-400 mb-2">Cost Estimates</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {report.estimatedRepairCost && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Repair Cost</p>
+                      <p className="font-medium">{parseFloat(report.estimatedRepairCost).toFixed(2)} €</p>
+                    </div>
+                  )}
+                  {report.estimatedValueLoss && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Value Reduction</p>
+                      <p className="font-medium">{parseFloat(report.estimatedValueLoss).toFixed(2)} €</p>
+                    </div>
+                  )}
+                  {report.estimatedRepairCost && report.estimatedValueLoss && (
+                    <div className="col-span-2 border-t pt-1 mt-1">
+                      <p className="text-xs text-muted-foreground">Total (est.)</p>
+                      <p className="font-semibold">{(parseFloat(report.estimatedRepairCost) + parseFloat(report.estimatedValueLoss)).toFixed(2)} €</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {report.photos.length > 0 && (
               <div>
                 <p className="text-xs text-muted-foreground mb-2">Damage photos</p>
@@ -159,6 +373,39 @@ function ReportCard({ report, isHamburg }: { report: DamageReport; isHamburg: bo
                     </a>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {isHamburg && report.invoiceId && (
+              <div className="flex items-center gap-2 flex-wrap pt-1 border-t">
+                <Receipt className="h-4 w-4 text-green-600 shrink-0" />
+                <span className="text-sm font-medium text-green-700 dark:text-green-400">{report.invoiceNumber}</span>
+                <div className="flex gap-2 ml-auto">
+                  <Link href="/sales">
+                    <Button size="sm" variant="outline" className="gap-1.5" data-testid={`button-view-invoice-${report.id}`}>
+                      <ExternalLink className="h-3.5 w-3.5" /> View Invoice
+                    </Button>
+                  </Link>
+                  <a href={`/api/sales/${report.invoiceId}/pdf`} target="_blank" rel="noreferrer">
+                    <Button size="sm" variant="outline" className="gap-1.5" data-testid={`button-download-pdf-${report.id}`}>
+                      <FileDown className="h-3.5 w-3.5" /> Download PDF
+                    </Button>
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {isHamburg && !report.invoiceId && (
+              <div className="pt-1 border-t">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 w-full sm:w-auto"
+                  onClick={() => setInvoiceDialogOpen(true)}
+                  data-testid={`button-open-invoice-dialog-${report.id}`}
+                >
+                  <Receipt className="h-3.5 w-3.5" /> Generate Customer Invoice
+                </Button>
               </div>
             )}
 
@@ -183,6 +430,11 @@ function ReportCard({ report, isHamburg }: { report: DamageReport; isHamburg: bo
         )}
       </CardContent>
     </Card>
+
+    {isHamburg && invoiceDialogOpen && (
+      <InvoiceDialog report={report} open={invoiceDialogOpen} onClose={() => setInvoiceDialogOpen(false)} />
+    )}
+    </>
   );
 }
 
