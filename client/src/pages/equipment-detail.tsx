@@ -99,19 +99,19 @@ export default function EquipmentDetailPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Purchase Price</p>
                 <p className="font-semibold" data-testid="text-purchase-price">
-                  {item.purchasePrice ? `\u20ac${item.purchasePrice}` : "N/A"}
+                  {item.purchasePrice ? `€${item.purchasePrice}` : "N/A"}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Current Value</p>
                 <p className="font-semibold" data-testid="text-current-value">
-                  {item.currentValue ? `\u20ac${item.currentValue}` : "N/A"}
+                  {item.currentValue ? `€${item.currentValue}` : "N/A"}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Sale Price</p>
                 <p className="font-semibold" data-testid="text-sale-price">
-                  {item.salePrice ? `\u20ac${item.salePrice}` : "N/A"}
+                  {item.salePrice ? `€${item.salePrice}` : "N/A"}
                 </p>
               </div>
             </div>
@@ -414,7 +414,7 @@ function RepairsSection({
             </div>
             {isAdmin && (
               <div className="space-y-2">
-                <Label>Cost (\u20ac)</Label>
+                <Label>Cost (€)</Label>
                 <Input type="number" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0.00" data-testid="input-repair-cost" />
               </div>
             )}
@@ -449,7 +449,7 @@ function RepairsSection({
                     <p className="text-sm font-medium">{r.description}</p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <StatusBadge status={r.status === "completed" ? "active" : "in_repair"} />
-                      {isAdmin && r.cost && <span className="text-xs text-muted-foreground">\u20ac{r.cost}</span>}
+                      {isAdmin && r.cost && <span className="text-xs text-muted-foreground">€{r.cost}</span>}
                       <span className="text-xs text-muted-foreground">
                         {r.date ? new Date(r.date).toLocaleDateString() : ""}
                       </span>

@@ -194,15 +194,15 @@ export default function EquipmentFormPage() {
             <h3 className="font-semibold text-sm mb-3 uppercase tracking-wider text-muted-foreground">Financial Data</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Purchase Price (\u20ac)</Label>
+                <Label>Purchase Price (€)</Label>
                 <Input type="number" step="0.01" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} placeholder="0.00" data-testid="input-purchase-price" />
               </div>
               <div className="space-y-2">
-                <Label>Current Value (\u20ac)</Label>
+                <Label>Current Value (€)</Label>
                 <Input type="number" step="0.01" value={currentValue} onChange={(e) => setCurrentValue(e.target.value)} placeholder="0.00" data-testid="input-current-value" />
               </div>
               <div className="space-y-2">
-                <Label>Sale Price (\u20ac)</Label>
+                <Label>Sale Price (€)</Label>
                 <Input type="number" step="0.01" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} placeholder="0.00" data-testid="input-sale-price" />
               </div>
             </div>
