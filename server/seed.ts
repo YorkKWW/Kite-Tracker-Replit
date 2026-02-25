@@ -19,6 +19,12 @@ export async function seedDatabase() {
     storage.createStation({ name: "Zanzibar", location: "Paje", country: "Tanzania" }),
   ]);
 
+  await Promise.all([
+    storage.createStation({ name: "Office Hamburg Warehouse/Incoming", location: "Hamburg", country: "Germany" }),
+    storage.createStation({ name: "Office Hamburg Shop", location: "Hamburg", country: "Germany" }),
+    storage.createStation({ name: "Service Center Heidenau", location: "Heidenau", country: "Germany" }),
+  ]);
+
   const adminPw = await hashPassword("admin123");
   const mgr1Pw = await hashPassword("manager123");
   const mgr2Pw = await hashPassword("manager123");

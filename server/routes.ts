@@ -819,6 +819,10 @@ export async function registerRoutes(
     const parsedDate = parseDateDE(deliveryDate) || parseDateDE(invoiceDate);
     const year = parsedDate ? parsedDate.getFullYear() : new Date().getFullYear();
 
+    const allStations = await storage.getAllStations();
+    const warehouseStation = allStations.find((s) => s.name === "Office Hamburg Warehouse/Incoming");
+    const warehouseStationId = warehouseStation?.id ?? null;
+
     let imported = 0;
     const errors: string[] = [];
     for (const item of toImport) {
@@ -831,7 +835,7 @@ export async function registerRoutes(
           model: item.name || "Unknown",
           purchaseDate: parsedDate,
           yearOfPurchase: year,
-          currentStationId: null,
+          currentStationId: warehouseStationId,
           status: "active",
           conditionRating: 5,
           purchasePrice: item.unitPriceAfterDiscount?.toString() || null,
