@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import type { Station } from "@shared/schema";
-import { EQUIPMENT_TYPE_LABELS, TYPE_SPECIFIC_FIELDS } from "@shared/schema";
+import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPE_SPECIFIC_FIELDS } from "@shared/schema";
 import { Link } from "wouter";
 
 export default function EquipmentFormPage() {
@@ -115,8 +115,8 @@ export default function EquipmentFormPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(EQUIPMENT_TYPE_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                {EQUIPMENT_TYPE_OPTIONS.map((key) => (
+                  <SelectItem key={key} value={key}>{EQUIPMENT_TYPE_LABELS[key]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

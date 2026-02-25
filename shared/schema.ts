@@ -262,14 +262,25 @@ export const loginSchema = z.object({
 export const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   kite: "Kites",
   board: "Kiteboards",
+  wing: "Wings",
   foilboard: "Foilboards",
   foil: "Foils",
-  wing: "Wings",
   bar_lines: "Bars",
   wetsuit: "Wetsuits",
   harness: "Harnesses",
-  helmet_safety: "Helmets & Safety Gear",
+  helmet_safety: "Helmets",
 };
+
+export const EQUIPMENT_TYPE_OPTIONS = [
+  "kite",
+  "board",
+  "wing",
+  "foilboard",
+  "bar_lines",
+  "wetsuit",
+  "harness",
+  "helmet_safety",
+] as const;
 
 export const EQUIPMENT_STATUS_LABELS: Record<string, string> = {
   active: "Active",

@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConditionBadge, StatusBadge } from "@/components/condition-badge";
 import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
-import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
+import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS } from "@shared/schema";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 
 export default function EquipmentListPage() {
@@ -150,8 +150,8 @@ export default function EquipmentListPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                {Object.entries(EQUIPMENT_TYPE_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                {EQUIPMENT_TYPE_OPTIONS.map((key) => (
+                  <SelectItem key={key} value={key}>{EQUIPMENT_TYPE_LABELS[key]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
