@@ -15,11 +15,14 @@ import { BarcodeScanner } from "@/components/barcode-scanner";
 
 export default function EquipmentListPage() {
   const { isAdmin } = useAuth();
-  const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [stationFilter, setStationFilter] = useState<string>("all");
-  const [showFilters, setShowFilters] = useState(false);
+  const urlParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const [search, setSearch] = useState(urlParams.get("search") || "");
+  const [typeFilter, setTypeFilter] = useState<string>(urlParams.get("type") || "all");
+  const [statusFilter, setStatusFilter] = useState<string>(urlParams.get("status") || "all");
+  const [stationFilter, setStationFilter] = useState<string>(urlParams.get("stationId") || "all");
+  const [showFilters, setShowFilters] = useState(
+    !!(urlParams.get("type") || urlParams.get("status") || urlParams.get("stationId"))
+  );
   const [scannerOpen, setScannerOpen] = useState(false);
   const [, navigate] = useLocation();
 
