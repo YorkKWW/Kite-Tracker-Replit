@@ -1,63 +1,275 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, Package, Star, Wrench, ArrowLeftRight, UserPlus, MapPin } from "lucide-react";
-import type { ActivityLog } from "@shared/schema";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  FileText, Package, Star, Wrench, ArrowLeftRight, UserPlus, MapPin,
+  Camera, ShoppingCart, ClipboardList, LogIn, X, Filter
+} from "lucide-react";
+import type { Station, User } from "@shared/schema";
 
-const actionIcons: Record<string, React.ReactNode> = {
+type ActivityEntry = {
+  id: number;
+  userId: number;
+  action: string;
+  equipmentId: number | null;
+  details: string | null;
+  timestamp: string | null;
+  userName: string;
+  equipmentLabel?: string;
+};
+
+const ACTION_ICONS: Record<string, React.ReactNode> = {
   equipment_created: <Package className="h-4 w-4 text-primary" />,
+  equipment_updated: <Package className="h-4 w-4 text-blue-500" />,
   equipment_deleted: <Package className="h-4 w-4 text-destructive" />,
   condition_rated: <Star className="h-4 w-4 text-yellow-500" />,
   repair_logged: <Wrench className="h-4 w-4 text-orange-500" />,
   transfer_initiated: <ArrowLeftRight className="h-4 w-4 text-purple-500" />,
   transfer_confirmed: <ArrowLeftRight className="h-4 w-4 text-green-500" />,
   user_created: <UserPlus className="h-4 w-4 text-blue-500" />,
+  user_login: <LogIn className="h-4 w-4 text-muted-foreground" />,
   station_created: <MapPin className="h-4 w-4 text-emerald-500" />,
-  system_seeded: <FileText className="h-4 w-4 text-muted-foreground" />,
+  photo_added: <Camera className="h-4 w-4 text-sky-500" />,
+  sale_created: <ShoppingCart className="h-4 w-4 text-violet-500" />,
+  sale_confirmed: <ShoppingCart className="h-4 w-4 text-green-600" />,
+  inventory_check_started: <ClipboardList className="h-4 w-4 text-amber-500" />,
+  inventory_check_completed: <ClipboardList className="h-4 w-4 text-green-500" />,
 };
 
+const ACTION_LABELS: Record<string, string> = {
+  equipment_created: "Equipment Added",
+  equipment_updated: "Equipment Updated",
+  equipment_deleted: "Equipment Deleted",
+  condition_rated: "Condition Rated",
+  repair_logged: "Repair Logged",
+  transfer_initiated: "Transfer Initiated",
+  transfer_confirmed: "Transfer Confirmed",
+  user_created: "User Created",
+  user_login: "Login",
+  station_created: "Location Created",
+  photo_added: "Photo Added",
+  sale_created: "Sale Created",
+  sale_confirmed: "Sale Confirmed",
+  inventory_check_started: "Inventory Check Started",
+  inventory_check_completed: "Inventory Check Completed",
+  system_seeded: "System Seeded",
+};
+
+function formatTime(ts: string | null) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+    " " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function ActivityPage() {
-  const { data: logs, isLoading } = useQuery<ActivityLog[]>({
-    queryKey: ["/api/activity"],
+  const { isAdmin, isHamburg } = useAuth();
+  const [userId, setUserId] = useState("");
+  const [action, setAction] = useState("");
+  const [stationId, setStationId] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
+  const { data: users } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+    enabled: isAdmin,
   });
 
-  if (isLoading) {
-    return (
-      <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto">
-        <Skeleton className="h-8 w-32" />
-        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}
-      </div>
-    );
+  const { data: stations } = useQuery<Station[]>({
+    queryKey: ["/api/stations"],
+  });
+
+  const params = new URLSearchParams();
+  if (userId) params.set("userId", userId);
+  if (action) params.set("action", action);
+  if (stationId) params.set("stationId", stationId);
+  if (dateFrom) params.set("dateFrom", new Date(dateFrom).toISOString());
+  if (dateTo) {
+    const d = new Date(dateTo);
+    d.setHours(23, 59, 59, 999);
+    params.set("dateTo", d.toISOString());
+  }
+  params.set("limit", "200");
+
+  const queryString = params.toString();
+  const { data: logs, isLoading } = useQuery<ActivityEntry[]>({
+    queryKey: ["/api/activity", queryString],
+    queryFn: async () => {
+      const res = await fetch(`/api/activity?${queryString}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    staleTime: 0,
+  });
+
+  const hasFilters = userId || action || stationId || dateFrom || dateTo;
+
+  function clearFilters() {
+    setUserId("");
+    setAction("");
+    setStationId("");
+    setDateFrom("");
+    setDateTo("");
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold tracking-tight" data-testid="text-activity-title">
-        Activity Log
-      </h1>
+    <div className="p-4 md:p-6 space-y-4 max-w-5xl mx-auto">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-activity-title">Activity Log</h1>
+        <div className="flex items-center gap-2">
+          {hasFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setShowFilters(f => !f)} data-testid="button-toggle-filters">
+            <Filter className="h-4 w-4 mr-1.5" />
+            Filters {hasFilters ? `(${[userId, action, stationId, dateFrom, dateTo].filter(Boolean).length})` : ""}
+          </Button>
+        </div>
+      </div>
 
-      {!logs?.length ? (
+      {showFilters && (
+        <Card>
+          <CardContent className="p-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+            {isAdmin && (
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">User</p>
+                <Select value={userId} onValueChange={setUserId} data-testid="select-filter-user">
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="All users" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All users</SelectItem>
+                    {users?.map(u => <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Action type</p>
+              <Select value={action} onValueChange={setAction} data-testid="select-filter-action">
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="All actions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All actions</SelectItem>
+                  {Object.entries(ACTION_LABELS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {isHamburg && (
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Location</p>
+                <Select value={stationId} onValueChange={setStationId} data-testid="select-filter-station">
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="All locations" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All locations</SelectItem>
+                    {stations?.map(s => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">From date</p>
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+                className="h-8 text-sm"
+                data-testid="input-filter-date-from"
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">To date</p>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={e => setDateTo(e.target.value)}
+                className="h-8 text-sm"
+                data-testid="input-filter-date-to"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-16" />)}
+        </div>
+      ) : !logs?.length ? (
         <div className="text-center py-16">
           <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-          <h3 className="font-medium">No activity yet</h3>
+          <h3 className="font-medium">No activity found</h3>
+          {hasFilters && <p className="text-sm text-muted-foreground mt-1">Try adjusting the filters</p>}
         </div>
       ) : (
-        <div className="space-y-2">
-          {logs.map((log) => (
-            <Card key={log.id} data-testid={`card-activity-${log.id}`}>
-              <CardContent className="p-3 flex items-center gap-3">
-                <div className="p-2 rounded-md bg-muted/50">
-                  {actionIcons[log.action] || <FileText className="h-4 w-4" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{log.details || log.action}</p>
-                  <p className="text-xs text-muted-foreground">
-                    User #{log.userId} &middot; {log.timestamp ? new Date(log.timestamp).toLocaleString() : ""}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="text-left p-3 font-medium text-muted-foreground w-8"></th>
+                <th className="text-left p-3 font-medium text-muted-foreground">What happened</th>
+                <th className="text-left p-3 font-medium text-muted-foreground hidden sm:table-cell">Who</th>
+                <th className="text-left p-3 font-medium text-muted-foreground hidden md:table-cell">Equipment</th>
+                <th className="text-right p-3 font-medium text-muted-foreground whitespace-nowrap">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log, idx) => (
+                <tr
+                  key={log.id}
+                  className={`border-b last:border-0 hover:bg-muted/20 transition-colors ${idx % 2 === 0 ? "" : "bg-muted/5"}`}
+                  data-testid={`row-activity-${log.id}`}
+                >
+                  <td className="p-3">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted/50">
+                      {ACTION_ICONS[log.action] || <FileText className="h-4 w-4 text-muted-foreground" />}
+                    </div>
+                  </td>
+                  <td className="p-3">
+                    <p className="font-medium">{log.details || ACTION_LABELS[log.action] || log.action}</p>
+                    <p className="text-xs text-muted-foreground sm:hidden">{log.userName}</p>
+                  </td>
+                  <td className="p-3 hidden sm:table-cell">
+                    <span className="text-muted-foreground">{log.userName}</span>
+                  </td>
+                  <td className="p-3 hidden md:table-cell">
+                    {log.equipmentId && log.equipmentLabel ? (
+                      <Link href={`/equipment/${log.equipmentId}`}>
+                        <span className="text-primary hover:underline cursor-pointer">{log.equipmentLabel}</span>
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground/50">—</span>
+                    )}
+                  </td>
+                  <td className="p-3 text-right whitespace-nowrap text-muted-foreground text-xs">
+                    {formatTime(log.timestamp)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

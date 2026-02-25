@@ -341,9 +341,14 @@ export async function registerRoutes(
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) return next(err);
       if (!user) return res.status(401).json({ message: info?.message || "Login failed" });
-      req.logIn(user, (err) => {
+      req.logIn(user, async (err) => {
         if (err) return next(err);
         const { password, ...safeUser } = user;
+        await storage.createActivityLog({
+          userId: user.id,
+          action: "user_login",
+          details: `${user.name} logged in`,
+        }).catch(() => {});
         return res.json(safeUser);
       });
     })(req, res, next);
@@ -505,8 +510,15 @@ export async function registerRoutes(
   });
 
   app.patch("/api/equipment/:id", requireHamburg, async (req, res) => {
-    const item = await storage.updateEquipment(parseInt(req.params.id), req.body);
+    const equipmentId = parseInt(req.params.id);
+    const item = await storage.updateEquipment(equipmentId, req.body);
     if (!item) return res.status(404).json({ message: "Equipment not found" });
+    await storage.createActivityLog({
+      userId: (req.user as any).id,
+      action: "equipment_updated",
+      equipmentId,
+      details: `Updated ${item.brand} ${item.model}`,
+    });
     res.json(item);
   });
 
@@ -695,6 +707,13 @@ export async function registerRoutes(
       uploadedBy: user.id,
       caption: caption || null,
     });
+    const eq = await storage.getEquipment(equipmentId);
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "photo_added",
+      equipmentId,
+      details: `Added photo to ${eq ? `${eq.brand} ${eq.model}` : `equipment #${equipmentId}`}`,
+    });
     res.json(photo);
   });
 
@@ -719,6 +738,13 @@ export async function registerRoutes(
     for (const eq of equipmentList) {
       await storage.upsertInventoryCheckItem({ checkId: check.id, equipmentId: eq.id });
     }
+    const stationsList = await storage.getAllStations();
+    const stationName = stationsList.find(s => s.id === stationId)?.name || `Station #${stationId}`;
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "inventory_check_started",
+      details: `Started inventory check at ${stationName} (${equipmentList.length} items)`,
+    });
     res.json(check);
   });
 
@@ -753,6 +779,13 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Access denied" });
     }
     const updated = await storage.completeInventoryCheck(check.id);
+    const stationsList = await storage.getAllStations();
+    const stationName = stationsList.find(s => s.id === check.stationId)?.name || `Station #${check.stationId}`;
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "inventory_check_completed",
+      details: `Completed inventory check at ${stationName}`,
+    });
     res.json(updated);
   });
 
@@ -775,9 +808,27 @@ export async function registerRoutes(
     res.json(item);
   });
 
-  app.get("/api/activity", requireAdmin, async (req, res) => {
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
-    const logs = await storage.getActivityLog(limit);
+  app.get("/api/activity", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+    const userId = req.query.userId ? parseInt(req.query.userId as string) : undefined;
+    const action = req.query.action as string | undefined;
+    const equipmentId = req.query.equipmentId ? parseInt(req.query.equipmentId as string) : undefined;
+    const dateFrom = req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined;
+    const dateTo = req.query.dateTo ? new Date(req.query.dateTo as string) : undefined;
+    const stationId = user.role === "station_lead"
+      ? user.assignedStationId
+      : req.query.stationId ? parseInt(req.query.stationId as string) : undefined;
+    const logs = await storage.getActivityLog({ limit, userId, action, stationId, equipmentId, dateFrom, dateTo });
+    res.json(logs);
+  });
+
+  app.get("/api/equipment/:id/activity", requireAuth, async (req, res) => {
+    const equipmentId = parseInt(req.params.id);
+    if (!(await checkEquipmentAccess(req, equipmentId))) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const logs = await storage.getEquipmentActivityLog(equipmentId);
     res.json(logs);
   });
 
@@ -1081,6 +1132,11 @@ export async function registerRoutes(
           total: item.unitPrice.toString(),
         }))
       );
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "sale_created",
+        details: `Created sale invoice ${sale.invoiceNumber}`,
+      });
       res.status(201).json(sale);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1088,8 +1144,14 @@ export async function registerRoutes(
   });
 
   app.post("/api/sales/:id/confirm", requireAuth, async (req, res) => {
+    const user = req.user as any;
     const sale = await storage.confirmSale(parseInt(req.params.id));
     if (!sale) return res.status(404).json({ message: "Not found" });
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "sale_confirmed",
+      details: `Confirmed sale invoice ${sale.invoiceNumber}`,
+    });
     res.json(sale);
   });
 

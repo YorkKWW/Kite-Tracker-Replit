@@ -61,9 +61,9 @@ export default function Layout({ children }: LayoutProps) {
       ? [
           { href: "/stations", label: "Locations", icon: MapPin },
           { href: "/users", label: "Users", icon: Users },
-          { href: "/activity", label: "Activity", icon: FileText },
         ]
       : []),
+    { href: "/activity", label: "Activity", icon: FileText },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 

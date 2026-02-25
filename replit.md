@@ -12,8 +12,16 @@ Full-stack web application for managing kitesurf school equipment across multipl
 - **State**: TanStack Query v5
 
 ## User Roles
-- **Admin**: Full access to all stations, equipment, financial data, user/station management
-- **Station Manager**: Access limited to their assigned station, no financial data visibility
+- **Admin** (`admin`): Full access, user/station management, all financial data, full activity log
+- **Hamburg Manager** (`manager`): Broad access (equipment CRUD, transfers, invoices, price lists), no user management
+- **Station Lead** (`station_lead`): Own station only, no purchase prices, no transfers/equipment creation, sees station activity
+
+## Activity Log (System-wide Audit Trail)
+All events are logged to `activity_log` table: equipment CRUD, transfers, repairs, photos, sales, inventory checks, logins.
+- Joined with user names and equipment labels in queries
+- Global page: `/activity` — visible to all roles, station leads see their station only
+- Equipment detail "History" tab: timeline view per item
+- Routes: `GET /api/activity?userId=&action=&stationId=&dateFrom=&dateTo=` and `GET /api/equipment/:id/activity`
 
 ## Project Structure
 ```

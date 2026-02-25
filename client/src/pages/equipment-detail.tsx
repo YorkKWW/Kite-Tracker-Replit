@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Star, Wrench, ArrowLeftRight, Camera,
   Upload, Trash2, MapPin, Calendar, Hash, X, ChevronLeft, ChevronRight,
+  FileText, Package,
 } from "lucide-react";
 import type { Equipment, Station, ConditionRating, Repair, Transfer, Photo } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS, TYPE_SPECIFIC_FIELDS } from "@shared/schema";
@@ -36,6 +37,17 @@ export default function EquipmentDetailPage() {
   const { data: repairsData } = useQuery<Repair[]>({ queryKey: ["/api/equipment", id, "repairs"] });
   const { data: transfersData } = useQuery<Transfer[]>({ queryKey: ["/api/equipment", id, "transfers"] });
   const { data: photosData } = useQuery<Photo[]>({ queryKey: ["/api/equipment", id, "photos"] });
+  type ActivityEntry = { id: number; userId: number; action: string; equipmentId: number | null; details: string | null; timestamp: string | null; userName: string };
+  const { data: activityData } = useQuery<ActivityEntry[]>({
+    queryKey: ["/api/equipment", id, "activity"],
+    queryFn: async () => {
+      const res = await fetch(`/api/equipment/${id}/activity`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    staleTime: 0,
+    enabled: !!id,
+  });
   const { data: retailPrice } = useQuery<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>({
     queryKey: ["/api/price-lists/lookup", item?.sku, item?.model, (item?.typeSpecificFields as any)?.size],
     queryFn: () => {
@@ -197,14 +209,15 @@ export default function EquipmentDetailPage() {
       )}
 
       <Tabs defaultValue="photos" className="w-full">
-        <TabsList className="w-full grid grid-cols-4">
+        <TabsList className="w-full grid grid-cols-5">
           <TabsTrigger value="photos" data-testid="tab-photos">
             <Camera className="h-4 w-4 mr-1 hidden sm:inline" />
             Photos {photosData?.length ? `(${photosData.length})` : ""}
           </TabsTrigger>
           <TabsTrigger value="condition" data-testid="tab-condition">
             <Star className="h-4 w-4 mr-1 hidden sm:inline" />
-            Condition
+            <span className="hidden sm:inline">Condition</span>
+            <span className="sm:hidden">Cond.</span>
           </TabsTrigger>
           <TabsTrigger value="repairs" data-testid="tab-repairs">
             <Wrench className="h-4 w-4 mr-1 hidden sm:inline" />
@@ -212,7 +225,12 @@ export default function EquipmentDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="transfers" data-testid="tab-transfers">
             <ArrowLeftRight className="h-4 w-4 mr-1 hidden sm:inline" />
-            Transfers
+            <span className="hidden sm:inline">Transfers</span>
+            <span className="sm:hidden">Trans.</span>
+          </TabsTrigger>
+          <TabsTrigger value="activity" data-testid="tab-activity">
+            <FileText className="h-4 w-4 mr-1 hidden sm:inline" />
+            History
           </TabsTrigger>
         </TabsList>
 
@@ -237,6 +255,10 @@ export default function EquipmentDetailPage() {
             getStationName={getStationName}
             isHamburg={isHamburg}
           />
+        </TabsContent>
+
+        <TabsContent value="activity" className="mt-4 space-y-4">
+          <EquipmentActivitySection logs={activityData || []} />
         </TabsContent>
       </Tabs>
     </div>
@@ -758,5 +780,62 @@ function TransfersSection({
         </div>
       )}
     </>
+  );
+}
+
+const EQUIPMENT_ACTION_ICONS: Record<string, React.ReactNode> = {
+  equipment_created: <Package className="h-4 w-4 text-primary" />,
+  equipment_updated: <Package className="h-4 w-4 text-blue-500" />,
+  equipment_deleted: <Package className="h-4 w-4 text-destructive" />,
+  condition_rated: <Star className="h-4 w-4 text-yellow-500" />,
+  repair_logged: <Wrench className="h-4 w-4 text-orange-500" />,
+  transfer_initiated: <ArrowLeftRight className="h-4 w-4 text-purple-500" />,
+  transfer_confirmed: <ArrowLeftRight className="h-4 w-4 text-green-500" />,
+  photo_added: <Camera className="h-4 w-4 text-sky-500" />,
+};
+
+function formatRelativeTime(ts: string | null) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+type ActivityEntry = { id: number; userId: number; action: string; equipmentId: number | null; details: string | null; timestamp: string | null; userName: string };
+
+function EquipmentActivitySection({ logs }: { logs: ActivityEntry[] }) {
+  if (logs.length === 0) {
+    return (
+      <p className="text-center text-muted-foreground text-sm py-8">No history recorded</p>
+    );
+  }
+
+  return (
+    <div className="relative pl-6 space-y-0">
+      <div className="absolute left-3 top-2 bottom-2 w-px bg-border" />
+      {logs.map((log) => (
+        <div key={log.id} className="relative pb-5" data-testid={`activity-item-${log.id}`}>
+          <div className="absolute -left-3.5 top-1 w-7 h-7 rounded-full bg-background border-2 border-border flex items-center justify-center">
+            {EQUIPMENT_ACTION_ICONS[log.action] || <FileText className="h-3.5 w-3.5 text-muted-foreground" />}
+          </div>
+          <div className="ml-4 pt-0.5">
+            <p className="text-sm leading-relaxed">{log.details || log.action}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs font-medium text-muted-foreground">{log.userName}</span>
+              <span className="text-xs text-muted-foreground/60">·</span>
+              <span className="text-xs text-muted-foreground/60">{formatRelativeTime(log.timestamp)}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

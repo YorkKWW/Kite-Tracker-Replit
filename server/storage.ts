@@ -71,7 +71,8 @@ export interface IStorage {
   createPhoto(photo: InsertPhoto): Promise<Photo>;
   deletePhoto(id: number): Promise<void>;
 
-  getActivityLog(limit?: number): Promise<ActivityLog[]>;
+  getActivityLog(opts?: { limit?: number; userId?: number; action?: string; stationId?: number; equipmentId?: number; dateFrom?: Date; dateTo?: Date }): Promise<(ActivityLog & { userName: string; equipmentLabel?: string; stationName?: string })[]>;
+  getEquipmentActivityLog(equipmentId: number): Promise<(ActivityLog & { userName: string })[]>;
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
 
   getDashboardStats(stationId?: number): Promise<{
@@ -376,10 +377,73 @@ export class DatabaseStorage implements IStorage {
     await db.delete(photos).where(eq(photos.id, id));
   }
 
-  async getActivityLog(limit = 50): Promise<ActivityLog[]> {
-    return db.select().from(activityLog)
+  async getActivityLog(opts: { limit?: number; userId?: number; action?: string; stationId?: number; equipmentId?: number; dateFrom?: Date; dateTo?: Date } = {}): Promise<(ActivityLog & { userName: string; equipmentLabel?: string })[]> {
+    const { limit = 100, userId, action, stationId, equipmentId, dateFrom, dateTo } = opts;
+
+    const conditions: ReturnType<typeof eq>[] = [];
+    if (userId) conditions.push(eq(activityLog.userId, userId));
+    if (action) conditions.push(eq(activityLog.action, action));
+    if (equipmentId) conditions.push(eq(activityLog.equipmentId, equipmentId));
+    if (dateFrom) conditions.push(sql`${activityLog.timestamp} >= ${dateFrom}` as any);
+    if (dateTo) conditions.push(sql`${activityLog.timestamp} <= ${dateTo}` as any);
+
+    const baseQuery = db
+      .select({
+        id: activityLog.id,
+        userId: activityLog.userId,
+        action: activityLog.action,
+        equipmentId: activityLog.equipmentId,
+        details: activityLog.details,
+        timestamp: activityLog.timestamp,
+        userName: users.name,
+        equipmentBrand: equipment.brand,
+        equipmentModel: equipment.model,
+        equipmentStation: equipment.currentStationId,
+      })
+      .from(activityLog)
+      .leftJoin(users, eq(activityLog.userId, users.id))
+      .leftJoin(equipment, eq(activityLog.equipmentId, equipment.id));
+
+    const withWhere = conditions.length > 0
+      ? baseQuery.where(and(...conditions))
+      : baseQuery;
+
+    const rows = await withWhere.orderBy(desc(activityLog.timestamp)).limit(limit);
+
+    let filtered = rows;
+    if (stationId) {
+      filtered = rows.filter(r => r.equipmentStation === stationId);
+    }
+
+    return filtered.map(r => ({
+      id: r.id,
+      userId: r.userId,
+      action: r.action,
+      equipmentId: r.equipmentId,
+      details: r.details,
+      timestamp: r.timestamp,
+      userName: r.userName || "Unknown",
+      equipmentLabel: r.equipmentBrand && r.equipmentModel ? `${r.equipmentBrand} ${r.equipmentModel}` : undefined,
+    }));
+  }
+
+  async getEquipmentActivityLog(equipmentId: number): Promise<(ActivityLog & { userName: string })[]> {
+    const rows = await db
+      .select({
+        id: activityLog.id,
+        userId: activityLog.userId,
+        action: activityLog.action,
+        equipmentId: activityLog.equipmentId,
+        details: activityLog.details,
+        timestamp: activityLog.timestamp,
+        userName: users.name,
+      })
+      .from(activityLog)
+      .leftJoin(users, eq(activityLog.userId, users.id))
+      .where(eq(activityLog.equipmentId, equipmentId))
       .orderBy(desc(activityLog.timestamp))
-      .limit(limit);
+      .limit(200);
+    return rows.map(r => ({ ...r, userName: r.userName || "Unknown" }));
   }
 
   async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
