@@ -834,7 +834,7 @@ export async function registerRoutes(
             conditionRating: row["condition"] ? parseInt(row["condition"]) : 5,
             notes: row["notes"] || null,
             purchasePrice: row["purchase_price"] || null,
-            currentValue: row["current_value"] || null,
+            currentValue: row["current_value"] || row["purchase_price"] || null,
             typeSpecificFields: {},
           });
           results.imported++;
@@ -962,6 +962,7 @@ export async function registerRoutes(
           status: "active",
           conditionRating: 5,
           purchasePrice: item.unitPriceAfterDiscount?.toString() || null,
+          currentValue: item.unitPriceAfterDiscount?.toString() || null,
           typeSpecificFields: { size: item.size || "", color: item.color || "" },
           invoiceId: invoice.id,
           invoiceReference: invoiceNumber || null,

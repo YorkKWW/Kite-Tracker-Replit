@@ -133,7 +133,7 @@ export default function EquipmentDetailPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Current Value</p>
                 <p className="font-semibold" data-testid="text-current-value">
-                  {item.currentValue ? `€${item.currentValue}` : "N/A"}
+                  {item.currentValue ? `€${item.currentValue}` : item.purchasePrice ? `€${item.purchasePrice}` : "N/A"}
                 </p>
               </div>
               <div>
