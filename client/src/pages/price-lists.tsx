@@ -15,7 +15,7 @@ import type { PriceList, PriceListItem } from "@shared/schema";
 
 const KNOWN_SUPPLIERS = ["Core", "Duotone", "North", "Eleveight", "Cabrinha", "Ozone", "F-One"];
 
-type ParsedItem = { sku: string; productName: string; retailPrice: string };
+type ParsedItem = { sku: string; productName: string; retailPrice: string; dealerPrice: string | null };
 
 export default function PriceListsPage() {
   const { toast } = useToast();
@@ -246,8 +246,9 @@ export default function PriceListsPage() {
                     <thead className="bg-muted sticky top-0">
                       <tr>
                         <th className="px-2 py-1.5 text-left font-medium w-8">✓</th>
-                        <th className="px-2 py-1.5 text-left font-medium">SKU</th>
+                        <th className="px-2 py-1.5 text-left font-medium">SKU / UPC</th>
                         <th className="px-2 py-1.5 text-left font-medium">Product Name</th>
+                        <th className="px-2 py-1.5 text-right font-medium">Dealer (net)</th>
                         <th className="px-2 py-1.5 text-right font-medium">UVP (brutto)</th>
                       </tr>
                     </thead>
@@ -262,8 +263,11 @@ export default function PriceListsPage() {
                           <td className="px-2 py-1">
                             <input type="checkbox" checked={!removedRows.has(i)} onChange={() => toggleRow(i)} className="h-3 w-3" />
                           </td>
-                          <td className="px-2 py-1 font-mono">{item.sku}</td>
+                          <td className="px-2 py-1 font-mono text-[10px]">{item.sku}</td>
                           <td className="px-2 py-1">{item.productName}</td>
+                          <td className="px-2 py-1 text-right text-muted-foreground">
+                            {item.dealerPrice ? `€${parseFloat(item.dealerPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}` : "—"}
+                          </td>
                           <td className="px-2 py-1 text-right font-medium">€{parseFloat(item.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}</td>
                         </tr>
                       ))}
@@ -350,16 +354,20 @@ export default function PriceListsPage() {
                       <table className="w-full text-xs">
                         <thead className="bg-muted sticky top-0">
                           <tr>
-                            <th className="px-2 py-1.5 text-left font-medium">SKU</th>
+                            <th className="px-2 py-1.5 text-left font-medium">SKU / UPC</th>
                             <th className="px-2 py-1.5 text-left font-medium">Product Name</th>
+                            <th className="px-2 py-1.5 text-right font-medium">Dealer (net)</th>
                             <th className="px-2 py-1.5 text-right font-medium">UVP (brutto)</th>
                           </tr>
                         </thead>
                         <tbody>
                           {viewItems.map((item) => (
                             <tr key={item.id} className="border-t" data-testid={`row-item-${item.id}`}>
-                              <td className="px-2 py-1 font-mono">{item.sku}</td>
+                              <td className="px-2 py-1 font-mono text-[10px]">{item.sku}</td>
                               <td className="px-2 py-1">{item.productName}</td>
+                              <td className="px-2 py-1 text-right text-muted-foreground">
+                                {item.dealerPrice ? `€${parseFloat(item.dealerPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}` : "—"}
+                              </td>
                               <td className="px-2 py-1 text-right font-medium">€{parseFloat(item.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}</td>
                             </tr>
                           ))}

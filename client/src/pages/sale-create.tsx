@@ -26,7 +26,7 @@ type LineItem = {
   sku: string;
   unitPrice: string;
   priceSuggestion: { label: string; value: string } | null;
-  uvp: { retailPrice: string; supplier: string } | null;
+  uvp: { retailPrice: string; dealerPrice: string | null; supplier: string } | null;
   equipment: Equipment;
 };
 
@@ -366,9 +366,16 @@ export default function SaleCreatePage() {
                         </p>
                       )}
                       {item.uvp ? (
-                        <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400 leading-tight" data-testid={`text-uvp-${idx}`}>
-                          UVP: €{parseFloat(item.uvp.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })} <span className="font-normal text-muted-foreground">(brutto incl. VAT · {item.uvp.supplier})</span>
-                        </p>
+                        <div data-testid={`text-uvp-${idx}`}>
+                          {item.uvp.dealerPrice && (
+                            <p className="text-[10px] text-blue-600 dark:text-blue-400 leading-tight">
+                              Dealer (net): €{parseFloat(item.uvp.dealerPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })} · {item.uvp.supplier}
+                            </p>
+                          )}
+                          <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400 leading-tight">
+                            UVP: €{parseFloat(item.uvp.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })} <span className="font-normal text-muted-foreground">(brutto incl. VAT)</span>
+                          </p>
+                        </div>
                       ) : item.sku ? (
                         <p className="text-[10px] text-muted-foreground leading-tight" data-testid={`text-no-uvp-${idx}`}>No retail price available</p>
                       ) : null}

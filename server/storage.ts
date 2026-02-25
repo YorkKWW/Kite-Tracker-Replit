@@ -116,7 +116,7 @@ export interface IStorage {
   deactivatePriceLists(supplier: string): Promise<void>;
   deletePriceList(id: number): Promise<void>;
   getPriceListItems(priceListId: number): Promise<PriceListItem[]>;
-  lookupRetailPrice(sku: string): Promise<{ retailPrice: string; supplier: string; productName: string } | null>;
+  lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -628,11 +628,12 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(priceListItems).where(eq(priceListItems.priceListId, priceListId));
   }
 
-  async lookupRetailPrice(sku: string): Promise<{ retailPrice: string; supplier: string; productName: string } | null> {
+  async lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null> {
     if (!sku) return null;
     const rows = await db
       .select({
         retailPrice: priceListItems.retailPrice,
+        dealerPrice: priceListItems.dealerPrice,
         supplier: priceLists.supplier,
         productName: priceListItems.productName,
       })
@@ -644,7 +645,12 @@ export class DatabaseStorage implements IStorage {
       .where(ilike(priceListItems.sku, sku))
       .limit(1);
     if (!rows.length) return null;
-    return { retailPrice: rows[0].retailPrice ?? "0", supplier: rows[0].supplier, productName: rows[0].productName };
+    return {
+      retailPrice: rows[0].retailPrice ?? "0",
+      dealerPrice: rows[0].dealerPrice ?? null,
+      supplier: rows[0].supplier,
+      productName: rows[0].productName,
+    };
   }
 }
 

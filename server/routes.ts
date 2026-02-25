@@ -1351,10 +1351,12 @@ export async function registerRoutes(
       const euroPrices = [...line.matchAll(new RegExp(EURO_PRICE_RX.source, "g"))];
       if (euroPrices.length === 0) continue;
 
-      // Retail price is the LAST € price on the line
+      // Retail price is the LAST € price on the line; dealer price is the second-to-last
       const retailRaw = euroPrices[euroPrices.length - 1][1];
       const retailPrice = parseEuroPrice(retailRaw);
       if (isNaN(retailPrice) || retailPrice < 200 || retailPrice > 100_000) continue;
+      const dealerRaw = euroPrices.length >= 2 ? euroPrices[euroPrices.length - 2][1] : null;
+      const dealerPrice = dealerRaw ? parseEuroPrice(dealerRaw) : null;
 
       // Use first UPC found as the SKU (enables barcode lookup later)
       // Fall back to product name slug if no barcode present
@@ -1375,7 +1377,7 @@ export async function registerRoutes(
       if (seen.has(key)) continue;
       seen.add(key);
 
-      items.push({ sku, productName, retailPrice: retailPrice.toFixed(2) });
+      items.push({ sku, productName, retailPrice: retailPrice.toFixed(2), dealerPrice: dealerPrice !== null ? dealerPrice.toFixed(2) : null });
     }
 
     return items;
@@ -1387,12 +1389,6 @@ export async function registerRoutes(
       if (!req.file) return res.status(400).json({ message: "No PDF uploaded" });
       const { text } = await parsePdfBuffer(req.file.buffer);
       const rawLineCount = text.split(/\r?\n|\r/).filter((l) => l.trim().length > 0).length;
-
-      // DEBUG: print first 80 non-empty lines so we can see the actual PDF structure
-      const debugLines = text.split(/\r?\n|\r/).filter((l) => l.trim()).slice(0, 80);
-      console.log("=== PDF TEXT SAMPLE (first 80 lines) ===");
-      debugLines.forEach((l, i) => console.log(`[${i}] ${l}`));
-      console.log("=== END SAMPLE ===");
 
       const items = parsePriceListText(text);
       res.json({ items, rawLineCount });
@@ -1411,7 +1407,7 @@ export async function registerRoutes(
       }
       const pl = await storage.createPriceList(
         { supplier: supplier.trim(), uploadedBy: user.id },
-        items.map((i: any) => ({ sku: i.sku, productName: i.productName, retailPrice: i.retailPrice })),
+        items.map((i: any) => ({ sku: i.sku, productName: i.productName, retailPrice: i.retailPrice, dealerPrice: i.dealerPrice || null })),
       );
       res.json(pl);
     } catch (err: any) {

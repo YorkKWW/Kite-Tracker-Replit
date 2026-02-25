@@ -36,7 +36,7 @@ export default function EquipmentDetailPage() {
   const { data: repairsData } = useQuery<Repair[]>({ queryKey: ["/api/equipment", id, "repairs"] });
   const { data: transfersData } = useQuery<Transfer[]>({ queryKey: ["/api/equipment", id, "transfers"] });
   const { data: photosData } = useQuery<Photo[]>({ queryKey: ["/api/equipment", id, "photos"] });
-  const { data: retailPrice } = useQuery<{ retailPrice: string; supplier: string; productName: string } | null>({
+  const { data: retailPrice } = useQuery<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>({
     queryKey: ["/api/price-lists/lookup", item?.sku],
     queryFn: () => item?.sku
       ? fetch(`/api/price-lists/lookup?sku=${encodeURIComponent(item.sku!)}`, { credentials: "include" }).then((r) => r.json())
@@ -144,12 +144,22 @@ export default function EquipmentDetailPage() {
               </div>
             </div>
             {retailPrice && (
-              <div className="mt-3 pt-3 border-t">
-                <p className="text-xs text-muted-foreground">Retail Price (UVP) — brutto incl. VAT</p>
-                <p className="font-semibold text-amber-600 dark:text-amber-400" data-testid="text-retail-price">
-                  €{parseFloat(retailPrice.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}
-                  <span className="ml-2 text-xs font-normal text-muted-foreground">{retailPrice.supplier} · {retailPrice.productName}</span>
-                </p>
+              <div className="mt-3 pt-3 border-t space-y-1">
+                <p className="text-xs text-muted-foreground">{retailPrice.supplier} · {retailPrice.productName}</p>
+                {retailPrice.dealerPrice && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Dealer Price (net)</p>
+                    <p className="font-semibold text-blue-600 dark:text-blue-400" data-testid="text-dealer-price">
+                      €{parseFloat(retailPrice.dealerPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-muted-foreground">Retail Price (UVP) — brutto incl. VAT</p>
+                  <p className="font-semibold text-amber-600 dark:text-amber-400" data-testid="text-retail-price">
+                    €{parseFloat(retailPrice.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
               </div>
             )}
             {(item as any).invoiceReference && (
