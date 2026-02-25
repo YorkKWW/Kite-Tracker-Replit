@@ -286,7 +286,7 @@ export default function StationDetailPage() {
   if (!station || !allEquipment) {
     return (
       <div className="p-4 md:p-6 text-center py-16">
-        <p className="text-muted-foreground">Station not found</p>
+        <p className="text-muted-foreground">Location not found</p>
         <Link href={isAdmin ? "/stations" : "/"}>
           <Button variant="secondary" className="mt-4">Go back</Button>
         </Link>
@@ -434,7 +434,7 @@ export default function StationDetailPage() {
       {allEquipment.length === 0 ? (
         <div className="text-center py-16">
           <Package className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-          <h3 className="font-medium">No equipment at this station</h3>
+          <h3 className="font-medium">No equipment at this location</h3>
           <p className="text-sm text-muted-foreground mt-1">Add equipment from the Equipment page</p>
         </div>
       ) : (

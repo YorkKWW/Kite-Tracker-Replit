@@ -41,7 +41,7 @@ export default function StationsPage() {
     mutationFn: () => apiRequest("POST", "/api/stations", { name, location: location || null, country: country || null }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
-      toast({ title: "Station created" });
+      toast({ title: "Location created" });
       setOpen(false);
     },
   });
@@ -50,7 +50,7 @@ export default function StationsPage() {
     mutationFn: () => apiRequest("PATCH", `/api/stations/${editStation!.id}`, { name, location: location || null, country: country || null }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
-      toast({ title: "Station updated" });
+      toast({ title: "Location updated" });
       setOpen(false);
     },
   });
@@ -59,24 +59,24 @@ export default function StationsPage() {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/stations/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stations"] });
-      toast({ title: "Station deleted" });
+      toast({ title: "Location deleted" });
     },
   });
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto">
       <div className="flex items-center justify-between gap-1">
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-stations-title">Stations</h1>
+        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-stations-title">Locations</h1>
         <Button onClick={openCreate} data-testid="button-add-station">
           <Plus className="h-4 w-4 mr-2" />
-          Add Station
+          Add Location
         </Button>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editStation ? "Edit Station" : "Add Station"}</DialogTitle>
+            <DialogTitle>{editStation ? "Edit Location" : "Add Location"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
@@ -97,7 +97,7 @@ export default function StationsPage() {
               className="w-full"
               data-testid="button-save-station"
             >
-              {editStation ? "Update Station" : "Create Station"}
+              {editStation ? "Update Location" : "Create Location"}
             </Button>
           </div>
         </DialogContent>
@@ -110,8 +110,8 @@ export default function StationsPage() {
       ) : !stationsList?.length ? (
         <div className="text-center py-16">
           <MapPin className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-          <h3 className="font-medium">No stations yet</h3>
-          <p className="text-sm text-muted-foreground mt-1">Add your first kitesurf station</p>
+          <h3 className="font-medium">No locations yet</h3>
+          <p className="text-sm text-muted-foreground mt-1">Add your first kitesurf location</p>
         </div>
       ) : (
         <div className="space-y-3">

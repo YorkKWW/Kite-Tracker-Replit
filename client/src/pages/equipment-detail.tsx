@@ -95,7 +95,7 @@ export default function EquipmentDetailPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <InfoCard icon={<Hash className="h-4 w-4" />} label="Type" value={EQUIPMENT_TYPE_LABELS[item.type] || item.type} />
-        <InfoCard icon={<MapPin className="h-4 w-4" />} label="Station" value={getStationName(item.currentStationId)} />
+        <InfoCard icon={<MapPin className="h-4 w-4" />} label="Location" value={getStationName(item.currentStationId)} />
         <InfoCard
           icon={<Calendar className="h-4 w-4" />}
           label="Purchased"
@@ -673,7 +673,7 @@ function TransfersSection({
                 <Label>Transfer to</Label>
                 <Select value={toStationId} onValueChange={setToStationId}>
                   <SelectTrigger data-testid="select-transfer-destination">
-                    <SelectValue placeholder="Select station" />
+                    <SelectValue placeholder="Select location" />
                   </SelectTrigger>
                   <SelectContent>
                     {stations

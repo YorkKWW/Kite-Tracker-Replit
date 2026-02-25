@@ -50,7 +50,7 @@ export default function Layout({ children }: LayoutProps) {
     { href: "/transfers", label: "Transfers", icon: ArrowLeftRight },
     ...(isAdmin
       ? [
-          { href: "/stations", label: "Stations", icon: MapPin },
+          { href: "/stations", label: "Locations", icon: MapPin },
           { href: "/users", label: "Users", icon: Users },
           { href: "/activity", label: "Activity", icon: FileText },
           { href: "/invoice-import", label: "Import Invoice", icon: FileUp },

@@ -11,8 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import type { Station } from "@shared/schema";
-import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPE_SPECIFIC_FIELDS } from "@shared/schema";
-import { TYPES_WITHOUT_SERIAL } from "./equipment-list";
+import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPE_SPECIFIC_FIELDS, TYPES_WITHOUT_SERIAL } from "@shared/schema";
 import { Link } from "wouter";
 
 export default function EquipmentFormPage() {
@@ -146,10 +145,10 @@ export default function EquipmentFormPage() {
               <Input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} data-testid="input-purchase-date" />
             </div>
             <div className="space-y-2">
-              <Label>Station</Label>
+              <Label>Location</Label>
               <Select value={currentStationId} onValueChange={setCurrentStationId}>
                 <SelectTrigger data-testid="select-station">
-                  <SelectValue placeholder="Select station" />
+                  <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
                   {stationsList?.map((s) => (

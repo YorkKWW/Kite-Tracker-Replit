@@ -75,7 +75,7 @@ export default function DashboardPage() {
       bgColor: "bg-purple-500/10",
     },
     {
-      label: "Stations",
+      label: "Locations",
       value: stats?.equipmentPerStation?.length ?? 0,
       icon: MapPin,
       color: "text-emerald-600 dark:text-emerald-400",

@@ -140,16 +140,16 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="manager">Station Manager</SelectItem>
+                  <SelectItem value="manager">Location Manager</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {role === "manager" && (
               <div className="space-y-2">
-                <Label>Assigned Station</Label>
+                <Label>Assigned Location</Label>
                 <Select value={stationId} onValueChange={setStationId}>
                   <SelectTrigger data-testid="select-user-station">
-                    <SelectValue placeholder="Select station" />
+                    <SelectValue placeholder="Select location" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>

@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConditionBadge, StatusBadge } from "@/components/condition-badge";
 import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
-import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS } from "@shared/schema";
+import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPES_WITHOUT_SERIAL } from "@shared/schema";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 
 const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
@@ -24,7 +24,6 @@ const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
   foil:          { label: "FO", cls: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
 };
 
-export const TYPES_WITHOUT_SERIAL = ["helmet_safety", "harness", "wetsuit"];
 
 export default function EquipmentListPage() {
   const { isAdmin } = useAuth();
@@ -177,9 +176,9 @@ export default function EquipmentListPage() {
             </Select>
             {isAdmin && (
               <Select value={stationFilter} onValueChange={setStationFilter}>
-                <SelectTrigger data-testid="select-station-filter"><SelectValue placeholder="All Stations" /></SelectTrigger>
+                <SelectTrigger data-testid="select-station-filter"><SelectValue placeholder="All Locations" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Stations</SelectItem>
+                  <SelectItem value="all">All Locations</SelectItem>
                   {stationsList?.map((s) => (
                     <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                   ))}
@@ -219,7 +218,7 @@ export default function EquipmentListPage() {
                 <th className="px-2 py-2.5 text-left font-medium text-muted-foreground w-16">Size</th>
                 <th className="px-2 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">SKU</th>
                 <th className="px-2 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Serial</th>
-                <SortTh col="station"   label="Station"  sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 hidden lg:table-cell" />
+                <SortTh col="station"   label="Location" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 hidden lg:table-cell" />
                 <SortTh col="condition" label="Cond"     sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 w-16" />
                 <SortTh col="status"    label="Status"   sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 pr-3 hidden sm:table-cell w-24" />
               </tr>

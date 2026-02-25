@@ -282,6 +282,8 @@ export const EQUIPMENT_TYPE_OPTIONS = [
   "helmet_safety",
 ] as const;
 
+export const TYPES_WITHOUT_SERIAL = ["helmet_safety", "harness", "wetsuit"] as const;
+
 export const EQUIPMENT_STATUS_LABELS: Record<string, string> = {
   active: "Active",
   in_repair: "In Repair",
