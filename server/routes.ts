@@ -148,9 +148,9 @@ export async function registerRoutes(
   });
 
   app.get("/api/equipment/scan", requireAuth, async (req, res) => {
-    const serial = req.query.serial as string;
-    if (!serial) return res.status(400).json({ message: "serial param required" });
-    const item = await storage.getEquipmentBySerial(serial);
+    const serial = (req.query.serial || req.query.code) as string;
+    if (!serial) return res.status(400).json({ message: "serial or code param required" });
+    const item = await storage.getEquipmentByCode(serial);
     if (!item) return res.status(404).json({ message: "Equipment not found" });
     const user = req.user as any;
     if (user.role === "manager" && item.currentStationId !== user.assignedStationId) {

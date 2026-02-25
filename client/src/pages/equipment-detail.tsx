@@ -74,12 +74,23 @@ export default function EquipmentDetailPage() {
           <h1 className="text-xl md:text-2xl font-bold truncate" data-testid="text-equipment-name">
             {item.brand} {item.model}
           </h1>
-          <p className="text-sm text-muted-foreground font-mono" data-testid="text-serial-detail">
-            {item.serialNumber}
-          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+            <span className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">S/N</span>
+              <span className="font-mono text-base font-bold text-foreground" data-testid="text-serial-detail">{item.serialNumber}</span>
+            </span>
+            {(item as any).sku && (
+              <span className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">SKU</span>
+                <span className="font-mono text-sm text-muted-foreground" data-testid="text-sku-detail">{(item as any).sku}</span>
+              </span>
+            )}
+          </div>
         </div>
-        <ConditionBadge rating={item.conditionRating} />
-        <StatusBadge status={item.status} />
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <ConditionBadge rating={item.conditionRating} />
+          <StatusBadge status={item.status} />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

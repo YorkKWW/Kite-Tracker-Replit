@@ -155,18 +155,19 @@ export default function InventoryCheckPage() {
             )}
           </p>
         </div>
-        {!readOnly && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setScannerOpen(true)}
-            title="Scan equipment"
-            data-testid="button-scan-check"
-          >
-            <ScanLine className="h-5 w-5" />
-          </Button>
-        )}
       </div>
+
+      {!readOnly && (
+        <Button
+          size="lg"
+          className="w-full h-16 text-lg font-bold gap-3 shadow-md active:scale-95 transition-transform"
+          onClick={() => setScannerOpen(true)}
+          data-testid="button-scan-check"
+        >
+          <ScanLine className="h-7 w-7" />
+          Scan Barcode / QR Code
+        </Button>
+      )}
 
       {/* Progress */}
       <Card>

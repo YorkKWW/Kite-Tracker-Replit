@@ -24,6 +24,7 @@ export default function EquipmentFormPage() {
     : "";
 
   const [serialNumber, setSerialNumber] = useState(prefillSerial);
+  const [sku, setSku] = useState("");
   const [type, setType] = useState("kite");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
@@ -41,6 +42,7 @@ export default function EquipmentFormPage() {
     mutationFn: () =>
       apiRequest("POST", "/api/equipment", {
         serialNumber,
+        sku: sku || null,
         type,
         brand,
         model,
@@ -93,20 +95,27 @@ export default function EquipmentFormPage() {
             <div className="space-y-2">
               <Label>Serial Number *</Label>
               <Input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="DT-K-2024-001" data-testid="input-serial" />
+              <p className="text-xs text-muted-foreground">Unique item identifier (barcode/label)</p>
             </div>
             <div className="space-y-2">
-              <Label>Equipment Type *</Label>
-              <Select value={type} onValueChange={(v) => { setType(v); setTypeSpecific({}); }}>
-                <SelectTrigger data-testid="select-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(EQUIPMENT_TYPE_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>SKU</Label>
+              <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="DT-REBEL-12-2024" data-testid="input-sku" />
+              <p className="text-xs text-muted-foreground">Product code (same for all items of this model)</p>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Equipment Type *</Label>
+            <Select value={type} onValueChange={(v) => { setType(v); setTypeSpecific({}); }}>
+              <SelectTrigger data-testid="select-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(EQUIPMENT_TYPE_LABELS).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

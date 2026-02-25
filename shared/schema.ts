@@ -69,6 +69,7 @@ export const users = pgTable("users", {
 export const equipment = pgTable("equipment", {
   id: serial("id").primaryKey(),
   serialNumber: text("serial_number").notNull().unique(),
+  sku: text("sku"),
   type: equipmentTypeEnum("type").notNull(),
   brand: text("brand").notNull(),
   model: text("model").notNull(),

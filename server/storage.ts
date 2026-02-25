@@ -31,6 +31,7 @@ export interface IStorage {
 
   getEquipment(id: number): Promise<Equipment | undefined>;
   getEquipmentBySerial(serial: string): Promise<Equipment | undefined>;
+  getEquipmentByCode(code: string): Promise<Equipment | undefined>;
   getAllEquipment(filters?: {
     stationId?: number;
     type?: string;
@@ -141,6 +142,16 @@ export class DatabaseStorage implements IStorage {
     return item;
   }
 
+  async getEquipmentByCode(code: string): Promise<Equipment | undefined> {
+    const [item] = await db.select().from(equipment).where(
+      or(
+        eq(equipment.serialNumber, code),
+        eq(equipment.sku, code)
+      )
+    );
+    return item;
+  }
+
   async getAllEquipment(filters?: {
     stationId?: number;
     type?: string;
@@ -166,6 +177,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(
         or(
           ilike(equipment.serialNumber, s),
+          ilike(equipment.sku, s),
           ilike(equipment.brand, s),
           ilike(equipment.model, s)
         )

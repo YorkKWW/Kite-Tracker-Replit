@@ -208,20 +208,33 @@ export default function EquipmentListPage() {
                       />
                     </div>
                   )}
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-1 mb-3">
+                  <div className="p-3">
+                    <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="min-w-0 flex-1">
-                        <p className="font-mono text-xs text-muted-foreground mb-1" data-testid={`text-serial-${item.id}`}>
-                          {item.serialNumber}
-                        </p>
-                        <p className="font-semibold truncate">
+                        <p className="font-semibold truncate text-sm">
                           {item.brand} {item.model}
                         </p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           {EQUIPMENT_TYPE_LABELS[item.type] || item.type}
                         </p>
                       </div>
                       <ConditionBadge rating={item.conditionRating} compact />
+                    </div>
+                    <div className="space-y-1 mb-2 bg-muted/40 rounded-md p-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-10 shrink-0">S/N</span>
+                        <span className="font-mono text-xs font-bold text-foreground truncate" data-testid={`text-serial-${item.id}`}>
+                          {item.serialNumber}
+                        </span>
+                      </div>
+                      {(item as any).sku && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground w-10 shrink-0">SKU</span>
+                          <span className="font-mono text-xs text-muted-foreground truncate" data-testid={`text-sku-${item.id}`}>
+                            {(item as any).sku}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center justify-between gap-1 flex-wrap">
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
