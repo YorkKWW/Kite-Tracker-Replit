@@ -1,18 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
 import type { Station } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPE_SPECIFIC_FIELDS, TYPES_WITHOUT_SERIAL } from "@shared/schema";
-import { Link } from "wouter";
 
 export default function EquipmentFormPage() {
   const [, setLocation] = useLocation();
@@ -40,6 +40,39 @@ export default function EquipmentFormPage() {
   const [typeSpecific, setTypeSpecific] = useState<Record<string, any>>({});
 
   const serialOptional = TYPES_WITHOUT_SERIAL.includes(type);
+
+  // Duplicate serial detection
+  const [duplicateId, setDuplicateId] = useState<number | null>(null);
+  const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
+  const [isCheckingSerial, setIsCheckingSerial] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (serialOptional || !serialNumber || serialNumber.trim().length < 3) {
+      setDuplicateId(null);
+      setDuplicateConfirmed(false);
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setIsCheckingSerial(true);
+      try {
+        const res = await fetch(`/api/equipment/scan?serial=${encodeURIComponent(serialNumber.trim())}`);
+        if (res.ok) {
+          const data = await res.json();
+          setDuplicateId(data.id ?? null);
+          setDuplicateConfirmed(false);
+        } else {
+          setDuplicateId(null);
+        }
+      } catch {
+        setDuplicateId(null);
+      } finally {
+        setIsCheckingSerial(false);
+      }
+    }, 500);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [serialNumber, serialOptional]);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -101,10 +134,46 @@ export default function EquipmentFormPage() {
         <CardContent className="p-4 md:p-6 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {!serialOptional && (
-              <div className="space-y-2">
+              <div className="space-y-2 md:col-span-2">
                 <Label>Serial Number *</Label>
-                <Input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="DT-K-2024-001" data-testid="input-serial" />
-                <p className="text-xs text-muted-foreground">Unique item identifier (barcode/label)</p>
+                <div className="relative">
+                  <Input
+                    value={serialNumber}
+                    onChange={(e) => setSerialNumber(e.target.value)}
+                    placeholder="DT-K-2024-001"
+                    data-testid="input-serial"
+                    className={duplicateId ? "border-red-400 dark:border-red-600 pr-8" : ""}
+                  />
+                  {isCheckingSerial && (
+                    <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+                {duplicateId ? (
+                  <div className="rounded-md border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30 p-3 space-y-2.5" data-testid="banner-serial-duplicate">
+                    <div className="flex items-start gap-2 text-red-700 dark:text-red-400">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <p className="text-sm font-medium">
+                        This serial number already exists in the system.{" "}
+                        <Link href={`/equipment/${duplicateId}`} className="underline hover:no-underline" data-testid="link-duplicate-existing">
+                          View existing item →
+                        </Link>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="dup-confirm"
+                        checked={duplicateConfirmed}
+                        onCheckedChange={(v) => setDuplicateConfirmed(!!v)}
+                        data-testid="checkbox-duplicate-confirm"
+                      />
+                      <label htmlFor="dup-confirm" className="text-xs text-muted-foreground cursor-pointer">
+                        I understand this is a duplicate — add anyway
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Unique item identifier (barcode/label)</p>
+                )}
               </div>
             )}
             <div className="space-y-2">
@@ -238,7 +307,13 @@ export default function EquipmentFormPage() {
 
           <Button
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || (!serialNumber && !serialOptional) || !brand || !model}
+            disabled={
+              mutation.isPending ||
+              (!serialNumber && !serialOptional) ||
+              !brand ||
+              !model ||
+              (!!duplicateId && !duplicateConfirmed)
+            }
             className="w-full"
             data-testid="button-save-equipment"
           >

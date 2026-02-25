@@ -876,20 +876,25 @@ export async function registerRoutes(
       const isDuotone = /boards.and.more|B&M\/B2B/i.test(data.text);
       const parsed = isDuotone ? parseDuotoneInvoice(data.text) : parsePdfInvoice(data.text);
 
-      // Check for duplicate serials in DB
+      // Check for duplicate serials in DB — store ID so frontend can link to existing item
       const allSerial = parsed.items
         .map((i: any) => i.serialNumber)
         .filter(Boolean);
-      const existingSerials = new Set<string>();
+      const existingSerialMap = new Map<string, number>();
       for (const s of allSerial) {
         const found = await storage.getEquipmentBySerial(s);
-        if (found) existingSerials.add(s);
+        if (found) existingSerialMap.set(s, found.id);
       }
 
-      const items = parsed.items.map((item: any) => ({
-        ...item,
-        isDuplicate: existingSerials.has(item.serialNumber),
-      }));
+      const items = parsed.items.map((item: any) => {
+        const isDuplicate = existingSerialMap.has(item.serialNumber);
+        return {
+          ...item,
+          isDuplicate,
+          duplicateId: existingSerialMap.get(item.serialNumber) ?? null,
+          skip: item.skip || isDuplicate, // auto-skip duplicates
+        };
+      });
 
       res.json({ ...parsed, items });
     } catch (err: any) {

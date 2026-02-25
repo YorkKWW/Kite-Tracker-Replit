@@ -30,6 +30,7 @@ type ParsedItem = {
   type: string;
   isSpare: boolean;
   isDuplicate: boolean;
+  duplicateId: number | null;
   skip: boolean;
 };
 
@@ -387,7 +388,7 @@ export default function InvoiceImportPage() {
             {items.map((item, idx) => (
               <Card
                 key={idx}
-                className={`${item.skip ? "opacity-50" : ""} ${item.isDuplicate && !item.skip ? "border-orange-400" : ""}`}
+                className={`${item.skip && !item.isDuplicate ? "opacity-50" : ""} ${item.isDuplicate ? "border-red-400 dark:border-red-600" : ""}`}
                 data-testid={`card-item-${idx}`}
               >
                 <CardContent className="p-3">
@@ -407,10 +408,21 @@ export default function InvoiceImportPage() {
                         {item.size && <span className="text-xs text-muted-foreground">{item.size}m²</span>}
                         {item.color && <span className="text-xs text-muted-foreground">{item.color}</span>}
                         {item.isSpare && <Badge variant="secondary" className="text-xs">Spare Part</Badge>}
-                        {item.isDuplicate && !item.skip && (
-                          <Badge variant="destructive" className="text-xs gap-1">
-                            <AlertTriangle className="h-3 w-3" /> Duplicate serial
-                          </Badge>
+                        {item.isDuplicate && (
+                          <span className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 font-medium">
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                            Serial already exists —{" "}
+                            <a
+                              href={`/equipment/${item.duplicateId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline hover:no-underline"
+                              data-testid={`link-duplicate-${idx}`}
+                            >
+                              view existing item
+                            </a>
+                            {item.skip && <span className="text-muted-foreground font-normal">(skipped by default)</span>}
+                          </span>
                         )}
                       </div>
 
