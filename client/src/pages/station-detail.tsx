@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Package, Wrench, ArrowLeftRight, Wind,
   ChevronDown, ChevronUp, Layers, Link2, Shirt, Shield,
-  Star, MapPin, ClipboardCheck, ClipboardList, Loader2,
+  Star, MapPin, ClipboardCheck, ClipboardList, Loader2, ChevronRight,
 } from "lucide-react";
 import type { Equipment, Station, InventoryCheck } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
@@ -62,46 +62,83 @@ function ConditionBar({ items }: { items: Equipment[] }) {
   );
 }
 
-// ─── Size / attribute tag cluster ────────────────────────────────
-function SizeCluster({
-  items,
-  getKey,
-  unit,
-}: {
-  items: Equipment[];
-  getKey: (i: Equipment) => string | null;
-  unit?: string;
-}) {
-  const groups: Record<string, Equipment[]> = {};
-  items.forEach((i) => {
-    const k = getKey(i) ?? "N/A";
-    (groups[k] = groups[k] || []).push(i);
-  });
+// ─── Extract human-readable size for each equipment type ─────────
+function getItemSize(item: Equipment): string | null {
+  const f = (item.typeSpecificFields || {}) as Record<string, any>;
+  switch (item.type) {
+    case "kite":
+    case "wing":
+      return f.size != null ? `${f.size} m²` : null;
+    case "board":
+    case "foilboard":
+      return f.size != null ? `${f.size} cm` : null;
+    case "bar_lines":
+      return f.lineLength != null ? `${f.lineLength} m` : null;
+    case "foil":
+      return f.mastLength != null ? `${f.mastLength} cm` : null;
+    case "wetsuit":
+    case "harness":
+    case "helmet_safety":
+      return f.size ?? null;
+    default:
+      return f.size ?? null;
+  }
+}
 
-  const sorted = Object.entries(groups).sort(([a], [b]) => {
-    const na = parseFloat(a), nb = parseFloat(b);
-    return isNaN(na) || isNaN(nb) ? a.localeCompare(b) : na - nb;
-  });
+// ─── Single equipment row ────────────────────────────────────────
+function EquipmentRow({ item }: { item: Equipment }) {
+  const rating = item.conditionRating as 1 | 2 | 3 | 4 | 5;
+  const col = CONDITION_COLORS[rating] ?? CONDITION_COLORS[3];
+  const size = getItemSize(item);
+  const statusBadge =
+    item.status === "in_repair" ? (
+      <span className="text-[10px] font-medium text-orange-600 dark:text-orange-400">Repair</span>
+    ) : item.status === "in_transfer" ? (
+      <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400">Transfer</span>
+    ) : null;
 
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {sorted.map(([key, grpItems]) => {
-        const avg = avgCondition(grpItems);
-        const col = conditionColor(avg);
-        return (
-          <span
-            key={key}
-            className={cn(
-              "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border",
-              col.badge
-            )}
-            title={`Avg condition: ${avg.toFixed(1)}`}
-          >
-            {key}{unit && key !== "N/A" ? unit : ""}
-            <span className="opacity-70">×{grpItems.length}</span>
+    <Link href={`/equipment/${item.id}`}>
+      <div
+        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 active:bg-accent transition-colors cursor-pointer"
+        data-testid={`row-equipment-${item.id}`}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium leading-tight truncate">
+              {item.brand} {item.model}
+            </span>
+            {statusBadge}
+          </div>
+          {size && (
+            <span className="text-xs text-muted-foreground">{size}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={cn("text-xs font-semibold px-1.5 py-0.5 rounded border", col.badge)}>
+            ★ {rating}
           </span>
-        );
-      })}
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// ─── List of equipment rows ──────────────────────────────────────
+function EquipmentItemList({ items }: { items: Equipment[] }) {
+  const sorted = [...items].sort((a, b) => {
+    const sa = getItemSize(a) ?? "";
+    const sb = getItemSize(b) ?? "";
+    const na = parseFloat(sa), nb = parseFloat(sb);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return `${a.brand} ${a.model}`.localeCompare(`${b.brand} ${b.model}`);
+  });
+  return (
+    <div className="divide-y divide-border/50 -mx-1">
+      {sorted.map((item) => (
+        <EquipmentRow key={item.id} item={item} />
+      ))}
     </div>
   );
 }
@@ -111,12 +148,11 @@ interface CategoryCardProps {
   icon: React.ReactNode;
   title: string;
   items: Equipment[];
-  renderContent: () => React.ReactNode;
   stationId: number;
   typeFilter?: string;
 }
 
-function CategoryCard({ icon, title, items, renderContent, stationId, typeFilter }: CategoryCardProps) {
+function CategoryCard({ icon, title, items, stationId, typeFilter }: CategoryCardProps) {
   const [expanded, setExpanded] = useState(true);
   if (!items.length) return null;
 
@@ -166,23 +202,31 @@ function CategoryCard({ icon, title, items, renderContent, stationId, typeFilter
       </button>
 
       {expanded && (
-        <CardContent className="pt-0 space-y-4">
-          <div>{renderContent()}</div>
-          <Link
-            href={`/equipment?stationId=${stationId}${typeFilter ? `&type=${typeFilter}` : ""}`}
-          >
-            <Button variant="ghost" size="sm" className="text-xs h-7 px-2 text-muted-foreground">
-              View all {title} →
-            </Button>
-          </Link>
+        <CardContent className="pt-0 pb-2">
+          <EquipmentItemList items={items} />
+          <div className="pt-1">
+            <Link
+              href={`/equipment?stationId=${stationId}${typeFilter ? `&type=${typeFilter}` : ""}`}
+            >
+              <Button variant="ghost" size="sm" className="text-xs h-7 px-2 text-muted-foreground">
+                View all {title} →
+              </Button>
+            </Link>
+          </div>
         </CardContent>
       )}
     </Card>
   );
 }
 
-// ─── "Other" grouped by sub-type ─────────────────────────────────
+// ─── "Other" grouped by sub-type with rows ───────────────────────
 function OtherCategory({ items, stationId }: { items: Equipment[]; stationId: number }) {
+  const [expanded, setExpanded] = useState(true);
+  if (!items.length) return null;
+
+  const avg = avgCondition(items);
+  const col = conditionColor(avg);
+
   const byType: Record<string, Equipment[]> = {};
   items.forEach((i) => {
     const label = EQUIPMENT_TYPE_LABELS[i.type] || i.type;
@@ -190,39 +234,67 @@ function OtherCategory({ items, stationId }: { items: Equipment[]; stationId: nu
   });
 
   return (
-    <CategoryCard
-      icon={<Shield className="h-4 w-4" />}
-      title="Other Gear"
-      items={items}
-      stationId={stationId}
-      renderContent={() => (
-        <div className="space-y-3">
-          {Object.entries(byType).map(([type, grpItems]) => {
-            const avg = avgCondition(grpItems);
-            const col = conditionColor(avg);
-            return (
-              <div key={type} className="space-y-1.5">
-                <div className="flex items-center justify-between gap-1">
-                  <span className="text-sm font-medium">{type}</span>
-                  <span className={cn("text-xs font-medium", col.text)}>
-                    {grpItems.length} item{grpItems.length !== 1 ? "s" : ""} · ★{avg.toFixed(1)}
-                  </span>
-                </div>
-                <ConditionBar items={grpItems} />
-                {/* Sub-grouping by size/type attributes */}
-                <SizeCluster
-                  items={grpItems}
-                  getKey={(i) => {
-                    const f = (i.typeSpecificFields || {}) as Record<string, any>;
-                    return f.size ?? f.harnessType ?? f.gearType ?? null;
-                  }}
-                />
+    <Card>
+      <button
+        className="w-full text-left"
+        onClick={() => setExpanded((v) => !v)}
+        data-testid="button-expand-other-gear"
+      >
+        <CardHeader className="pb-2 flex flex-row items-center justify-between gap-1">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 rounded-md bg-primary/10 text-primary shrink-0">
+              <Shield className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold">Other Gear</h3>
+                <Badge
+                  variant="secondary"
+                  className="no-default-hover-elevate no-default-active-elevate text-[10px] font-bold"
+                >
+                  {items.length}
+                </Badge>
               </div>
-            );
-          })}
-        </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={cn("text-xs font-medium", col.text)}>
+                  ★ {avg.toFixed(1)} avg
+                </span>
+                <div className="flex-1 min-w-[80px]">
+                  <ConditionBar items={items} />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="shrink-0">
+            {expanded ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
+        </CardHeader>
+      </button>
+
+      {expanded && (
+        <CardContent className="pt-0 pb-2 space-y-3">
+          {Object.entries(byType).map(([type, grpItems]) => (
+            <div key={type}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-3 mb-0.5">
+                {type}
+              </p>
+              <EquipmentItemList items={grpItems} />
+            </div>
+          ))}
+          <div className="pt-1">
+            <Link href={`/equipment?stationId=${stationId}`}>
+              <Button variant="ghost" size="sm" className="text-xs h-7 px-2 text-muted-foreground">
+                View all Other Gear →
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
       )}
-    />
+    </Card>
   );
 }
 
@@ -294,7 +366,7 @@ export default function StationDetailPage() {
     );
   }
 
-  // ─── Data slices ───────────────────────────────────────────────
+  // ─── Data slices (category order matches dropdown) ──────────────
   const kites      = allEquipment.filter((e) => e.type === "kite");
   const wings      = allEquipment.filter((e) => e.type === "wing");
   const boards     = allEquipment.filter((e) => e.type === "board");
@@ -302,14 +374,13 @@ export default function StationDetailPage() {
   const barsLines  = allEquipment.filter((e) => e.type === "bar_lines");
   const foils      = allEquipment.filter((e) => e.type === "foil");
   const other      = allEquipment.filter((e) =>
-    ["wetsuit", "harness", "helmet_safety", "foil"].includes(e.type)
+    ["wetsuit", "harness", "helmet_safety"].includes(e.type)
   );
 
-  const avgCond      = avgCondition(allEquipment);
-  const avgCol       = conditionColor(avgCond);
-  const inRepair     = allEquipment.filter((e) => e.status === "in_repair").length;
-  const inTransfer   = allEquipment.filter((e) => e.status === "in_transfer").length;
-  const needsAttn    = allEquipment.filter((e) => e.conditionRating <= 2).length;
+  const avgCond    = avgCondition(allEquipment);
+  const avgCol     = conditionColor(avgCond);
+  const inRepair   = allEquipment.filter((e) => e.status === "in_repair").length;
+  const inTransfer = allEquipment.filter((e) => e.status === "in_transfer").length;
 
   const statCards = [
     {
@@ -439,178 +510,49 @@ export default function StationDetailPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Kites */}
-          {kites.length > 0 && (
-            <CategoryCard
-              icon={<KiteIcon className="h-4 w-4" />}
-              title="Kites"
-              items={kites}
-              stationId={stationId}
-              typeFilter="kite"
-              renderContent={() => (
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2">
-                      By size
-                    </p>
-                    <SizeCluster
-                      items={kites}
-                      getKey={(i) => {
-                        const f = (i.typeSpecificFields || {}) as Record<string, any>;
-                        return f.size != null ? String(f.size) : null;
-                      }}
-                      unit="m²"
-                    />
-                  </div>
-                  <ColorCluster items={kites} />
-                </div>
-              )}
-            />
-          )}
-
-          {/* Wings */}
-          {wings.length > 0 && (
-            <CategoryCard
-              icon={<Wind className="h-4 w-4" />}
-              title="Wings"
-              items={wings}
-              stationId={stationId}
-              typeFilter="wing"
-              renderContent={() => (
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2">
-                      By size
-                    </p>
-                    <SizeCluster
-                      items={wings}
-                      getKey={(i) => {
-                        const f = (i.typeSpecificFields || {}) as Record<string, any>;
-                        return f.size != null ? String(f.size) : null;
-                      }}
-                      unit="m²"
-                    />
-                  </div>
-                  <ColorCluster items={wings} />
-                </div>
-              )}
-            />
-          )}
-
-          {/* Kiteboards */}
-          {boards.length > 0 && (
-            <CategoryCard
-              icon={<Layers className="h-4 w-4" />}
-              title="Kiteboards"
-              items={boards}
-              stationId={stationId}
-              typeFilter="board"
-              renderContent={() => (
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2">
-                      By size
-                    </p>
-                    <SizeCluster
-                      items={boards}
-                      getKey={(i) => {
-                        const f = (i.typeSpecificFields || {}) as Record<string, any>;
-                        return f.size != null ? String(f.size) : null;
-                      }}
-                      unit="cm"
-                    />
-                  </div>
-                  <BoardTypeCluster items={boards} />
-                </div>
-              )}
-            />
-          )}
-
-          {/* Foilboards */}
-          {foilboards.length > 0 && (
-            <CategoryCard
-              icon={<Layers className="h-4 w-4" />}
-              title="Foilboards"
-              items={foilboards}
-              stationId={stationId}
-              typeFilter="foilboard"
-              renderContent={() => (
-                <div>
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2">
-                    By size
-                  </p>
-                  <SizeCluster
-                    items={foilboards}
-                    getKey={(i) => {
-                      const f = (i.typeSpecificFields || {}) as Record<string, any>;
-                      return f.size != null ? String(f.size) : null;
-                    }}
-                    unit="cm"
-                  />
-                </div>
-              )}
-            />
-          )}
-
-          {/* Bars */}
-          {barsLines.length > 0 && (
-            <CategoryCard
-              icon={<Link2 className="h-4 w-4" />}
-              title="Bars"
-              items={barsLines}
-              stationId={stationId}
-              typeFilter="bar_lines"
-              renderContent={() => (
-                <div>
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2">
-                    By line length
-                  </p>
-                  <SizeCluster
-                    items={barsLines}
-                    getKey={(i) => {
-                      const f = (i.typeSpecificFields || {}) as Record<string, any>;
-                      return f.lineLength != null ? String(f.lineLength) : null;
-                    }}
-                    unit="m"
-                  />
-                </div>
-              )}
-            />
-          )}
-
-          {/* Foils (if present, show in own card) */}
-          {foils.length > 0 && (
-            <CategoryCard
-              icon={<FoilIcon className="h-4 w-4" />}
-              title="Foils"
-              items={foils}
-              stationId={stationId}
-              typeFilter="foil"
-              renderContent={() => (
-                <div>
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2">
-                    By mast length
-                  </p>
-                  <SizeCluster
-                    items={foils}
-                    getKey={(i) => {
-                      const f = (i.typeSpecificFields || {}) as Record<string, any>;
-                      return f.mastLength != null ? String(f.mastLength) : null;
-                    }}
-                    unit="cm"
-                  />
-                </div>
-              )}
-            />
-          )}
-
-          {/* Other gear */}
-          {other.length > 0 && (
-            <OtherCategory
-              items={other}
-              stationId={stationId}
-            />
-          )}
+          <CategoryCard
+            icon={<KiteIcon className="h-4 w-4" />}
+            title="Kites"
+            items={kites}
+            stationId={stationId}
+            typeFilter="kite"
+          />
+          <CategoryCard
+            icon={<Wind className="h-4 w-4" />}
+            title="Wings"
+            items={wings}
+            stationId={stationId}
+            typeFilter="wing"
+          />
+          <CategoryCard
+            icon={<Layers className="h-4 w-4" />}
+            title="Kiteboards"
+            items={boards}
+            stationId={stationId}
+            typeFilter="board"
+          />
+          <CategoryCard
+            icon={<Layers className="h-4 w-4" />}
+            title="Foilboards"
+            items={foilboards}
+            stationId={stationId}
+            typeFilter="foilboard"
+          />
+          <CategoryCard
+            icon={<Link2 className="h-4 w-4" />}
+            title="Bars & Lines"
+            items={barsLines}
+            stationId={stationId}
+            typeFilter="bar_lines"
+          />
+          <CategoryCard
+            icon={<FoilIcon className="h-4 w-4" />}
+            title="Foils"
+            items={foils}
+            stationId={stationId}
+            typeFilter="foil"
+          />
+          <OtherCategory items={other} stationId={stationId} />
         </div>
       )}
 
@@ -664,60 +606,6 @@ export default function StationDetailPage() {
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────
-
-function ColorCluster({ items }: { items: Equipment[] }) {
-  const colors: Record<string, number> = {};
-  items.forEach((i) => {
-    const f = (i.typeSpecificFields || {}) as Record<string, any>;
-    const c = f.color;
-    if (c) colors[c] = (colors[c] || 0) + 1;
-  });
-  const entries = Object.entries(colors);
-  if (!entries.length) return null;
-  return (
-    <div>
-      <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2">Colors</p>
-      <div className="flex flex-wrap gap-1.5">
-        {entries.map(([color, count]) => (
-          <span
-            key={color}
-            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border"
-          >
-            {color} <span className="opacity-60">×{count}</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function BoardTypeCluster({ items }: { items: Equipment[] }) {
-  const types: Record<string, number> = {};
-  items.forEach((i) => {
-    const f = (i.typeSpecificFields || {}) as Record<string, any>;
-    const t = f.boardType || "Unknown";
-    types[t] = (types[t] || 0) + 1;
-  });
-  const entries = Object.entries(types);
-  if (!entries.length) return null;
-  return (
-    <div>
-      <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2">Board types</p>
-      <div className="flex flex-wrap gap-1.5">
-        {entries.map(([type, count]) => (
-          <span
-            key={type}
-            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-accent/50 text-accent-foreground border border-border"
-          >
-            {type} <span className="opacity-60">×{count}</span>
-          </span>
-        ))}
-      </div>
     </div>
   );
 }
