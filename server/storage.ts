@@ -453,6 +453,11 @@ export class DatabaseStorage implements IStorage {
 
     const inTransferEq = allEquipment.filter((e) => e.status === "in_transfer");
 
+    const byType = inTransferEq.reduce((acc, e) => {
+      acc[e.type] = (acc[e.type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
     return {
       totalEquipment: allEquipment.length,
       equipmentPerStation,
@@ -463,6 +468,7 @@ export class DatabaseStorage implements IStorage {
         wings: inTransferEq.filter((e) => e.type === "wing").length,
         boards: inTransferEq.filter((e) => e.type === "board" || e.type === "foilboard").length,
         totalValue: inTransferEq.reduce((sum, e) => sum + (parseFloat(e.currentValue ?? "0") || 0), 0),
+        byType,
       },
     };
   }

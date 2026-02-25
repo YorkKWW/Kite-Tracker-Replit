@@ -676,8 +676,7 @@ function TransfersSection({
 
   return (
     <>
-      {currentStationId && (
-        <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button data-testid="button-initiate-transfer">
               <ArrowLeftRight className="h-4 w-4 mr-2" />
@@ -690,7 +689,7 @@ function TransfersSection({
             </DialogHeader>
             <div className="space-y-4 pt-2">
               <p className="text-sm text-muted-foreground">
-                From: <span className="font-medium text-foreground">{getStationName(currentStationId)}</span>
+                From: <span className="font-medium text-foreground">{currentStationId ? getStationName(currentStationId) : "Unassigned"}</span>
               </p>
               <div className="space-y-2">
                 <Label>Transfer to</Label>
@@ -715,7 +714,6 @@ function TransfersSection({
             </div>
           </DialogContent>
         </Dialog>
-      )}
 
       {transfers.length === 0 ? (
         <p className="text-center text-muted-foreground text-sm py-8">No transfers recorded</p>

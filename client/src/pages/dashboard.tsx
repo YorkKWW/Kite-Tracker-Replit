@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package, AlertTriangle, ArrowLeftRight, MapPin } from "lucide-react";
 import type { Transfer } from "@shared/schema";
+import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 
 type StationStat = {
   stationId: number;
@@ -21,7 +22,7 @@ type DashboardStats = {
   equipmentPerStation: StationStat[];
   needsAttention: number;
   inTransfer: number;
-  inTransferBreakdown: { kites: number; wings: number; boards: number; totalValue: number };
+  inTransferBreakdown: { kites: number; wings: number; boards: number; totalValue: number; byType: Record<string, number> };
 };
 
 export default function DashboardPage() {
@@ -158,13 +159,25 @@ export default function DashboardPage() {
             {/* In Transfer row */}
             {stats?.inTransferBreakdown && stats.inTransfer > 0 && (
               <div className="flex items-center justify-between py-2 border-t border-dashed border-border/70">
-                <span className="text-sm font-medium text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
-                  <ArrowLeftRight className="h-3.5 w-3.5" />
-                  In Transfer
-                  <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full px-1.5 py-0.5 font-semibold">
-                    {stats.inTransfer}
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                    <ArrowLeftRight className="h-3.5 w-3.5" />
+                    In Transfer
+                    <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full px-1.5 py-0.5 font-semibold">
+                      {stats.inTransfer}
+                    </span>
                   </span>
-                </span>
+                  {stats.inTransferBreakdown.byType && Object.entries(stats.inTransferBreakdown.byType)
+                    .filter(([type]) => type !== "kite" && type !== "wing" && type !== "board" && type !== "foilboard")
+                    .length > 0 && (
+                    <span className="text-xs text-purple-500 dark:text-purple-400 pl-5">
+                      {Object.entries(stats.inTransferBreakdown.byType)
+                        .filter(([type]) => type !== "kite" && type !== "wing" && type !== "board" && type !== "foilboard")
+                        .map(([type, count]) => `${count}× ${EQUIPMENT_TYPE_LABELS[type] ?? type}`)
+                        .join(", ")}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-4 shrink-0">
                   <StatPill value={stats.inTransferBreakdown.kites} color="blue" muted />
                   <StatPill value={stats.inTransferBreakdown.wings} color="emerald" muted />
