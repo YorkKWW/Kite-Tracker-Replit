@@ -1276,36 +1276,88 @@ export async function registerRoutes(
   });
 
   // ── Price Lists ──────────────────────────────────────────────────
+  function normalisePrice(raw: string): number {
+    let s: string;
+    // German format: 1.529,00 (last separator is comma)
+    if (raw.includes(",") && raw.lastIndexOf(",") > raw.lastIndexOf(".")) {
+      s = raw.replace(/\./g, "").replace(",", ".");
+    } else {
+      // English format: 1,529.00 or plain 1529.00
+      s = raw.replace(/,/g, "");
+    }
+    return parseFloat(s);
+  }
+
   function parsePriceListText(text: string): Array<{ sku: string; productName: string; retailPrice: string }> {
-    const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
-    const items: Array<{ sku: string; productName: string; retailPrice: string }> = [];
-    // Matches prices like 1.529,00 or 1529.00 or 1,529.00 at end of line (optionally preceded by €)
-    const pricePattern = /(?:€\s*)?(\d{1,3}(?:[.,]\d{3})*[.,]\d{2}|\d+[.,]\d{2})\s*€?\s*$/;
-    // SKU: starts uppercase letter or digit, contains letters/digits/hyphens/dots, 3-25 chars
-    const skuPattern = /^([A-Z0-9][A-Z0-9\-_.]{2,24})\s+([\s\S]+)$/;
-    for (const line of lines) {
-      const priceMatch = line.match(pricePattern);
-      if (!priceMatch) continue;
-      const raw = priceMatch[1];
-      // Normalise: German 1.529,00 → 1529.00  or  English 1,529.00 → 1529.00
-      let normalised: string;
-      if (raw.includes(",") && raw.lastIndexOf(",") > raw.lastIndexOf(".")) {
-        normalised = raw.replace(/\./g, "").replace(",", ".");
+    // Step 1: split text into candidate lines.
+    // PDFs often extract tables as very long lines with multiple spaces between columns,
+    // so we also break on runs of 2+ spaces to recover individual columns.
+    const rawLines = text.split(/\r?\n|\r/);
+    const lines: string[] = [];
+    for (const raw of rawLines) {
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      if (trimmed.length > 80) {
+        // Split on 2+ consecutive spaces — often separates table columns in PDFs
+        const parts = trimmed.split(/  +/).map((p) => p.trim()).filter((p) => p.length > 2);
+        lines.push(...parts);
       } else {
-        normalised = raw.replace(/,/g, "");
-      }
-      const price = parseFloat(normalised);
-      if (isNaN(price) || price <= 0 || price > 100000) continue;
-      const lineWithoutPrice = line.slice(0, line.length - priceMatch[0].length).trim();
-      if (!lineWithoutPrice || lineWithoutPrice.length < 3) continue;
-      const skuMatch = lineWithoutPrice.match(skuPattern);
-      if (skuMatch) {
-        const sku = skuMatch[1].trim();
-        const productName = skuMatch[2].replace(/\s+/g, " ").trim();
-        if (productName.length < 2) continue;
-        items.push({ sku, productName, retailPrice: price.toFixed(2) });
+        lines.push(trimmed);
       }
     }
+
+    // Step 2: price regex — finds German (1.529,00) or English (1529.00 / 1,529.00) prices
+    // anywhere in the line, not just at the end
+    const priceRx = /(?<![0-9,.-])(\d{1,4}(?:[.,]\d{3})?[.,]\d{2})(?![0-9])/g;
+    // SKU: an uppercase-starting token of 3–25 chars (letters, digits, dash, dot, underscore)
+    const skuRx = /\b([A-Z][A-Z0-9\-_.]{2,24})\b/;
+
+    const items: Array<{ sku: string; productName: string; retailPrice: string }> = [];
+    const seen = new Set<string>();
+
+    for (const line of lines) {
+      // Find every price-like number in the line
+      const priceMatches = [...line.matchAll(priceRx)];
+      if (priceMatches.length === 0) continue;
+
+      // Use the last price found (retail price is usually rightmost)
+      const lastMatch = priceMatches[priceMatches.length - 1];
+      const price = normalisePrice(lastMatch[1]);
+      if (isNaN(price) || price < 1 || price > 100000) continue;
+
+      // Find the first SKU-like token in the line
+      const skuMatch = skuRx.exec(line);
+      if (!skuMatch) continue;
+      const sku = skuMatch[1];
+
+      // Extract product name: text between end of SKU token and start of the last price
+      const skuEnd = (skuMatch.index ?? 0) + sku.length;
+      const priceStart = lastMatch.index ?? line.length;
+      let productName = "";
+      if (priceStart > skuEnd) {
+        productName = line.slice(skuEnd, priceStart).replace(/\s+/g, " ").trim();
+      }
+      // Strip any leftover price-like numbers from the product name
+      productName = productName.replace(/\d{1,4}(?:[.,]\d{3})?[.,]\d{2}/g, "").replace(/\s+/g, " ").trim();
+      // If name is still empty or too short, use everything after the SKU
+      if (productName.length < 2) {
+        productName = line.slice(skuEnd).replace(/\s+/g, " ").trim();
+        productName = productName.replace(/\d{1,4}(?:[.,]\d{3})?[.,]\d{2}/g, "").replace(/[€$]\s*/g, "").trim();
+      }
+      if (productName.length < 2) continue;
+
+      // Skip obvious header/total rows
+      const lc = line.toLowerCase();
+      if (/^(total|summe|subtotal|mwst|vat|ust|price|preis|artikel|item|description|beschreibung|sku|ref)/i.test(sku)) continue;
+      if (/total|summe|subtotal/i.test(lc) && priceMatches.length === 1) continue;
+
+      const key = `${sku}:${price.toFixed(2)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      items.push({ sku, productName, retailPrice: price.toFixed(2) });
+    }
+
     return items;
   }
 
@@ -1314,8 +1366,9 @@ export async function registerRoutes(
     try {
       if (!req.file) return res.status(400).json({ message: "No PDF uploaded" });
       const { text } = await parsePdfBuffer(req.file.buffer);
+      const rawLineCount = text.split(/\r?\n|\r/).filter((l) => l.trim().length > 0).length;
       const items = parsePriceListText(text);
-      res.json({ items, rawLineCount: text.split("\n").length });
+      res.json({ items, rawLineCount });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

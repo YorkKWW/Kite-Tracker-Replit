@@ -53,9 +53,9 @@ export default function PriceListsPage() {
       setRemovedRows(new Set());
       setExpandPreview(true);
       if (data.items.length === 0) {
-        toast({ title: "No items extracted", description: "The parser couldn't find SKU + price rows. Check the PDF format.", variant: "destructive" });
+        toast({ title: "No items extracted", description: `Parser processed ${data.rawLineCount} lines but found no matching SKU + price rows. The PDF format may not be supported.`, variant: "destructive" });
       } else {
-        toast({ title: `Extracted ${data.items.length} items`, description: "Review the preview below, then confirm to save." });
+        toast({ title: `Extracted ${data.items.length} items`, description: `From ${data.rawLineCount} text lines in the PDF. Review below, then confirm to save.` });
       }
     },
     onError: (e: any) => toast({ title: "Parse failed", description: e.message, variant: "destructive" }),
@@ -241,7 +241,7 @@ export default function PriceListsPage() {
               </div>
 
               {expandPreview && parsedItems.length > 0 && (
-                <div className="overflow-x-auto max-h-80 overflow-y-auto rounded border">
+                <div className="overflow-x-auto max-h-[60vh] overflow-y-auto rounded border">
                   <table className="w-full text-xs">
                     <thead className="bg-muted sticky top-0">
                       <tr>
