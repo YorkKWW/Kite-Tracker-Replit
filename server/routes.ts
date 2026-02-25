@@ -649,16 +649,33 @@ export async function registerRoutes(
     const existingTransfers = await storage.getTransfers({ status: "pending" });
     const existing = existingTransfers.find(t => t.id === transferId);
     if (!existing) return res.status(404).json({ message: "Transfer not found" });
-    if (user.role === "station_lead" && user.assignedStationId !== existing.toStationId && user.assignedStationId !== existing.fromStationId) {
-      return res.status(403).json({ message: "Access denied" });
+
+    const isAdmin = user.role === "admin";
+    const isReceivingManager =
+      (user.role === "manager" || user.role === "station_lead") &&
+      user.assignedStationId === existing.toStationId;
+    if (!isAdmin && !isReceivingManager) {
+      return res.status(403).json({ message: "Only the receiving station manager or admin can confirm receipt" });
     }
-    const transfer = await storage.confirmTransfer(transferId, user.id);
+
+    const { arrived, condition } = req.body as { arrived: boolean; condition?: number };
+    if (typeof arrived !== "boolean") {
+      return res.status(400).json({ message: "arrived (boolean) is required" });
+    }
+    if (arrived && (condition == null || condition < 1 || condition > 5)) {
+      return res.status(400).json({ message: "condition (1–5) is required when item arrived" });
+    }
+
+    const transfer = await storage.confirmTransfer(transferId, user.id, { arrived, condition });
     if (!transfer) return res.status(404).json({ message: "Transfer not found" });
+
     await storage.createActivityLog({
       userId: user.id,
-      action: "transfer_confirmed",
+      action: arrived ? "transfer_confirmed" : "transfer_item_missing",
       equipmentId: transfer.equipmentId,
-      details: `Transfer confirmed`,
+      details: arrived
+        ? `Transfer received · condition ${condition}/5`
+        : `Transfer receipt: item reported missing`,
     });
     res.json(transfer);
   });

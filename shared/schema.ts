@@ -34,6 +34,7 @@ export const equipmentStatusEnum = pgEnum("equipment_status", [
   "retired",
   "sold",
   "in_transfer",
+  "missing",
 ]);
 
 export const transferStatusEnum = pgEnum("transfer_status", [
@@ -136,6 +137,8 @@ export const transfers = pgTable("transfers", {
   initiatedAt: timestamp("initiated_at").defaultNow(),
   confirmedAt: timestamp("confirmed_at"),
   status: transferStatusEnum("status").notNull().default("pending"),
+  arrivedCondition: integer("arrived_condition"),
+  missing: boolean("missing").notNull().default(false),
 });
 
 export const photos = pgTable("photos", {

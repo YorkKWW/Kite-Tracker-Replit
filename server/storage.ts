@@ -316,18 +316,34 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async confirmTransfer(id: number, confirmedBy: number): Promise<Transfer | undefined> {
+  async confirmTransfer(id: number, confirmedBy: number, opts: { arrived: boolean; condition?: number }): Promise<Transfer | undefined> {
     const [transfer] = await db.select().from(transfers).where(eq(transfers.id, id));
     if (!transfer) return undefined;
 
     const [updated] = await db.update(transfers)
-      .set({ status: "confirmed", confirmedBy, confirmedAt: new Date() })
+      .set({
+        status: "confirmed",
+        confirmedBy,
+        confirmedAt: new Date(),
+        arrivedCondition: opts.arrived ? (opts.condition ?? null) : null,
+        missing: !opts.arrived,
+      })
       .where(eq(transfers.id, id))
       .returning();
 
-    await db.update(equipment)
-      .set({ currentStationId: transfer.toStationId, status: "active" })
-      .where(eq(equipment.id, transfer.equipmentId));
+    if (opts.arrived) {
+      await db.update(equipment)
+        .set({
+          currentStationId: transfer.toStationId,
+          status: "active",
+          ...(opts.condition ? { conditionRating: opts.condition } : {}),
+        })
+        .where(eq(equipment.id, transfer.equipmentId));
+    } else {
+      await db.update(equipment)
+        .set({ status: "missing" })
+        .where(eq(equipment.id, transfer.equipmentId));
+    }
 
     return updated;
   }

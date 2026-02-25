@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   FileText, Package, Star, Wrench, ArrowLeftRight, UserPlus, MapPin,
-  Camera, ShoppingCart, ClipboardList, LogIn, X, Filter
+  Camera, ShoppingCart, ClipboardList, LogIn, X, Filter, AlertTriangle
 } from "lucide-react";
 import type { Station, User } from "@shared/schema";
 
@@ -32,6 +32,7 @@ const ACTION_ICONS: Record<string, React.ReactNode> = {
   repair_logged: <Wrench className="h-4 w-4 text-orange-500" />,
   transfer_initiated: <ArrowLeftRight className="h-4 w-4 text-purple-500" />,
   transfer_confirmed: <ArrowLeftRight className="h-4 w-4 text-green-500" />,
+  transfer_item_missing: <AlertTriangle className="h-4 w-4 text-red-500" />,
   user_created: <UserPlus className="h-4 w-4 text-blue-500" />,
   user_login: <LogIn className="h-4 w-4 text-muted-foreground" />,
   station_created: <MapPin className="h-4 w-4 text-emerald-500" />,
@@ -49,7 +50,8 @@ const ACTION_LABELS: Record<string, string> = {
   condition_rated: "Condition Rated",
   repair_logged: "Repair Logged",
   transfer_initiated: "Transfer Initiated",
-  transfer_confirmed: "Transfer Confirmed",
+  transfer_confirmed: "Transfer Received",
+  transfer_item_missing: "Item Reported Missing",
   user_created: "User Created",
   user_login: "Login",
   station_created: "Location Created",

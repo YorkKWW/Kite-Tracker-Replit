@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Star, Wrench, ArrowLeftRight, Camera,
   Upload, Trash2, MapPin, Calendar, Hash, X, ChevronLeft, ChevronRight,
-  FileText, Package,
+  FileText, Package, AlertTriangle,
 } from "lucide-react";
 import type { Equipment, Station, ConditionRating, Repair, Transfer, Photo } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS, TYPE_SPECIFIC_FIELDS } from "@shared/schema";
@@ -791,6 +791,7 @@ const EQUIPMENT_ACTION_ICONS: Record<string, React.ReactNode> = {
   repair_logged: <Wrench className="h-4 w-4 text-orange-500" />,
   transfer_initiated: <ArrowLeftRight className="h-4 w-4 text-purple-500" />,
   transfer_confirmed: <ArrowLeftRight className="h-4 w-4 text-green-500" />,
+  transfer_item_missing: <AlertTriangle className="h-4 w-4 text-red-500" />,
   photo_added: <Camera className="h-4 w-4 text-sky-500" />,
 };
 
