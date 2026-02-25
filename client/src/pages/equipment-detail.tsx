@@ -37,11 +37,18 @@ export default function EquipmentDetailPage() {
   const { data: transfersData } = useQuery<Transfer[]>({ queryKey: ["/api/equipment", id, "transfers"] });
   const { data: photosData } = useQuery<Photo[]>({ queryKey: ["/api/equipment", id, "photos"] });
   const { data: retailPrice } = useQuery<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>({
-    queryKey: ["/api/price-lists/lookup", item?.sku],
-    queryFn: () => item?.sku
-      ? fetch(`/api/price-lists/lookup?sku=${encodeURIComponent(item.sku!)}`, { credentials: "include" }).then((r) => r.json())
-      : Promise.resolve(null),
-    enabled: !!item?.sku,
+    queryKey: ["/api/price-lists/lookup", item?.sku, item?.model, (item?.typeSpecificFields as any)?.size],
+    queryFn: () => {
+      if (!item) return Promise.resolve(null);
+      const params = new URLSearchParams();
+      if (item.sku) params.set("sku", item.sku);
+      const size = (item.typeSpecificFields as any)?.size;
+      const searchName = [item.model, size != null ? String(size) : ""].filter(Boolean).join(" ");
+      if (searchName.length >= 3) params.set("name", searchName);
+      if (!params.toString()) return Promise.resolve(null);
+      return fetch(`/api/price-lists/lookup?${params}`, { credentials: "include" }).then((r) => r.json());
+    },
+    enabled: !!item,
   });
 
   const getStationName = (sid: number | null) => stationsList?.find((s) => s.id === sid)?.name || "Unknown";
@@ -137,9 +144,11 @@ export default function EquipmentDetailPage() {
                 </p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Sale Price</p>
-                <p className="font-semibold" data-testid="text-sale-price">
-                  {item.salePrice ? `€${item.salePrice}` : "N/A"}
+                <p className="text-xs text-muted-foreground">Retail Price (UVP)</p>
+                <p className="font-semibold" data-testid="text-retail-price">
+                  {retailPrice?.retailPrice
+                    ? `€${parseFloat(retailPrice.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}`
+                    : "N/A"}
                 </p>
               </div>
             </div>
