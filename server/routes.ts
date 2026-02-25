@@ -11,7 +11,14 @@ import { ObjectStorageService } from "./replit_integrations/object_storage/objec
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { createRequire } from "module";
 const _require = createRequire(import.meta.url);
-const pdfParse: (buffer: Buffer) => Promise<{ text: string }> = _require("pdf-parse");
+const { PDFParse } = _require("pdf-parse");
+
+async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string }> {
+  const parser = new PDFParse({ data: buffer });
+  const result = await parser.getText();
+  await parser.destroy();
+  return { text: result.text };
+}
 
 const objectStorage = new ObjectStorageService();
 
@@ -77,18 +84,55 @@ function parsePdfInvoice(text: string) {
   const totalGross = text.match(/Gesamt\s+([\d.,]+)\s*€/)?.[1] || "";
 
   const items: any[] = [];
-  const productLineRe = /^\[([A-Z0-9]+)\]\s+(.+?)\s{2,}(\d+)\s+([\d.]+,\d{2})\s+(\d+)%\s+([\d.]+,\d{2})\s*€?$/;
+
+  // CORE invoice multi-line format:
+  //   Line 1: "[SKU] Product Name (size, color)"
+  //   Line 2: description text
+  //   Line 3: serial(s) OR already the qty line (spare parts have no serial)
+  //   Line N: "qty \t unitPrice \t discount% total €"
+  const skuLineRe = /^\[([A-Z0-9]+)\]\s+(.+)$/;
+  const qtyLineRe = /^(\d+)\s+[\d.,]+\s+\d+%\s+([\d.,]+)\s*€?$/;
+  const serialLineRe = /^([A-Z0-9]{6,}(?:,\s*[A-Z0-9]{6,})*)$/;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const match = line.match(productLineRe);
-    if (!match) continue;
+    const skuMatch = line.match(skuLineRe);
+    if (!skuMatch) continue;
 
-    const [, sku, rawName, qtyStr, , discountStr, totalStr] = match;
-    const quantity = parseInt(qtyStr, 10);
-    const total = parseGermanNumber(totalStr);
-    const discount = parseInt(discountStr, 10);
+    const [, sku, rawName] = skuMatch;
+
+    // Find qty line within the next 4 lines
+    let qtyLine: string | null = null;
+    let qtyLineIdx = -1;
+    for (let j = i + 1; j <= Math.min(i + 4, lines.length - 1); j++) {
+      if (lines[j].match(qtyLineRe)) {
+        qtyLine = lines[j];
+        qtyLineIdx = j;
+        break;
+      }
+    }
+    if (!qtyLine || qtyLineIdx < 0) continue;
+
+    const qtyMatch = qtyLine.match(/^(\d+)\s+([\d.]+,\d{2})\s+(\d+)%\s+([\d.,]+)\s*€?$/);
+    let quantity = 1, discount = 0, total = 0;
+    if (qtyMatch) {
+      quantity = parseInt(qtyMatch[1], 10);
+      discount = parseInt(qtyMatch[3], 10);
+      total = parseGermanNumber(qtyMatch[4]);
+    }
     const unitPriceAfterDiscount = quantity > 0 ? total / quantity : total;
+
+    // Look for serial line between SKU line and qty line
+    let serials: string[] = [];
+    for (let j = i + 1; j < qtyLineIdx; j++) {
+      const serialMatch = lines[j].match(serialLineRe);
+      if (serialMatch) {
+        serials = serialMatch[1].split(",").map((s: string) => s.trim()).filter(Boolean);
+        break;
+      }
+    }
+
+    if (serials.length === 0) serials = [""];
 
     const sizeMatch = rawName.match(/\(([0-9.]+)/);
     const colorMatch = rawName.match(/,\s*([^)]+)\)/);
@@ -96,19 +140,6 @@ function parsePdfInvoice(text: string) {
     const color = colorMatch?.[1]?.trim() || "";
     const name = rawName.replace(/\s*\([^)]*\)\s*/, "").trim();
 
-    let serials: string[] = [];
-    for (let j = i + 1; j <= Math.min(i + 5, lines.length - 1); j++) {
-      const nxt = lines[j];
-      if (/^\[/.test(nxt)) break;
-      if (/Nettobetrag|Gesamt|UPS|Zahlungs|Lieferadresse/.test(nxt)) break;
-      const serialMatch = nxt.match(/^([A-Z0-9]{6,}(?:,\s*[A-Z0-9]{6,})*)$/);
-      if (serialMatch) {
-        serials = serialMatch[1].split(",").map((s) => s.trim()).filter(Boolean);
-        break;
-      }
-    }
-
-    if (serials.length === 0) serials = [""];
     const { type, isSpare } = detectEquipmentType(name, sku);
 
     for (const serial of serials) {
@@ -126,6 +157,9 @@ function parsePdfInvoice(text: string) {
         skip: isSpare,
       });
     }
+
+    // Skip ahead past the qty line so we don't re-process
+    i = qtyLineIdx;
   }
 
   return {
@@ -718,7 +752,7 @@ export async function registerRoutes(
   app.post("/api/invoices/parse", requireAdmin, uploadPdf.single("pdf"), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No PDF uploaded" });
     try {
-      const data = await pdfParse(req.file.buffer);
+      const data = await parsePdfBuffer(req.file.buffer);
       const parsed = parsePdfInvoice(data.text);
 
       // Check for duplicate serials in DB
