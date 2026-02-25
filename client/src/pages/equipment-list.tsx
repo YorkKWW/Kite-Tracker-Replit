@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConditionBadge, StatusBadge } from "@/components/condition-badge";
-import { Plus, Search, Package, SlidersHorizontal, ScanLine } from "lucide-react";
+import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -89,12 +89,20 @@ export default function EquipmentListPage() {
           Equipment
         </h1>
         {isAdmin && (
-          <Link href="/equipment/new">
-            <Button data-testid="button-add-equipment">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Equipment
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/invoice-import">
+              <Button variant="outline" data-testid="button-import-invoice">
+                <FileUp className="h-4 w-4 mr-2" />
+                Import Invoice
+              </Button>
+            </Link>
+            <Link href="/equipment/new">
+              <Button data-testid="button-add-equipment">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Equipment
+              </Button>
+            </Link>
+          </div>
         )}
       </div>
 
