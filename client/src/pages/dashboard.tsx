@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -113,9 +114,14 @@ export default function DashboardPage() {
               <div key={station.stationId} className="flex items-center justify-between gap-1">
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-primary" />
-                  <span className="font-medium" data-testid={`text-station-name-${station.stationId}`}>
-                    {station.stationName}
-                  </span>
+                  <Link href={`/stations/${station.stationId}`}>
+                    <span
+                      className="font-medium underline-offset-2 cursor-pointer"
+                      data-testid={`text-station-name-${station.stationId}`}
+                    >
+                      {station.stationName}
+                    </span>
+                  </Link>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-32 h-2 rounded-full bg-muted overflow-hidden">

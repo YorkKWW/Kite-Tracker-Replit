@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -117,17 +118,17 @@ export default function StationsPage() {
           {stationsList.map((s) => (
             <Card key={s.id} data-testid={`card-station-${s.id}`}>
               <CardContent className="p-4 flex items-center justify-between gap-1">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-primary/10">
+                <Link href={`/stations/${s.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="p-2 rounded-md bg-primary/10 shrink-0">
                     <MapPin className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-semibold" data-testid={`text-station-${s.id}`}>{s.name}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground truncate">
                       {[s.location, s.country].filter(Boolean).join(", ") || "No location"}
                     </p>
                   </div>
-                </div>
+                </Link>
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(s)} data-testid={`button-edit-station-${s.id}`}>
                     <Pencil className="h-4 w-4" />
