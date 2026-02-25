@@ -90,35 +90,34 @@ function EquipmentRow({ item }: { item: Equipment }) {
   const rating = item.conditionRating as 1 | 2 | 3 | 4 | 5;
   const col = CONDITION_COLORS[rating] ?? CONDITION_COLORS[3];
   const size = getItemSize(item);
-  const statusBadge =
-    item.status === "in_repair" ? (
-      <span className="text-[10px] font-medium text-orange-600 dark:text-orange-400">Repair</span>
-    ) : item.status === "in_transfer" ? (
-      <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400">Transfer</span>
-    ) : null;
 
   return (
     <Link href={`/equipment/${item.id}`}>
       <div
-        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 active:bg-accent transition-colors cursor-pointer"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent/50 active:bg-accent transition-colors cursor-pointer"
         data-testid={`row-equipment-${item.id}`}
       >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium leading-tight truncate">
-              {item.brand} {item.model}
-            </span>
-            {statusBadge}
-          </div>
+        <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
+          <span className="text-sm font-medium leading-tight truncate shrink">
+            {item.brand} {item.model}
+          </span>
           {size && (
-            <span className="text-xs text-muted-foreground">{size}</span>
+            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-medium shrink-0">
+              {size}
+            </span>
+          )}
+          {item.status === "in_repair" && (
+            <span className="text-[10px] font-medium text-orange-600 dark:text-orange-400 shrink-0">Repair</span>
+          )}
+          {item.status === "in_transfer" && (
+            <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400 shrink-0">Transfer</span>
           )}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           <span className={cn("text-xs font-semibold px-1.5 py-0.5 rounded border", col.badge)}>
             ★ {rating}
           </span>
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
+          <ChevronRight className="h-3 w-3 text-muted-foreground/40" />
         </div>
       </div>
     </Link>
