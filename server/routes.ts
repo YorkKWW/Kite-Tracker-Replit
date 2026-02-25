@@ -1398,6 +1398,13 @@ export async function registerRoutes(
       if (!req.file) return res.status(400).json({ message: "No PDF uploaded" });
       const { text } = await parsePdfBuffer(req.file.buffer);
       const rawLineCount = text.split(/\r?\n|\r/).filter((l) => l.trim().length > 0).length;
+
+      // DEBUG: print first 80 non-empty lines so we can see the actual PDF structure
+      const debugLines = text.split(/\r?\n|\r/).filter((l) => l.trim()).slice(0, 80);
+      console.log("=== PDF TEXT SAMPLE (first 80 lines) ===");
+      debugLines.forEach((l, i) => console.log(`[${i}] ${l}`));
+      console.log("=== END SAMPLE ===");
+
       const items = parsePriceListText(text);
       res.json({ items, rawLineCount });
     } catch (err: any) {
