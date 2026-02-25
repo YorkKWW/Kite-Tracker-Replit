@@ -18,11 +18,8 @@ const PAY_LABELS: Record<string, string> = {
 };
 
 const VAT_LABELS: Record<string, string> = {
-  standard_19: "19% MwSt.",
-  differenzbesteuerung: "§25a UStG",
-  kleinunternehmer: "§19 UStG",
-  eu_delivery: "§4 Nr.1b UStG",
-  custom: "Custom",
+  standard_19: "19% VAT",
+  eu_delivery: "0% Intra-Community",
 };
 
 export default function SalesPage() {

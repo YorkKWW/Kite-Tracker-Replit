@@ -30,11 +30,8 @@ type LineItem = {
 };
 
 const VAT_OPTIONS = [
-  { value: "standard_19", label: "19% MwSt. (standard)", rate: 19, note: "" },
-  { value: "differenzbesteuerung", label: "0% – Differenzbesteuerung §25a UStG", rate: 0, note: "Differenzbesteuerung nach §25a UStG" },
-  { value: "kleinunternehmer", label: "0% – Kleinunternehmer §19 UStG", rate: 0, note: "Kleinunternehmer nach §19 UStG" },
-  { value: "eu_delivery", label: "0% – Innergemeinschaftliche Lieferung §4 Nr. 1b", rate: 0, note: "Innergemeinschaftliche Lieferung nach §4 Nr. 1b UStG" },
-  { value: "custom", label: "Custom VAT rate", rate: 0, note: "" },
+  { value: "standard_19", label: "19% VAT", rate: 19, note: "" },
+  { value: "eu_delivery", label: "0% – Intra-Community Supply (§4 Nr. 1b UStG)", rate: 0, note: "Tax-exempt intra-community supply pursuant to §4 No. 1b UStG" },
 ];
 
 const PAY_OPTIONS = [
@@ -119,15 +116,13 @@ export default function SaleCreatePage() {
 
   // ── Invoice settings ──────────────────────────────────────────
   const [vatType, setVatType] = useState("standard_19");
-  const [customVatRate, setCustomVatRate] = useState("0");
-  const [customVatNote, setCustomVatNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
   const [invoiceDate, setInvoiceDate] = useState(today());
   const [notes, setNotes] = useState("");
 
   const vatOption = VAT_OPTIONS.find((v) => v.value === vatType)!;
-  const vatRate = vatType === "custom" ? parseFloat(customVatRate) || 0 : vatOption.rate;
-  const vatNote = vatType === "custom" ? customVatNote : vatOption.note;
+  const vatRate = vatOption.rate;
+  const vatNote = vatOption.note;
 
   // ── Totals ────────────────────────────────────────────────────
   const totalNet = items.reduce((sum, i) => sum + (parseFloat(i.unitPrice) || 0), 0);
@@ -454,19 +449,6 @@ export default function SaleCreatePage() {
               </SelectContent>
             </Select>
           </div>
-
-          {vatType === "custom" && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Custom VAT Rate (%)</Label>
-                <Input type="number" step="0.01" value={customVatRate} onChange={(e) => setCustomVatRate(e.target.value)} placeholder="7.00" data-testid="input-custom-vat-rate" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Legal Note on Invoice</Label>
-                <Input value={customVatNote} onChange={(e) => setCustomVatNote(e.target.value)} placeholder="e.g. Sonderregelung..." data-testid="input-custom-vat-note" />
-              </div>
-            </div>
-          )}
 
           <div className="space-y-1.5">
             <Label className="text-xs">Notes / Comments</Label>
