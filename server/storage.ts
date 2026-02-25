@@ -117,6 +117,7 @@ export interface IStorage {
   deletePriceList(id: number): Promise<void>;
   getPriceListItems(priceListId: number): Promise<PriceListItem[]>;
   lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>;
+  lookupRetailPriceByName(name: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -643,6 +644,31 @@ export class DatabaseStorage implements IStorage {
         eq(priceLists.isActive, true),
       ))
       .where(ilike(priceListItems.sku, sku))
+      .limit(1);
+    if (!rows.length) return null;
+    return {
+      retailPrice: rows[0].retailPrice ?? "0",
+      dealerPrice: rows[0].dealerPrice ?? null,
+      supplier: rows[0].supplier,
+      productName: rows[0].productName,
+    };
+  }
+
+  async lookupRetailPriceByName(name: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null> {
+    if (!name || name.length < 3) return null;
+    const rows = await db
+      .select({
+        retailPrice: priceListItems.retailPrice,
+        dealerPrice: priceListItems.dealerPrice,
+        supplier: priceLists.supplier,
+        productName: priceListItems.productName,
+      })
+      .from(priceListItems)
+      .innerJoin(priceLists, and(
+        eq(priceListItems.priceListId, priceLists.id),
+        eq(priceLists.isActive, true),
+      ))
+      .where(ilike(priceListItems.productName, `%${name}%`))
       .limit(1);
     if (!rows.length) return null;
     return {

@@ -1477,9 +1477,16 @@ export async function registerRoutes(
   // Retail price lookup by SKU (used on sale-create + equipment-detail)
   app.get("/api/price-lists/lookup", requireAuth, async (req, res) => {
     const sku = (req.query.sku as string || "").trim();
-    if (!sku) return res.json(null);
-    const result = await storage.lookupRetailPrice(sku);
-    res.json(result);
+    const name = (req.query.name as string || "").trim();
+    if (sku) {
+      const result = await storage.lookupRetailPrice(sku);
+      if (result) return res.json(result);
+    }
+    if (name) {
+      const result = await storage.lookupRetailPriceByName(name);
+      if (result) return res.json(result);
+    }
+    res.json(null);
   });
 
   return httpServer;

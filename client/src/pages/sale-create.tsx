@@ -95,13 +95,18 @@ export default function SaleCreatePage() {
       : equip.purchasePrice && parseFloat(equip.purchasePrice) > 0
         ? { label: "Reference (purchase price, net)", value: parseFloat(equip.purchasePrice).toFixed(2) }
         : null;
-    let uvp: { retailPrice: string; supplier: string } | null = null;
-    if (equip.sku) {
-      try {
-        const r = await fetch(`/api/price-lists/lookup?sku=${encodeURIComponent(equip.sku)}`, { credentials: "include" });
+    let uvp: { retailPrice: string; dealerPrice: string | null; supplier: string } | null = null;
+    try {
+      const params = new URLSearchParams();
+      if (equip.sku) params.set("sku", equip.sku);
+      const size = (equip.typeSpecificFields as any)?.size;
+      const searchName = [equip.model, size != null ? String(size) : ""].filter(Boolean).join(" ");
+      if (searchName.length >= 3) params.set("name", searchName);
+      if (params.toString()) {
+        const r = await fetch(`/api/price-lists/lookup?${params}`, { credentials: "include" });
         if (r.ok) uvp = await r.json();
-      } catch {}
-    }
+      }
+    } catch {}
     setItems((prev) => [
       ...prev,
       {
@@ -376,9 +381,9 @@ export default function SaleCreatePage() {
                             UVP: €{parseFloat(item.uvp.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })} <span className="font-normal text-muted-foreground">(brutto incl. VAT)</span>
                           </p>
                         </div>
-                      ) : item.sku ? (
+                      ) : (
                         <p className="text-[10px] text-muted-foreground leading-tight" data-testid={`text-no-uvp-${idx}`}>No retail price available</p>
-                      ) : null}
+                      )}
                     </div>
                   </div>
                 </div>
