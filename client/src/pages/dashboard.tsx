@@ -6,15 +6,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Package, AlertTriangle, ArrowLeftRight, MapPin } from "lucide-react";
 import type { Transfer } from "@shared/schema";
 
+type StationStat = {
+  stationId: number;
+  stationName: string;
+  count: number;
+  kites: number;
+  wings: number;
+  boards: number;
+  totalValue: number;
+};
+
+type DashboardStats = {
+  totalEquipment: number;
+  equipmentPerStation: StationStat[];
+  needsAttention: number;
+  inTransfer: number;
+};
+
 export default function DashboardPage() {
   const { user, isAdmin } = useAuth();
 
-  const { data: stats, isLoading } = useQuery<{
-    totalEquipment: number;
-    equipmentPerStation: { stationId: number; stationName: string; count: number }[];
-    needsAttention: number;
-    inTransfer: number;
-  }>({
+  const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard"],
   });
 
@@ -31,10 +43,9 @@ export default function DashboardPage() {
     return (
       <div className="p-4 md:p-6 space-y-6">
         <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-48" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
       </div>
     );
@@ -71,8 +82,14 @@ export default function DashboardPage() {
     },
   ];
 
+  const stations = stats?.equipmentPerStation ?? [];
+  const totalKites = stations.reduce((s, st) => s + st.kites, 0);
+  const totalWings = stations.reduce((s, st) => s + st.wings, 0);
+  const totalBoards = stations.reduce((s, st) => s + st.boards, 0);
+  const totalValue = stations.reduce((s, st) => s + st.totalValue, 0);
+
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold tracking-tight" data-testid="text-dashboard-title">
           Welcome back, {user?.name}
@@ -82,6 +99,77 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* Fleet Overview — first visible section */}
+      {stations.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-sm">Fleet Overview</h2>
+              <div className="flex items-center gap-4 pr-1">
+                <span className="w-14 flex items-center justify-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                  <KiteIcon className="h-3.5 w-3.5" /> Kites
+                </span>
+                <span className="w-14 flex items-center justify-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                  <WingIcon className="h-3.5 w-3.5" /> Wings
+                </span>
+                <span className="w-14 flex items-center justify-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                  <BoardIcon className="h-3.5 w-3.5" /> Boards
+                </span>
+                {isAdmin && (
+                  <span className="w-20 text-right text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                    Value
+                  </span>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 space-y-0">
+            {stations.map((st, idx) => (
+              <div
+                key={st.stationId}
+                className={`flex items-center justify-between py-2 ${idx < stations.length - 1 ? "border-b border-border/50" : ""}`}
+                data-testid={`row-station-fleet-${st.stationId}`}
+              >
+                <Link href={`/stations/${st.stationId}`}>
+                  <span
+                    className="text-sm font-medium hover:text-primary transition-colors cursor-pointer truncate max-w-[140px] md:max-w-[200px]"
+                    data-testid={`text-station-name-${st.stationId}`}
+                  >
+                    {st.stationName}
+                  </span>
+                </Link>
+                <div className="flex items-center gap-4 shrink-0">
+                  <StatPill value={st.kites} color="blue" />
+                  <StatPill value={st.wings} color="emerald" />
+                  <StatPill value={st.boards} color="amber" />
+                  {isAdmin && (
+                    <span className="w-20 text-right text-sm font-medium text-muted-foreground" data-testid={`text-value-${st.stationId}`}>
+                      {st.totalValue > 0 ? `€${Math.round(st.totalValue).toLocaleString("de-DE")}` : "—"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Total row */}
+            <div className="flex items-center justify-between pt-2.5 mt-1 border-t border-border">
+              <span className="text-sm font-bold">Total</span>
+              <div className="flex items-center gap-4 shrink-0">
+                <StatPill value={totalKites} color="blue" bold />
+                <StatPill value={totalWings} color="emerald" bold />
+                <StatPill value={totalBoards} color="amber" bold />
+                {isAdmin && (
+                  <span className="w-20 text-right text-sm font-bold" data-testid="text-total-value">
+                    {totalValue > 0 ? `€${Math.round(totalValue).toLocaleString("de-DE")}` : "—"}
+                  </span>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {statCards.map((stat) => (
           <Card key={stat.label}>
@@ -104,44 +192,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {isAdmin && stats?.equipmentPerStation && stats.equipmentPerStation.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <h2 className="font-semibold">Equipment by Station</h2>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {stats.equipmentPerStation.map((station) => (
-              <div key={station.stationId} className="flex items-center justify-between gap-1">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-primary" />
-                  <Link href={`/stations/${station.stationId}`}>
-                    <span
-                      className="font-medium underline-offset-2 cursor-pointer"
-                      data-testid={`text-station-name-${station.stationId}`}
-                    >
-                      {station.stationName}
-                    </span>
-                  </Link>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-32 h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{
-                        width: `${stats.totalEquipment > 0 ? (station.count / stats.totalEquipment) * 100 : 0}%`,
-                      }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-muted-foreground w-8 text-right">
-                    {station.count}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
+      {/* Pending transfers */}
       {pendingTransfers && pendingTransfers.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
@@ -172,5 +223,44 @@ export default function DashboardPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+function StatPill({ value, color, bold }: { value: number; color: "blue" | "emerald" | "amber"; bold?: boolean }) {
+  const colorMap = {
+    blue: "text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30",
+    emerald: "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30",
+    amber: "text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30",
+  };
+  return (
+    <span
+      className={`w-14 text-center text-sm rounded-md py-0.5 ${bold ? "font-bold" : "font-medium"} ${value > 0 ? colorMap[color] : "text-muted-foreground/40 bg-transparent"}`}
+    >
+      {value > 0 ? value : "—"}
+    </span>
+  );
+}
+
+function KiteIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M12 3C7.5 3 3 7 3 12c0 1.5 0.4 2.5 1 3.2C5.5 16.3 8.5 16 12 16s6.5 0.3 8-0.8c0.6-0.7 1-1.7 1-3.2C21 7 16.5 3 12 3z" />
+    </svg>
+  );
+}
+
+function WingIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M12 4L2 15l10-3.5L22 15Z" />
+    </svg>
+  );
+}
+
+function BoardIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <rect x="2" y="9" width="20" height="6" rx="3" />
+    </svg>
   );
 }

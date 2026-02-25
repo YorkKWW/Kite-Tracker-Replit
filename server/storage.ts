@@ -408,11 +408,18 @@ export class DatabaseStorage implements IStorage {
 
     const allStations = await db.select().from(stations);
 
-    const equipmentPerStation = allStations.map((s) => ({
-      stationId: s.id,
-      stationName: s.name,
-      count: allEquipment.filter((e) => e.currentStationId === s.id).length,
-    }));
+    const equipmentPerStation = allStations.map((s) => {
+      const stEq = allEquipment.filter((e) => e.currentStationId === s.id);
+      return {
+        stationId: s.id,
+        stationName: s.name,
+        count: stEq.length,
+        kites: stEq.filter((e) => e.type === "kite").length,
+        wings: stEq.filter((e) => e.type === "wing").length,
+        boards: stEq.filter((e) => e.type === "board" || e.type === "foilboard").length,
+        totalValue: stEq.reduce((sum, e) => sum + (parseFloat(e.currentValue ?? "0") || 0), 0),
+      };
+    });
 
     return {
       totalEquipment: allEquipment.length,
