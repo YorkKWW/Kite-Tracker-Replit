@@ -251,8 +251,8 @@ export default function EquipmentListPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-2.5 text-xs text-muted-foreground hidden md:table-cell w-16" data-testid={`text-year-${item.id}`}>
-                      {item.yearOfPurchase || ""}
+                    <td className="px-2 py-2.5 hidden md:table-cell w-16" data-testid={`text-year-${item.id}`}>
+                      {item.yearOfPurchase ? <YearBadge year={item.yearOfPurchase} /> : ""}
                     </td>
                     <td className="px-2 py-2.5 font-mono text-xs text-muted-foreground hidden md:table-cell whitespace-nowrap" data-testid={`text-sku-${item.id}`}>
                       {item.sku || ""}
@@ -295,6 +295,21 @@ function getSizeBadge(item: Equipment): string | null {
     default:
       return null;
   }
+}
+
+function YearBadge({ year }: { year: number }) {
+  const current = new Date().getFullYear();
+  const age = current - year;
+  const cls =
+    age === 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" :
+    age === 1 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" :
+    age === 2 ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" :
+                "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+  return (
+    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none whitespace-nowrap ${cls}`}>
+      {year}
+    </span>
+  );
 }
 
 function SortTh({
