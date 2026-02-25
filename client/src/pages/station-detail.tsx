@@ -106,6 +106,11 @@ function EquipmentRow({ item }: { item: Equipment }) {
               {size}
             </span>
           )}
+          {item.yearOfPurchase && (
+            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-medium shrink-0">
+              {item.yearOfPurchase}
+            </span>
+          )}
           {item.status === "in_repair" && (
             <span className="text-[10px] font-medium text-orange-600 dark:text-orange-400 shrink-0">Repair</span>
           )}
