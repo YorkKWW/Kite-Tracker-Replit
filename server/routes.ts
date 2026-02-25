@@ -1323,7 +1323,7 @@ export async function registerRoutes(
       // Use the last price found (retail price is usually rightmost)
       const lastMatch = priceMatches[priceMatches.length - 1];
       const price = normalisePrice(lastMatch[1]);
-      if (isNaN(price) || price < 1 || price > 100000) continue;
+      if (isNaN(price) || price < 200 || price > 100000) continue;
 
       // Find the first SKU-like token in the line
       const skuMatch = skuRx.exec(line);
@@ -1381,31 +1381,6 @@ export async function registerRoutes(
         "velcro", "foam", "rubber", "tape", "wax",
       ];
       if (EXCLUDE_KEYWORDS.some((kw) => combined.includes(kw))) continue;
-
-      // Allowlist: at least one category keyword must appear in the product name
-      // (or we give benefit of the doubt if the price is > €150 suggesting main equipment)
-      const CATEGORY_KEYWORDS = [
-        // Kites
-        "kite", "delta", "bow", "hybrid", "foil kite",
-        // Wings
-        "wing", "foilwing", "wing-foil", "wingsurf",
-        // Boards
-        "board", "twintip", "twin tip", "directional", "surfboard", "wakeboard",
-        "prorider", "kiteboard", "foilboard",
-        // Foils
-        "foil", "hydrofoil", "mast", "fuselage", "front wing", "rear wing", "stabilizer",
-        // Bars & control systems
-        "bar", "control system", "bar & lines", "bar and lines", "lines", "depower bar",
-        "chicken loop", "sensor", "trust", "overdrive", "navigator",
-        // Wetsuits
-        "wetsuit", "neopren", "neoprene", "fullsuit", "shorty", "steamer",
-        // Harnesses
-        "harness", "trapez", "hook", "spreaderbar",
-        // Helmets / impact protection
-        "helmet", "helm", "impact vest", "impact protection", "buoyancy",
-      ];
-      const hasCategory = CATEGORY_KEYWORDS.some((kw) => combined.includes(kw));
-      if (!hasCategory && price < 150) continue;
 
       const key = `${sku}:${price.toFixed(2)}`;
       if (seen.has(key)) continue;
