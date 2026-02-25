@@ -211,7 +211,27 @@ export default function EquipmentListPage() {
       </div>
 
       {!isLoading && equipment && (
-        <p className="text-xs text-muted-foreground">{equipment.length} item{equipment.length !== 1 ? "s" : ""}</p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <p className="text-xs text-muted-foreground">{equipment.length} item{equipment.length !== 1 ? "s" : ""}</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {[
+              { label: "K",  cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",       name: "Kite" },
+              { label: "KB", cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",   name: "Board" },
+              { label: "WF", cls: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300", name: "Foilboard" },
+              { label: "W",  cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300", name: "Wing" },
+              { label: "BR", cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",      name: "Bar & Lines" },
+              { label: "WS", cls: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300",       name: "Wetsuit" },
+              { label: "HA", cls: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300", name: "Harness" },
+              { label: "HE", cls: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",       name: "Helmet / Safety" },
+              { label: "FO", cls: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",          name: "Foil" },
+            ].map(({ label, cls, name }) => (
+              <span key={label} className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span className={`inline-flex items-center justify-center rounded font-bold text-[10px] w-5 h-5 ${cls}`}>{label}</span>
+                {name}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
 
       {isLoading ? (
