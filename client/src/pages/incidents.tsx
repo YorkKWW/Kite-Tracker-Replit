@@ -15,10 +15,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertTriangle, Plus, X, Upload, Camera, CheckCircle2, Clock,
-  Search, Filter, ChevronDown, ChevronUp, Image as ImageIcon,
+  Search, Filter, ChevronDown, ChevronUp, Image as ImageIcon, ScanLine,
 } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
 import { Link } from "wouter";
+import { BarcodeScanner } from "@/components/barcode-scanner";
 
 type DamageReport = {
   id: number;
@@ -199,6 +200,7 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
   const [uploadedPhotos, setUploadedPhotos] = useState<{ id: number; url: string }[]>([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [pendingReportId, setPendingReportId] = useState<number | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const { data: equipmentList } = useQuery<Equipment[]>({ queryKey: ["/api/equipment"] });
   const { data: stationsList } = useQuery<Station[]>({ queryKey: ["/api/stations"] });
@@ -262,6 +264,24 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
   };
 
   const canSubmitStep1 = form.equipmentId > 0 && form.howItHappened.length >= 5;
+  const MIN_PHOTOS = 3;
+  const canFinish = uploadedPhotos.length >= MIN_PHOTOS;
+
+  const handleScan = async (code: string) => {
+    setScannerOpen(false);
+    try {
+      const res = await fetch(`/api/equipment/scan?serial=${encodeURIComponent(code)}`, { credentials: "include" });
+      if (res.ok) {
+        const item = await res.json();
+        set("equipmentId", item.id);
+        toast({ title: `Found: ${item.brand} ${item.model}` });
+      } else {
+        toast({ title: "Equipment not found", description: `No equipment with serial: ${code}`, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Scan error", variant: "destructive" });
+    }
+  };
 
   if (step === 2) {
     return (
@@ -272,31 +292,54 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
           </div>
           <div>
             <h3 className="font-semibold text-lg">Damage Report Submitted</h3>
-            <p className="text-sm text-muted-foreground mt-1">The admin has been notified. Add up to 3 damage photos below.</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Now add <strong>at least 3 damage photos</strong> before finishing.
+            </p>
           </div>
         </div>
 
         <div>
-          <p className="text-sm font-medium mb-3">Damage Photos ({uploadedPhotos.length}/3)</p>
-          <div className="flex gap-2 flex-wrap mb-3">
-            {uploadedPhotos.map(p => (
-              <img key={p.id} src={p.url} className="h-20 w-20 rounded-lg object-cover border" alt="Damage" />
-            ))}
-            {uploadingPhoto && (
-              <div className="h-20 w-20 rounded-lg border-2 border-dashed border-muted flex items-center justify-center">
-                <div className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-              </div>
-            )}
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium">
+              Damage Photos
+            </p>
+            <span className={`text-sm font-semibold ${canFinish ? "text-green-600 dark:text-green-400" : "text-orange-500"}`}>
+              {uploadedPhotos.length} / {MIN_PHOTOS} required
+            </span>
           </div>
 
-          {uploadedPhotos.length < 3 && (
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {[0, 1, 2].map(slot => {
+              const photo = uploadedPhotos[slot];
+              const isUploading = uploadingPhoto && slot === uploadedPhotos.length;
+              return (
+                <div
+                  key={slot}
+                  className={`aspect-square rounded-lg border-2 overflow-hidden flex items-center justify-center
+                    ${photo ? "border-green-500" : isUploading ? "border-primary border-dashed" : "border-dashed border-muted-foreground/30 bg-muted/30"}`}
+                >
+                  {photo ? (
+                    <img src={photo.url} className="w-full h-full object-cover" alt={`Damage photo ${slot + 1}`} />
+                  ) : isUploading ? (
+                    <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                  ) : (
+                    <div className="flex flex-col items-center gap-1 text-muted-foreground/50">
+                      <Camera className="h-6 w-6" />
+                      <span className="text-xs">Photo {slot + 1}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {uploadedPhotos.length < MIN_PHOTOS && (
             <div className="flex gap-2">
               <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} className="hidden" />
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
               <Button
                 variant="outline"
-                size="sm"
-                className="gap-2"
+                className="flex-1 gap-2"
                 onClick={() => cameraInputRef.current?.click()}
                 disabled={uploadingPhoto}
                 data-testid="button-take-damage-photo"
@@ -306,8 +349,7 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
               </Button>
               <Button
                 variant="outline"
-                size="sm"
-                className="gap-2"
+                className="flex-1 gap-2"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingPhoto}
                 data-testid="button-upload-damage-photo"
@@ -317,10 +359,21 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
               </Button>
             </div>
           )}
+
+          {!canFinish && (
+            <p className="text-xs text-orange-500 text-center mt-2">
+              {MIN_PHOTOS - uploadedPhotos.length} more photo{MIN_PHOTOS - uploadedPhotos.length !== 1 ? "s" : ""} required
+            </p>
+          )}
         </div>
 
-        <Button className="w-full" onClick={onSuccess} data-testid="button-done-damage-report">
-          Done
+        <Button
+          className="w-full"
+          disabled={!canFinish}
+          onClick={onSuccess}
+          data-testid="button-done-damage-report"
+        >
+          {canFinish ? "Done — Submit Report" : `Add ${MIN_PHOTOS - uploadedPhotos.length} more photo${MIN_PHOTOS - uploadedPhotos.length !== 1 ? "s" : ""} to finish`}
         </Button>
       </div>
     );
@@ -328,22 +381,43 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
 
   return (
     <div className="space-y-5">
+      <BarcodeScanner open={scannerOpen} onClose={() => setScannerOpen(false)} onScan={handleScan} />
+
       <div className="space-y-3">
         <div>
           <Label htmlFor="dr-equipment" className="text-sm font-medium">Equipment *</Label>
           {equipmentId ? (
             <p className="font-medium mt-1">{equipmentList?.find(e => e.id === equipmentId)?.brand ?? ""} {equipmentList?.find(e => e.id === equipmentId)?.model ?? ""}</p>
           ) : (
-            <Select value={String(form.equipmentId || "")} onValueChange={v => set("equipmentId", Number(v))}>
-              <SelectTrigger className="mt-1" data-testid="select-damage-equipment">
-                <SelectValue placeholder="Select equipment…" />
-              </SelectTrigger>
-              <SelectContent>
-                {equipmentList?.filter(e => e.status === "active" || e.status === "in_transfer").map(e => (
-                  <SelectItem key={e.id} value={String(e.id)}>{e.brand} {e.model} – {(e.typeSpecificFields as any)?.size ?? ""}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2 mt-1">
+              <Select value={String(form.equipmentId || "")} onValueChange={v => set("equipmentId", Number(v))}>
+                <SelectTrigger className="flex-1" data-testid="select-damage-equipment">
+                  <SelectValue placeholder="Select equipment…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {equipmentList?.filter(e => e.status === "active" || e.status === "in_transfer" || e.status === "in_repair").map(e => (
+                    <SelectItem key={e.id} value={String(e.id)}>
+                      {e.brand} {e.model}{(e.typeSpecificFields as any)?.size ? ` – ${(e.typeSpecificFields as any).size}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setScannerOpen(true)}
+                title="Scan barcode"
+                data-testid="button-scan-equipment"
+              >
+                <ScanLine className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {form.equipmentId > 0 && !equipmentId && (
+            <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">
+              ✓ {equipmentList?.find(e => e.id === form.equipmentId)?.brand} {equipmentList?.find(e => e.id === form.equipmentId)?.model}
+            </p>
           )}
         </div>
 
