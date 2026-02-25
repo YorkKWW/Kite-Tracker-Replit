@@ -231,7 +231,7 @@ export default function EquipmentListPage() {
               {sortedEquipment.map((item) => {
                 const badge = TYPE_BADGE[item.type] || { label: item.type.slice(0, 2).toUpperCase(), cls: "bg-muted text-muted-foreground" };
                 const size = getSizeBadge(item);
-                const noSerial = TYPES_WITHOUT_SERIAL.includes(item.type);
+                const noSerial = TYPES_WITHOUT_SERIAL.includes(item.type) || !!item.serialNumber?.startsWith("AUTO-");
                 return (
                   <tr
                     key={item.id}

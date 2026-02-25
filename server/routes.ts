@@ -946,7 +946,7 @@ export async function registerRoutes(
     for (const item of toImport) {
       try {
         await storage.createEquipment({
-          serialNumber: item.serialNumber || `IMPORT-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+          serialNumber: item.serialNumber || `AUTO-${item.type?.toUpperCase() || "ITEM"}-${Date.now()}`,
           sku: item.sku || null,
           type: item.type,
           brand: brand || item.brand || "Unknown",
