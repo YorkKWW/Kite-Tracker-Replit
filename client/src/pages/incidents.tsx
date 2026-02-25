@@ -584,7 +584,7 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
                       />
                     </div>
                     <div>
-                      <Label className="text-xs font-medium">Wertminderung (est.) €</Label>
+                      <Label className="text-xs font-medium">Value Reduction (est.) €</Label>
                       <Input
                         type="number"
                         min="0"
