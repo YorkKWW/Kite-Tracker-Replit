@@ -1351,6 +1351,62 @@ export async function registerRoutes(
       if (/^(total|summe|subtotal|mwst|vat|ust|price|preis|artikel|item|description|beschreibung|sku|ref)/i.test(sku)) continue;
       if (/total|summe|subtotal/i.test(lc) && priceMatches.length === 1) continue;
 
+      // ── Category filter ────────────────────────────────────────────
+      // Keep only the 9 equipment types we track. Exclude spare parts,
+      // fins, bags, covers, pumps, leashes, and standalone accessories.
+      const combined = (productName + " " + sku).toLowerCase();
+
+      // Blocklist: keywords that clearly indicate excluded products
+      const EXCLUDE_KEYWORDS = [
+        // Spare parts & repair
+        "spare", "part", "ersatz", "ersatzteil", "repair", "reparatur",
+        "bladder", "valve", "leading edge", "strut", "panel", "canopy",
+        "bridle", "pigtail", "knot", "pulley", "depower", "cleat", "screw",
+        "bolt", "nut", "washer", "connector", "adapter", "plug", "cap",
+        // Fins
+        "fin", "finne", "thruster", "single tab", "us box",
+        // Bags & covers
+        "bag", "tasche", "cover", "case", "sock", "sleeve",
+        // Pumps
+        "pump", "pumpe", "inflation", "deflation",
+        // Leashes
+        "leash", "leine",
+        // Apparel / clothing (not wetsuits / harnesses)
+        "shirt", "shorts", "cap", "glove", "handschuh", "socks", "lycra",
+        "rash guard", "rashguard", "sunscreen", "sunblock",
+        // Other accessories
+        "sticker", "decal", "key ring", "keyring", "bottle", "book",
+        "manual", "gift", "voucher", "insurance", "mounting", "mount",
+        "carry", "strap", "rail", "pad", "stomp", "traction",
+        "velcro", "foam", "rubber", "tape", "wax",
+      ];
+      if (EXCLUDE_KEYWORDS.some((kw) => combined.includes(kw))) continue;
+
+      // Allowlist: at least one category keyword must appear in the product name
+      // (or we give benefit of the doubt if the price is > €150 suggesting main equipment)
+      const CATEGORY_KEYWORDS = [
+        // Kites
+        "kite", "delta", "bow", "hybrid", "foil kite",
+        // Wings
+        "wing", "foilwing", "wing-foil", "wingsurf",
+        // Boards
+        "board", "twintip", "twin tip", "directional", "surfboard", "wakeboard",
+        "prorider", "kiteboard", "foilboard",
+        // Foils
+        "foil", "hydrofoil", "mast", "fuselage", "front wing", "rear wing", "stabilizer",
+        // Bars & control systems
+        "bar", "control system", "bar & lines", "bar and lines", "lines", "depower bar",
+        "chicken loop", "sensor", "trust", "overdrive", "navigator",
+        // Wetsuits
+        "wetsuit", "neopren", "neoprene", "fullsuit", "shorty", "steamer",
+        // Harnesses
+        "harness", "trapez", "hook", "spreaderbar",
+        // Helmets / impact protection
+        "helmet", "helm", "impact vest", "impact protection", "buoyancy",
+      ];
+      const hasCategory = CATEGORY_KEYWORDS.some((kw) => combined.includes(kw));
+      if (!hasCategory && price < 150) continue;
+
       const key = `${sku}:${price.toFixed(2)}`;
       if (seen.has(key)) continue;
       seen.add(key);
