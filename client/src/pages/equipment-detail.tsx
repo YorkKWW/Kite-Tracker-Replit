@@ -153,22 +153,8 @@ export default function EquipmentDetailPage() {
               </div>
             </div>
             {retailPrice && (
-              <div className="mt-3 pt-3 border-t space-y-1">
-                <p className="text-xs text-muted-foreground">{retailPrice.supplier} · {retailPrice.productName}</p>
-                {retailPrice.dealerPrice && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Dealer Price (net)</p>
-                    <p className="font-semibold text-blue-600 dark:text-blue-400" data-testid="text-dealer-price">
-                      €{parseFloat(retailPrice.dealerPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                )}
-                <div>
-                  <p className="text-xs text-muted-foreground">Retail Price (UVP) — brutto incl. VAT</p>
-                  <p className="font-semibold text-amber-600 dark:text-amber-400" data-testid="text-retail-price">
-                    €{parseFloat(retailPrice.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
+              <div className="mt-3 pt-3 border-t">
+                <p className="text-xs text-muted-foreground">Price source: {retailPrice.supplier} · {retailPrice.productName}</p>
               </div>
             )}
             {(item as any).invoiceReference && (
