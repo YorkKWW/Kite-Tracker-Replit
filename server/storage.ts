@@ -421,11 +421,19 @@ export class DatabaseStorage implements IStorage {
       };
     });
 
+    const inTransferEq = allEquipment.filter((e) => e.status === "in_transfer");
+
     return {
       totalEquipment: allEquipment.length,
       equipmentPerStation,
       needsAttention: allEquipment.filter((e) => e.conditionRating <= 2).length,
-      inTransfer: allEquipment.filter((e) => e.status === "in_transfer").length,
+      inTransfer: inTransferEq.length,
+      inTransferBreakdown: {
+        kites: inTransferEq.filter((e) => e.type === "kite").length,
+        wings: inTransferEq.filter((e) => e.type === "wing").length,
+        boards: inTransferEq.filter((e) => e.type === "board" || e.type === "foilboard").length,
+        totalValue: inTransferEq.reduce((sum, e) => sum + (parseFloat(e.currentValue ?? "0") || 0), 0),
+      },
     };
   }
 

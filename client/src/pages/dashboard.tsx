@@ -21,6 +21,7 @@ type DashboardStats = {
   equipmentPerStation: StationStat[];
   needsAttention: number;
   inTransfer: number;
+  inTransferBreakdown: { kites: number; wings: number; boards: number; totalValue: number };
 };
 
 export default function DashboardPage() {
@@ -151,6 +152,28 @@ export default function DashboardPage() {
               </div>
             ))}
 
+            {/* In Transfer row */}
+            {stats?.inTransferBreakdown && stats.inTransfer > 0 && (
+              <div className="flex items-center justify-between py-2 border-t border-dashed border-border/70">
+                <span className="text-sm font-medium text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                  <ArrowLeftRight className="h-3.5 w-3.5" />
+                  In Transfer
+                </span>
+                <div className="flex items-center gap-4 shrink-0">
+                  <StatPill value={stats.inTransferBreakdown.kites} color="blue" muted />
+                  <StatPill value={stats.inTransferBreakdown.wings} color="emerald" muted />
+                  <StatPill value={stats.inTransferBreakdown.boards} color="amber" muted />
+                  {isAdmin && (
+                    <span className="w-20 text-right text-sm font-medium text-muted-foreground">
+                      {stats.inTransferBreakdown.totalValue > 0
+                        ? `€${Math.round(stats.inTransferBreakdown.totalValue).toLocaleString("de-DE")}`
+                        : "—"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Total row */}
             <div className="flex items-center justify-between pt-2.5 mt-1 border-t border-border">
               <span className="text-sm font-bold">Total</span>
@@ -226,11 +249,11 @@ export default function DashboardPage() {
   );
 }
 
-function StatPill({ value, color, bold }: { value: number; color: "blue" | "emerald" | "amber"; bold?: boolean }) {
+function StatPill({ value, color, bold, muted }: { value: number; color: "blue" | "emerald" | "amber"; bold?: boolean; muted?: boolean }) {
   const colorMap = {
-    blue: "text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30",
-    emerald: "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30",
-    amber: "text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30",
+    blue: muted ? "text-blue-600/70 dark:text-blue-400/70 bg-blue-50 dark:bg-blue-900/15" : "text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30",
+    emerald: muted ? "text-emerald-600/70 dark:text-emerald-400/70 bg-emerald-50 dark:bg-emerald-900/15" : "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30",
+    amber: muted ? "text-amber-600/70 dark:text-amber-400/70 bg-amber-50 dark:bg-amber-900/15" : "text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30",
   };
   return (
     <span
