@@ -26,6 +26,7 @@ type LineItem = {
   sku: string;
   unitPrice: string;
   priceSuggestion: { label: string; value: string } | null;
+  uvp: { retailPrice: string; supplier: string } | null;
   equipment: Equipment;
 };
 
@@ -84,7 +85,7 @@ export default function SaleCreatePage() {
     );
   }, [allEquipment, selectedIds, equipSearch]);
 
-  const addItem = (equip: Equipment) => {
+  const addItem = async (equip: Equipment) => {
     const size = (equip.typeSpecificFields as any)?.size;
     const desc = [equip.brand, equip.model, size ? `${size}${equip.type === "kite" || equip.type === "wing" ? "m²" : "cm"}` : ""].filter(Boolean).join(" ");
     const isNoSerial = TYPES_WITHOUT_SERIAL.includes(equip.type as any) ||
@@ -94,6 +95,13 @@ export default function SaleCreatePage() {
       : equip.purchasePrice && parseFloat(equip.purchasePrice) > 0
         ? { label: "Reference (purchase price, net)", value: parseFloat(equip.purchasePrice).toFixed(2) }
         : null;
+    let uvp: { retailPrice: string; supplier: string } | null = null;
+    if (equip.sku) {
+      try {
+        const r = await fetch(`/api/price-lists/lookup?sku=${encodeURIComponent(equip.sku)}`, { credentials: "include" });
+        if (r.ok) uvp = await r.json();
+      } catch {}
+    }
     setItems((prev) => [
       ...prev,
       {
@@ -103,6 +111,7 @@ export default function SaleCreatePage() {
         sku: equip.sku || "",
         unitPrice: "",
         priceSuggestion,
+        uvp,
         equipment: equip,
       },
     ]);
@@ -356,6 +365,13 @@ export default function SaleCreatePage() {
                           </button>
                         </p>
                       )}
+                      {item.uvp ? (
+                        <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400 leading-tight" data-testid={`text-uvp-${idx}`}>
+                          UVP: €{parseFloat(item.uvp.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })} <span className="font-normal text-muted-foreground">(brutto incl. VAT · {item.uvp.supplier})</span>
+                        </p>
+                      ) : item.sku ? (
+                        <p className="text-[10px] text-muted-foreground leading-tight" data-testid={`text-no-uvp-${idx}`}>No retail price available</p>
+                      ) : null}
                     </div>
                   </div>
                 </div>

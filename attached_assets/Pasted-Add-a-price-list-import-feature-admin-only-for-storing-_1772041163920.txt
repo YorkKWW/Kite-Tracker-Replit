@@ -1,0 +1,30 @@
+Add a price list import feature (admin only) for storing manufacturer retail prices (UVP/MSRP):
+Import:
+
+In Settings or a dedicated "Price Lists" section, admin can upload a PDF price list per supplier (Core, Duotone, North, Eleveight, etc.)
+Parse the PDF to extract: SKU, product name, retail price (Brutto UVP including VAT)
+Store each entry in a price_list table: supplier, SKU, product name, retail price (brutto), import date
+When a new price list is uploaded for the same supplier, the old one becomes inactive — the new one becomes active
+Show a preview after parsing so admin can confirm before saving
+
+Price List Management page (admin only):
+
+Show a list of all uploaded price lists with: supplier name, upload date, number of items, status (Active / Inactive)
+Only one price list per supplier can be active at a time — the most recently uploaded one
+Admin can view which price list is currently active per supplier
+Admin can delete old inactive price lists
+Admin can click into a price list to see its contents (SKU, product name, price) as a simple table
+Show a clear indicator which suppliers have an active price list and which don't (e.g. "Core: Active (uploaded 15.01.2026, 45 items)" vs "North: No price list uploaded")
+
+Usage in Sales:
+
+When adding an equipment item to a sales invoice, look up its SKU in the ACTIVE price list for that supplier
+If found: show the retail price (brutto UVP) as additional info next to the sale price field, e.g. "UVP: €1,529.00 (brutto)"
+IMPORTANT: The retail price is BRUTTO (including VAT). Make this clearly labeled so there's no confusion with the net sale price the admin enters.
+If not found: show "No retail price available" in gray — not a problem, admin just enters the price manually
+This is purely informational — it helps the admin set a fair sale price by seeing what the item costs new
+
+Display on equipment detail page:
+
+If a retail price exists for the item's SKU in the active price list, show it on the equipment detail page as "Retail Price (UVP): €1,529.00"
+This gives a quick reference when browsing equipment

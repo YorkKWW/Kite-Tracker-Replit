@@ -270,6 +270,23 @@ export const saleItems = pgTable("sale_items", {
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
 });
 
+export const priceLists = pgTable("price_lists", {
+  id: serial("id").primaryKey(),
+  supplier: text("supplier").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  itemCount: integer("item_count").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  uploadedBy: integer("uploaded_by").references(() => users.id),
+});
+
+export const priceListItems = pgTable("price_list_items", {
+  id: serial("id").primaryKey(),
+  priceListId: integer("price_list_id").notNull().references(() => priceLists.id, { onDelete: "cascade" }),
+  sku: text("sku").notNull(),
+  productName: text("product_name").notNull(),
+  retailPrice: decimal("retail_price", { precision: 10, scale: 2 }).notNull(),
+});
+
 export const insertStationSchema = createInsertSchema(stations).omit({ id: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertEquipmentSchema = createInsertSchema(equipment).omit({ id: true, createdAt: true });
@@ -286,6 +303,8 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).o
 export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true });
 export const insertSalesInvoiceSchema = createInsertSchema(salesInvoices).omit({ id: true, createdAt: true });
 export const insertSaleItemSchema = createInsertSchema(saleItems).omit({ id: true });
+export const insertPriceListSchema = createInsertSchema(priceLists).omit({ id: true, uploadedAt: true });
+export const insertPriceListItemSchema = createInsertSchema(priceListItems).omit({ id: true });
 
 export type InsertStation = z.infer<typeof insertStationSchema>;
 export type Station = typeof stations.$inferSelect;
@@ -334,6 +353,12 @@ export type SalesInvoice = typeof salesInvoices.$inferSelect;
 
 export type InsertSaleItem = z.infer<typeof insertSaleItemSchema>;
 export type SaleItem = typeof saleItems.$inferSelect;
+
+export type InsertPriceList = z.infer<typeof insertPriceListSchema>;
+export type PriceList = typeof priceLists.$inferSelect;
+
+export type InsertPriceListItem = z.infer<typeof insertPriceListItemSchema>;
+export type PriceListItem = typeof priceListItems.$inferSelect;
 
 export const loginSchema = z.object({
   email: z.string().email(),

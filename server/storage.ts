@@ -3,7 +3,7 @@ import { db } from "./db";
 import {
   stations, users, equipment, conditionRatings, repairs, transfers, photos, activityLog,
   inventoryChecks, inventoryCheckItems, suppliers, invoices,
-  companySettings, customers, salesInvoices, saleItems,
+  companySettings, customers, salesInvoices, saleItems, priceLists, priceListItems,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -20,6 +20,8 @@ import {
   type Customer, type InsertCustomer,
   type SalesInvoice, type InsertSalesInvoice,
   type SaleItem, type InsertSaleItem,
+  type PriceList, type InsertPriceList,
+  type PriceListItem, type InsertPriceListItem,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -107,6 +109,14 @@ export interface IStorage {
   createSalesInvoice(inv: InsertSalesInvoice, items: Omit<InsertSaleItem, "saleId">[]): Promise<SalesInvoice>;
   confirmSale(id: number): Promise<SalesInvoice | undefined>;
   getNextInvoiceNumber(): Promise<string>;
+
+  getAllPriceLists(): Promise<PriceList[]>;
+  getPriceList(id: number): Promise<PriceList | undefined>;
+  createPriceList(pl: InsertPriceList, items: Omit<InsertPriceListItem, "priceListId">[]): Promise<PriceList>;
+  deactivatePriceLists(supplier: string): Promise<void>;
+  deletePriceList(id: number): Promise<void>;
+  getPriceListItems(priceListId: number): Promise<PriceListItem[]>;
+  lookupRetailPrice(sku: string): Promise<{ retailPrice: string; supplier: string; productName: string } | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -582,6 +592,59 @@ export class DatabaseStorage implements IStorage {
       .set({ invoiceNextNumber: nextNum + 1, invoiceYear: year })
       .where(eq(companySettings.id, 1));
     return invoiceNumber;
+  }
+
+  async getAllPriceLists(): Promise<PriceList[]> {
+    return db.select().from(priceLists).orderBy(desc(priceLists.uploadedAt));
+  }
+
+  async getPriceList(id: number): Promise<PriceList | undefined> {
+    const [row] = await db.select().from(priceLists).where(eq(priceLists.id, id));
+    return row;
+  }
+
+  async createPriceList(pl: InsertPriceList, items: Omit<InsertPriceListItem, "priceListId">[]): Promise<PriceList> {
+    await this.deactivatePriceLists(pl.supplier);
+    const [created] = await db.insert(priceLists)
+      .values({ ...pl, itemCount: items.length, isActive: true })
+      .returning();
+    if (items.length > 0) {
+      await db.insert(priceListItems).values(items.map((i) => ({ ...i, priceListId: created.id })));
+    }
+    return created;
+  }
+
+  async deactivatePriceLists(supplier: string): Promise<void> {
+    await db.update(priceLists)
+      .set({ isActive: false })
+      .where(and(eq(priceLists.supplier, supplier), eq(priceLists.isActive, true)));
+  }
+
+  async deletePriceList(id: number): Promise<void> {
+    await db.delete(priceLists).where(eq(priceLists.id, id));
+  }
+
+  async getPriceListItems(priceListId: number): Promise<PriceListItem[]> {
+    return db.select().from(priceListItems).where(eq(priceListItems.priceListId, priceListId));
+  }
+
+  async lookupRetailPrice(sku: string): Promise<{ retailPrice: string; supplier: string; productName: string } | null> {
+    if (!sku) return null;
+    const rows = await db
+      .select({
+        retailPrice: priceListItems.retailPrice,
+        supplier: priceLists.supplier,
+        productName: priceListItems.productName,
+      })
+      .from(priceListItems)
+      .innerJoin(priceLists, and(
+        eq(priceListItems.priceListId, priceLists.id),
+        eq(priceLists.isActive, true),
+      ))
+      .where(ilike(priceListItems.sku, sku))
+      .limit(1);
+    if (!rows.length) return null;
+    return { retailPrice: rows[0].retailPrice ?? "0", supplier: rows[0].supplier, productName: rows[0].productName };
   }
 }
 

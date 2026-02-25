@@ -1275,5 +1275,92 @@ export async function registerRoutes(
     }
   });
 
+  // ── Price Lists ──────────────────────────────────────────────────
+  function parsePriceListText(text: string): Array<{ sku: string; productName: string; retailPrice: string }> {
+    const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+    const items: Array<{ sku: string; productName: string; retailPrice: string }> = [];
+    // Matches prices like 1.529,00 or 1529.00 or 1,529.00 at end of line (optionally preceded by €)
+    const pricePattern = /(?:€\s*)?(\d{1,3}(?:[.,]\d{3})*[.,]\d{2}|\d+[.,]\d{2})\s*€?\s*$/;
+    // SKU: starts uppercase letter or digit, contains letters/digits/hyphens/dots, 3-25 chars
+    const skuPattern = /^([A-Z0-9][A-Z0-9\-_.]{2,24})\s+([\s\S]+)$/;
+    for (const line of lines) {
+      const priceMatch = line.match(pricePattern);
+      if (!priceMatch) continue;
+      const raw = priceMatch[1];
+      // Normalise: German 1.529,00 → 1529.00  or  English 1,529.00 → 1529.00
+      let normalised: string;
+      if (raw.includes(",") && raw.lastIndexOf(",") > raw.lastIndexOf(".")) {
+        normalised = raw.replace(/\./g, "").replace(",", ".");
+      } else {
+        normalised = raw.replace(/,/g, "");
+      }
+      const price = parseFloat(normalised);
+      if (isNaN(price) || price <= 0 || price > 100000) continue;
+      const lineWithoutPrice = line.slice(0, line.length - priceMatch[0].length).trim();
+      if (!lineWithoutPrice || lineWithoutPrice.length < 3) continue;
+      const skuMatch = lineWithoutPrice.match(skuPattern);
+      if (skuMatch) {
+        const sku = skuMatch[1].trim();
+        const productName = skuMatch[2].replace(/\s+/g, " ").trim();
+        if (productName.length < 2) continue;
+        items.push({ sku, productName, retailPrice: price.toFixed(2) });
+      }
+    }
+    return items;
+  }
+
+  // Parse PDF → preview (no DB save)
+  app.post("/api/price-lists/parse", requireAdmin, uploadPdf.single("file"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No PDF uploaded" });
+      const { text } = await parsePdfBuffer(req.file.buffer);
+      const items = parsePriceListText(text);
+      res.json({ items, rawLineCount: text.split("\n").length });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Confirm and save a parsed price list
+  app.post("/api/price-lists", requireAdmin, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { supplier, items } = req.body;
+      if (!supplier || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "supplier and items[] are required" });
+      }
+      const pl = await storage.createPriceList(
+        { supplier: supplier.trim(), uploadedBy: user.id },
+        items.map((i: any) => ({ sku: i.sku, productName: i.productName, retailPrice: i.retailPrice })),
+      );
+      res.json(pl);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/price-lists", requireAdmin, async (_req, res) => {
+    const lists = await storage.getAllPriceLists();
+    res.json(lists);
+  });
+
+  app.get("/api/price-lists/:id/items", requireAdmin, async (req, res) => {
+    const items = await storage.getPriceListItems(parseInt(req.params.id));
+    res.json(items);
+  });
+
+  app.delete("/api/price-lists/:id", requireAdmin, async (req, res) => {
+    await storage.deletePriceList(parseInt(req.params.id));
+    res.json({ ok: true });
+  });
+
+  // Retail price lookup by SKU (used on sale-create + equipment-detail)
+  app.get("/api/price-lists/lookup", requireAuth, async (req, res) => {
+    const sku = (req.query.sku as string || "").trim();
+    if (!sku) return res.json(null);
+    const result = await storage.lookupRetailPrice(sku);
+    res.json(result);
+  });
+
   return httpServer;
 }
