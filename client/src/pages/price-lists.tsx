@@ -194,7 +194,10 @@ export default function PriceListsPage() {
         <CardHeader className="pb-2">
           <h2 className="font-semibold flex items-center gap-2"><Upload className="h-4 w-4" /> Upload New Price List</h2>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <div className="mx-4 mb-0 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40 px-4 py-3 text-sm text-blue-800 dark:text-blue-300 leading-relaxed">
+          ℹ️ <strong>Important:</strong> Only items with a UVP of €200 or more will be captured. Please review all imported items carefully and uncheck any that are not needed. If you encounter problems with the upload, please contact <a href="mailto:york@kite-worldwide.com" className="underline underline-offset-2 hover:opacity-80">york@kite-worldwide.com</a> with a description of the error.
+        </div>
+        <CardContent className="space-y-4 pt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">Supplier *</Label>
