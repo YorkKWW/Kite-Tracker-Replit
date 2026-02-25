@@ -48,7 +48,10 @@ function detectEquipmentType(name: string, sku: string): { type: string; isSpare
   if (/\bbar\b|sensor|navigator|control bar|rse\d|click bar|trust bar/i.test(text)) {
     return { type: "bar_lines", isSpare: false };
   }
-  if (/\bboard\b|twintip|directional|foilboard/i.test(text)) {
+  if (/\bfoilboard\b/i.test(text)) {
+    return { type: "foilboard", isSpare: false };
+  }
+  if (/\bboard\b|twintip|directional/i.test(text)) {
     return { type: "board", isSpare: false };
   }
   if (/\bfoil\b|hydrofoil|wingfoil|wing foil/i.test(text)) {

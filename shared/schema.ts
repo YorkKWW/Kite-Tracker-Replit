@@ -18,6 +18,7 @@ export const userRoleEnum = pgEnum("user_role", ["admin", "manager"]);
 export const equipmentTypeEnum = pgEnum("equipment_type", [
   "kite",
   "board",
+  "foilboard",
   "foil",
   "wing",
   "bar_lines",
@@ -260,10 +261,11 @@ export const loginSchema = z.object({
 
 export const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   kite: "Kites",
-  board: "Boards",
+  board: "Kiteboards",
+  foilboard: "Foilboards",
   foil: "Foils",
   wing: "Wings",
-  bar_lines: "Bars & Lines",
+  bar_lines: "Bars",
   wetsuit: "Wetsuits",
   harness: "Harnesses",
   helmet_safety: "Helmets & Safety Gear",
@@ -284,7 +286,11 @@ export const TYPE_SPECIFIC_FIELDS: Record<string, { key: string; label: string; 
   ],
   board: [
     { key: "size", label: "Size (cm)", type: "number" },
-    { key: "boardType", label: "Type", type: "select", options: ["TwinTip", "Directional", "Foilboard"] },
+    { key: "boardType", label: "Type", type: "select", options: ["TwinTip", "Directional"] },
+  ],
+  foilboard: [
+    { key: "size", label: "Size (cm)", type: "number" },
+    { key: "volume", label: "Volume (L)", type: "number" },
   ],
   foil: [
     { key: "mastLength", label: "Mast Length (cm)", type: "number" },

@@ -298,6 +298,7 @@ export default function StationDetailPage() {
   const kites      = allEquipment.filter((e) => e.type === "kite");
   const wings      = allEquipment.filter((e) => e.type === "wing");
   const boards     = allEquipment.filter((e) => e.type === "board");
+  const foilboards = allEquipment.filter((e) => e.type === "foilboard");
   const barsLines  = allEquipment.filter((e) => e.type === "bar_lines");
   const foils      = allEquipment.filter((e) => e.type === "foil");
   const other      = allEquipment.filter((e) =>
@@ -496,11 +497,11 @@ export default function StationDetailPage() {
             />
           )}
 
-          {/* Boards */}
+          {/* Kiteboards */}
           {boards.length > 0 && (
             <CategoryCard
               icon={<Layers className="h-4 w-4" />}
-              title="Boards"
+              title="Kiteboards"
               items={boards}
               stationId={stationId}
               typeFilter="board"
@@ -525,11 +526,37 @@ export default function StationDetailPage() {
             />
           )}
 
-          {/* Bars & Lines */}
+          {/* Foilboards */}
+          {foilboards.length > 0 && (
+            <CategoryCard
+              icon={<Layers className="h-4 w-4" />}
+              title="Foilboards"
+              items={foilboards}
+              stationId={stationId}
+              typeFilter="foilboard"
+              renderContent={() => (
+                <div>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2">
+                    By size
+                  </p>
+                  <SizeCluster
+                    items={foilboards}
+                    getKey={(i) => {
+                      const f = (i.typeSpecificFields || {}) as Record<string, any>;
+                      return f.size != null ? String(f.size) : null;
+                    }}
+                    unit="cm"
+                  />
+                </div>
+              )}
+            />
+          )}
+
+          {/* Bars */}
           {barsLines.length > 0 && (
             <CategoryCard
               icon={<Link2 className="h-4 w-4" />}
-              title="Bars & Lines"
+              title="Bars"
               items={barsLines}
               stationId={stationId}
               typeFilter="bar_lines"
