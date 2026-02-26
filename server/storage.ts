@@ -17,11 +17,16 @@ export interface ActiveRepairItem {
   stationName: string | null;
   damageReportId: number | null;
   damageReportStatus: string | null;
+  damageReportedAt: Date | null;
   estimatedRepairCost: string | null;
+  estimatedValueLoss: string | null;
   sparePartsNeeded: string | null;
   needsSpareParts: boolean;
   customerName: string | null;
   bookingReference: string | null;
+  usageType: string | null;
+  repairable: boolean;
+  totalLoss: boolean;
 }
 import {
   stations, users, equipment, conditionRatings, repairs, transfers, photos, activityLog,
@@ -317,7 +322,6 @@ export class DatabaseStorage implements IStorage {
     if (!equipInRepair.length) return [];
 
     const equipIds = equipInRepair.map(e => e.id);
-    const stationIds = (await db.select({ id: stations.id }).from(stations)).map(s => s.id);
 
     const [allEquip, allRepairs, allUsers, allStations, allDamageReports] = await Promise.all([
       db.select().from(equipment).where(inArray(equipment.id, equipIds)),
@@ -366,14 +370,23 @@ export class DatabaseStorage implements IStorage {
         stationName: eq_.currentStationId ? stationMap[eq_.currentStationId] ?? null : null,
         damageReportId: dr?.id ?? null,
         damageReportStatus: dr?.status ?? null,
+        damageReportedAt: dr?.reportedAt ?? null,
         estimatedRepairCost: dr?.estimatedRepairCost ?? null,
+        estimatedValueLoss: dr?.estimatedValueLoss ?? null,
         sparePartsNeeded: dr?.sparePartsNeeded ?? null,
         needsSpareParts: dr?.needsSpareParts ?? false,
         customerName: dr?.customerName ?? null,
         bookingReference: dr?.bookingReference ?? null,
+        usageType: dr?.usageType ?? null,
+        repairable: dr?.repairable ?? true,
+        totalLoss: dr?.totalLoss ?? false,
       });
     }
-    results.sort((a, b) => (b.repairDate?.getTime() ?? 0) - (a.repairDate?.getTime() ?? 0));
+    results.sort((a, b) => {
+      const aTime = (a.damageReportedAt ?? a.repairDate)?.getTime() ?? 0;
+      const bTime = (b.damageReportedAt ?? b.repairDate)?.getTime() ?? 0;
+      return bTime - aTime;
+    });
     return results;
   }
 
