@@ -65,8 +65,43 @@ export default function InvoiceImportPage() {
   const [items, setItems] = useState<ParsedItem[]>([]);
   const [isParsing, setIsParsing] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; errors: string[] } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (isParsing) return;
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      toast({ title: "Wrong file type", description: "Please drop a PDF file.", variant: "destructive" });
+      return;
+    }
+    handlePdfUpload(file);
+  };
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
@@ -292,23 +327,36 @@ export default function InvoiceImportPage() {
           </div>
 
           <Card
-            className="border-2 border-dashed border-border hover:border-primary/50 transition-colors cursor-pointer"
-            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed transition-colors cursor-pointer ${
+              isDragging
+                ? "border-primary bg-primary/5 scale-[1.01]"
+                : "border-border hover:border-primary/50"
+            }`}
+            onClick={() => !isParsing && fileInputRef.current?.click()}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             data-testid="card-pdf-upload"
           >
-            <CardContent className="p-12 flex flex-col items-center gap-3 text-center">
+            <CardContent className="p-12 flex flex-col items-center gap-3 text-center pointer-events-none">
               {isParsing ? (
                 <>
                   <Loader2 className="h-12 w-12 text-primary animate-spin" />
                   <p className="font-medium">Parsing PDF…</p>
                   <p className="text-sm text-muted-foreground">Extracting line items and serial numbers</p>
                 </>
+              ) : isDragging ? (
+                <>
+                  <FileText className="h-12 w-12 text-primary" />
+                  <p className="font-semibold text-lg text-primary">Release to upload</p>
+                </>
               ) : (
                 <>
                   <FileText className="h-12 w-12 text-muted-foreground" />
                   <p className="font-semibold text-lg">Drop PDF invoice here</p>
                   <p className="text-sm text-muted-foreground">or click to select file</p>
-                  <Button variant="outline" size="sm" className="mt-2 gap-2" data-testid="button-select-pdf">
+                  <Button variant="outline" size="sm" className="mt-2 gap-2 pointer-events-auto" data-testid="button-select-pdf">
                     <Upload className="h-4 w-4" />
                     Select PDF
                   </Button>
