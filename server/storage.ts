@@ -1,5 +1,28 @@
 import { eq, and, desc, ilike, or, sql, inArray } from "drizzle-orm";
 import { db } from "./db";
+
+export interface ActiveRepairItem {
+  repairId: number;
+  repairDescription: string;
+  repairStatus: string;
+  repairDate: Date | null;
+  repairCost: string | null;
+  loggedByName: string;
+  equipmentId: number;
+  equipmentSerial: string;
+  equipmentBrand: string;
+  equipmentModel: string;
+  equipmentType: string;
+  stationId: number | null;
+  stationName: string | null;
+  damageReportId: number | null;
+  damageReportStatus: string | null;
+  estimatedRepairCost: string | null;
+  sparePartsNeeded: string | null;
+  needsSpareParts: boolean;
+  customerName: string | null;
+  bookingReference: string | null;
+}
 import {
   stations, users, equipment, conditionRatings, repairs, transfers, photos, activityLog,
   inventoryChecks, inventoryCheckItems, suppliers, invoices,
@@ -60,6 +83,7 @@ export interface IStorage {
 
   getRepairs(equipmentId: number): Promise<Repair[]>;
   getAllRepairs(): Promise<Repair[]>;
+  getActiveRepairsWithDetails(stationId?: number): Promise<ActiveRepairItem[]>;
   createRepair(repair: InsertRepair): Promise<Repair>;
   updateRepair(id: number, data: Partial<InsertRepair>): Promise<Repair | undefined>;
 
@@ -282,6 +306,75 @@ export class DatabaseStorage implements IStorage {
 
   async getAllRepairs(): Promise<Repair[]> {
     return db.select().from(repairs).orderBy(desc(repairs.date));
+  }
+
+  async getActiveRepairsWithDetails(stationId?: number): Promise<ActiveRepairItem[]> {
+    const equipInRepair = await db
+      .select({ id: equipment.id })
+      .from(equipment)
+      .where(eq(equipment.status, "in_repair"));
+
+    if (!equipInRepair.length) return [];
+
+    const equipIds = equipInRepair.map(e => e.id);
+    const stationIds = (await db.select({ id: stations.id }).from(stations)).map(s => s.id);
+
+    const [allEquip, allRepairs, allUsers, allStations, allDamageReports] = await Promise.all([
+      db.select().from(equipment).where(inArray(equipment.id, equipIds)),
+      db.select().from(repairs).where(and(inArray(repairs.equipmentId, equipIds), eq(repairs.status, "pending"))).orderBy(desc(repairs.date)),
+      db.select({ id: users.id, name: users.name }).from(users),
+      db.select({ id: stations.id, name: stations.name }).from(stations),
+      db.select().from(damageReports).where(inArray(damageReports.equipmentId, equipIds)),
+    ]);
+
+    const equipMap = Object.fromEntries(allEquip.map(e => [e.id, e]));
+    const userMap = Object.fromEntries(allUsers.map(u => [u.id, u.name]));
+    const stationMap = Object.fromEntries(allStations.map(s => [s.id, s.name]));
+    const damageMap: Record<number, typeof allDamageReports[0]> = {};
+    for (const dr of allDamageReports) {
+      if (!damageMap[dr.equipmentId] || dr.reportedAt > damageMap[dr.equipmentId].reportedAt) {
+        damageMap[dr.equipmentId] = dr;
+      }
+    }
+
+    const repairMap: Record<number, typeof allRepairs[0]> = {};
+    for (const r of allRepairs) {
+      if (!repairMap[r.equipmentId]) repairMap[r.equipmentId] = r;
+    }
+
+    const results: ActiveRepairItem[] = [];
+    for (const eqId of equipIds) {
+      const eq_ = equipMap[eqId];
+      if (!eq_) continue;
+      if (stationId && eq_.currentStationId !== stationId) continue;
+      const repair = repairMap[eqId];
+      if (!repair) continue;
+      const dr = damageMap[eqId];
+      results.push({
+        repairId: repair.id,
+        repairDescription: repair.description,
+        repairStatus: repair.status,
+        repairDate: repair.date,
+        repairCost: repair.cost,
+        loggedByName: userMap[repair.loggedBy] ?? "Unknown",
+        equipmentId: eqId,
+        equipmentSerial: eq_.serialNumber,
+        equipmentBrand: eq_.brand,
+        equipmentModel: eq_.model,
+        equipmentType: eq_.type,
+        stationId: eq_.currentStationId,
+        stationName: eq_.currentStationId ? stationMap[eq_.currentStationId] ?? null : null,
+        damageReportId: dr?.id ?? null,
+        damageReportStatus: dr?.status ?? null,
+        estimatedRepairCost: dr?.estimatedRepairCost ?? null,
+        sparePartsNeeded: dr?.sparePartsNeeded ?? null,
+        needsSpareParts: dr?.needsSpareParts ?? false,
+        customerName: dr?.customerName ?? null,
+        bookingReference: dr?.bookingReference ?? null,
+      });
+    }
+    results.sort((a, b) => (b.repairDate?.getTime() ?? 0) - (a.repairDate?.getTime() ?? 0));
+    return results;
   }
 
   async createRepair(repair: InsertRepair): Promise<Repair> {

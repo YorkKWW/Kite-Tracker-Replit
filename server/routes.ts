@@ -609,6 +609,51 @@ export async function registerRoutes(
     res.json(repair);
   });
 
+  app.get("/api/repairs/active", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const stationId = user.role === "station_lead" ? user.assignedStationId : undefined;
+    const items = await storage.getActiveRepairsWithDetails(stationId);
+    res.json(items);
+  });
+
+  app.post("/api/repairs/:id/complete", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const repairId = parseInt(req.params.id);
+    const { actualCost, notes } = req.body;
+
+    const existing = await storage.getAllRepairs();
+    const existingRepair = existing.find(r => r.id === repairId);
+    if (!existingRepair) return res.status(404).json({ message: "Repair not found" });
+
+    const descriptionUpdate = notes
+      ? `${existingRepair.description}\n\nCompletion notes: ${notes}`
+      : existingRepair.description;
+
+    const repair = await storage.updateRepair(repairId, {
+      status: "completed",
+      cost: actualCost ?? null,
+      description: descriptionUpdate,
+    });
+    if (!repair) return res.status(404).json({ message: "Repair not found" });
+
+    await storage.updateEquipment(repair.equipmentId, { status: "active" });
+
+    const damageReports_ = await storage.getDamageReportsByEquipment(repair.equipmentId);
+    const openDR = damageReports_.find(dr => dr.status === "open" && dr.repairId === repairId);
+    if (openDR) {
+      await storage.updateDamageReport(openDR.id, { status: "closed" as any });
+    }
+
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "repair_logged",
+      equipmentId: repair.equipmentId,
+      details: `Repair completed. Actual cost: ${actualCost ? `€${actualCost}` : "not recorded"}${notes ? `. Notes: ${notes}` : ""}`,
+    });
+
+    res.json({ success: true, repair });
+  });
+
   app.get("/api/transfers", requireAuth, async (req, res) => {
     const user = req.user as any;
     const filters: any = {};

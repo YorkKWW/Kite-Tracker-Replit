@@ -20,6 +20,7 @@ import {
   ShoppingCart,
   Tag,
   AlertTriangle,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -54,6 +55,7 @@ export default function Layout({ children }: LayoutProps) {
     ...(isHamburg ? [{ href: "/transfers", label: "Transfers", icon: ArrowLeftRight }] : []),
     { href: "/sales", label: "Sales", icon: ShoppingCart },
     { href: "/incidents", label: "Incidents", icon: AlertTriangle },
+    { href: "/repairs", label: "Repairs", icon: Wrench },
     ...(isHamburg
       ? [
           { href: "/price-lists", label: "Price Lists", icon: Tag },

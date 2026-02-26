@@ -55,3 +55,6 @@ outputType = "console"
 
 [agent]
 integrations = ["javascript_object_storage:2.0.0"]
+
+[objectStorage]
+defaultBucketID = "replit-objstore-77a345c2-8aee-4028-bdfa-bd5a8e3dbab6"
