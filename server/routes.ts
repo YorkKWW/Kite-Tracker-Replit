@@ -10,9 +10,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { ObjectStorageService, objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
-import { createRequire } from "module";
-const _require = createRequire(import.meta.url);
-const { PDFParse } = _require("pdf-parse");
+import { PDFParse } from "pdf-parse";
 
 async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string }> {
   const parser = new PDFParse({ data: buffer });
