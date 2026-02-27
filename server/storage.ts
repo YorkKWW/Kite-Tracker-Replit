@@ -210,7 +210,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: number): Promise<void> {
-    await db.delete(users).where(eq(users.id, id));
+    await db.transaction(async (tx) => {
+      // Nullify all (now nullable) FK references
+      await tx.execute(sql`UPDATE activity_log SET user_id = NULL WHERE user_id = ${id}`);
+      await tx.execute(sql`UPDATE transfers SET initiated_by = NULL WHERE initiated_by = ${id}`);
+      await tx.execute(sql`UPDATE transfers SET confirmed_by = NULL WHERE confirmed_by = ${id}`);
+      await tx.execute(sql`UPDATE photos SET uploaded_by = NULL WHERE uploaded_by = ${id}`);
+      await tx.execute(sql`UPDATE inventory_check_items SET checked_by = NULL WHERE checked_by = ${id}`);
+      await tx.execute(sql`UPDATE invoices SET imported_by = NULL WHERE imported_by = ${id}`);
+      await tx.execute(sql`UPDATE repairs SET logged_by = NULL WHERE logged_by = ${id}`);
+      await tx.execute(sql`UPDATE sales_invoices SET created_by = NULL WHERE created_by = ${id}`);
+      await tx.execute(sql`UPDATE price_lists SET uploaded_by = NULL WHERE uploaded_by = ${id}`);
+      await tx.execute(sql`UPDATE condition_ratings SET rated_by = NULL WHERE rated_by = ${id}`);
+      // For remaining NOT NULL FKs: delete dependent records or reassign to admin
+      await tx.execute(sql`DELETE FROM damage_report_photos WHERE uploaded_by = ${id}`);
+      await tx.execute(sql`DELETE FROM inventory_check_items WHERE check_id IN (SELECT id FROM inventory_checks WHERE started_by = ${id})`);
+      await tx.execute(sql`DELETE FROM inventory_checks WHERE started_by = ${id}`);
+      // Reassign damage reports to user 1 (admin) — avoids losing damage history
+      await tx.execute(sql`UPDATE damage_reports SET reported_by = 1 WHERE reported_by = ${id} AND ${id} != 1`);
+      // Finally delete the user
+      await tx.execute(sql`DELETE FROM users WHERE id = ${id}`);
+    });
   }
 
   async getEquipment(id: number): Promise<Equipment | undefined> {

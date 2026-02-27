@@ -427,8 +427,17 @@ export async function registerRoutes(
   });
 
   app.delete("/api/users/:id", requireAdmin, async (req, res) => {
-    await storage.deleteUser(parseInt(req.params.id));
-    res.json({ message: "Deleted" });
+    const targetId = parseInt(req.params.id);
+    if (targetId === (req.user as any)?.id) {
+      return res.status(400).json({ message: "You cannot delete your own account." });
+    }
+    try {
+      await storage.deleteUser(targetId);
+      res.json({ message: "Deleted" });
+    } catch (err: any) {
+      console.error("deleteUser error:", err);
+      res.status(500).json({ message: "Failed to delete user. " + (err.message || "") });
+    }
   });
 
   app.get("/api/equipment/scan", requireAuth, async (req, res) => {

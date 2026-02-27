@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ interface SafeUser {
 
 export default function UsersPage() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const { data: usersList, isLoading } = useQuery<SafeUser[]>({ queryKey: ["/api/users"] });
   const { data: stationsList } = useQuery<Station[]>({ queryKey: ["/api/stations"] });
 
@@ -97,7 +99,20 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({ title: "User deleted" });
     },
+    onError: async (err: any) => {
+      const msg = await err?.response?.json().catch(() => null);
+      toast({ title: "Could not delete user", description: msg?.message || "An error occurred.", variant: "destructive" });
+    },
   });
+
+  const handleDelete = (u: SafeUser) => {
+    if (u.id === currentUser?.id) {
+      toast({ title: "Cannot delete your own account", variant: "destructive" });
+      return;
+    }
+    if (!window.confirm(`Delete user "${u.name}" (${u.email})? This cannot be undone.`)) return;
+    deleteMutation.mutate(u.id);
+  };
 
   const getStationName = (id: number | null) => {
     if (!id) return "None";
@@ -210,7 +225,7 @@ export default function UsersPage() {
                   <Button variant="ghost" size="icon" onClick={() => openEdit(u)} data-testid={`button-edit-user-${u.id}`}>
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(u.id)} data-testid={`button-delete-user-${u.id}`}>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(u)} data-testid={`button-delete-user-${u.id}`} disabled={deleteMutation.isPending}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
