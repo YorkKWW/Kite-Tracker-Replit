@@ -90,9 +90,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Demo: admin@kitetracker.com / admin123
-        </p>
+
       </div>
     </div>
   );
