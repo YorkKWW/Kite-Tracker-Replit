@@ -40,7 +40,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await apiRequest("POST", "/api/auth/logout");
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+    } catch {
+      // ignore network errors — still log out client-side
+    }
+    queryClient.setQueryData(["/api/auth/me"], null);
     queryClient.clear();
   };
 
