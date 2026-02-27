@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConditionBadge, StatusBadge } from "@/components/condition-badge";
-import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp, Inbox } from "lucide-react";
+import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp, Inbox, ArrowRightLeft } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPES_WITHOUT_SERIAL } from "@shared/schema";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -336,13 +336,20 @@ export default function EquipmentListPage() {
                       {noSerial ? "" : (item.serialNumber || "")}
                     </td>
                     <td className="px-2 py-2.5 text-xs hidden lg:table-cell max-w-[140px] truncate">
-                      {getStation(item.currentStationId)?.isVirtual ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 whitespace-nowrap">
-                          <Inbox className="h-3 w-3" /> Incoming
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">{getStationName(item.currentStationId)}</span>
-                      )}
+                      {(() => {
+                        const st = getStation(item.currentStationId);
+                        if (!st?.isVirtual) return <span className="text-muted-foreground">{getStationName(item.currentStationId)}</span>;
+                        if (st.name === "In Transfer") return (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 whitespace-nowrap">
+                            <ArrowRightLeft className="h-3 w-3" /> In Transit
+                          </span>
+                        );
+                        return (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 whitespace-nowrap">
+                            <Inbox className="h-3 w-3" /> Incoming
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-2 py-2.5">
                       <ConditionBadge rating={item.conditionRating} compact />

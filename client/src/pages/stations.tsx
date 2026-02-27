@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, MapPin, Pencil, Trash2, Inbox } from "lucide-react";
+import { Plus, MapPin, Pencil, Trash2, Inbox, ArrowRightLeft } from "lucide-react";
 import type { Station } from "@shared/schema";
 
 export default function StationsPage() {
@@ -116,21 +116,32 @@ export default function StationsPage() {
       ) : (
         <div className="space-y-3">
           {stationsList.map((s) => (
-            <Card key={s.id} data-testid={`card-station-${s.id}`} className={s.isVirtual ? "border-amber-300 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-900/10" : ""}>
+            <Card key={s.id} data-testid={`card-station-${s.id}`} className={s.isVirtual && s.name === "In Transfer" ? "border-blue-300 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-900/10" : s.isVirtual ? "border-amber-300 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-900/10" : ""}>
               <CardContent className="p-4 flex items-center justify-between gap-1">
                 <Link href={`/stations/${s.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className={`p-2 rounded-md shrink-0 ${s.isVirtual ? "bg-amber-100 dark:bg-amber-900/30" : "bg-primary/10"}`}>
-                    {s.isVirtual ? <Inbox className="h-5 w-5 text-amber-600 dark:text-amber-400" /> : <MapPin className="h-5 w-5 text-primary" />}
+                  <div className={`p-2 rounded-md shrink-0 ${s.isVirtual && s.name === "In Transfer" ? "bg-blue-100 dark:bg-blue-900/30" : s.isVirtual ? "bg-amber-100 dark:bg-amber-900/30" : "bg-primary/10"}`}>
+                    {s.isVirtual && s.name === "In Transfer"
+                      ? <ArrowRightLeft className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      : s.isVirtual
+                      ? <Inbox className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                      : <MapPin className="h-5 w-5 text-primary" />}
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold" data-testid={`text-station-${s.id}`}>{s.name}</p>
-                      {s.isVirtual && (
+                      {s.isVirtual && s.name === "In Transfer" && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200 uppercase tracking-wide">Virtual</span>
+                      )}
+                      {s.isVirtual && s.name !== "In Transfer" && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-200 uppercase tracking-wide">Staging</span>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground truncate">
-                      {s.isVirtual ? "Virtual staging location – equipment awaiting assignment" : ([s.location, s.country].filter(Boolean).join(", ") || "No location")}
+                      {s.name === "In Transfer"
+                        ? "Virtual location – equipment currently in transit between stations"
+                        : s.isVirtual
+                        ? "Virtual staging location – equipment awaiting assignment"
+                        : ([s.location, s.country].filter(Boolean).join(", ") || "No location")}
                     </p>
                   </div>
                 </Link>

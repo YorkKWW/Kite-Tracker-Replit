@@ -59,6 +59,7 @@ export const stations = pgTable("stations", {
   location: text("location"),
   country: text("country"),
   isVirtual: boolean("is_virtual").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(99),
 });
 
 export const users = pgTable("users", {

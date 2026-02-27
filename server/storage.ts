@@ -168,7 +168,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllStations(): Promise<Station[]> {
-    return db.select().from(stations);
+    return db.select().from(stations).orderBy(stations.sortOrder, stations.id);
   }
 
   async createStation(station: InsertStation): Promise<Station> {
@@ -447,8 +447,10 @@ export class DatabaseStorage implements IStorage {
 
   async createTransfer(transfer: InsertTransfer): Promise<Transfer> {
     const [created] = await db.insert(transfers).values(transfer).returning();
+    const [inTransferStation] = await db.select().from(stations)
+      .where(and(eq(stations.isVirtual, true), eq(stations.name, "In Transfer")));
     await db.update(equipment)
-      .set({ status: "in_transfer" })
+      .set({ status: "in_transfer", currentStationId: inTransferStation?.id ?? null })
       .where(eq(equipment.id, transfer.equipmentId));
     return created;
   }
@@ -495,7 +497,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     await db.update(equipment)
-      .set({ status: "active" })
+      .set({ status: "active", currentStationId: transfer.fromStationId })
       .where(eq(equipment.id, transfer.equipmentId));
 
     return updated;
