@@ -169,7 +169,7 @@ export default function UsersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {stationsList?.map((s) => (
+                    {stationsList?.filter((s) => !s.isVirtual).map((s) => (
                       <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                     ))}
                   </SelectContent>

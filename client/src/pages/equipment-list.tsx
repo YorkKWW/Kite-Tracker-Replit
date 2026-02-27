@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConditionBadge, StatusBadge } from "@/components/condition-badge";
-import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp } from "lucide-react";
+import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp, Inbox } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPES_WITHOUT_SERIAL } from "@shared/schema";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -81,10 +81,13 @@ export default function EquipmentListPage() {
     staleTime: 30000,
   });
 
+  const getStation = (id: number | null) => stationsList?.find((s) => s.id === id) ?? null;
   const getStationName = (id: number | null) => {
     if (!id) return "—";
-    return stationsList?.find((s) => s.id === id)?.name || `Station ${id}`;
+    return getStation(id)?.name || `Station ${id}`;
   };
+  const incomingStation = stationsList?.find((s) => s.isVirtual) ?? null;
+  const incomingCount = equipment?.filter((e) => e.currentStationId === incomingStation?.id).length ?? 0;
 
   const handleScan = async (code: string) => {
     try {
@@ -210,6 +213,17 @@ export default function EquipmentListPage() {
         )}
       </div>
 
+      {!isLoading && incomingStation && incomingCount > 0 && (
+        <button
+          onClick={() => setStationFilter(stationFilter === incomingStation.id.toString() ? "all" : incomingStation.id.toString())}
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors w-full sm:w-auto ${stationFilter === incomingStation.id.toString() ? "bg-amber-100 border-amber-400 text-amber-800 dark:bg-amber-900/30 dark:border-amber-600 dark:text-amber-300" : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/10 dark:border-amber-800 dark:text-amber-400"}`}
+          data-testid="button-filter-incoming"
+        >
+          <Inbox className="h-4 w-4" />
+          <span>{incomingCount} item{incomingCount !== 1 ? "s" : ""} not yet assigned to a location</span>
+        </button>
+      )}
+
       {!isLoading && equipment && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <p className="text-xs text-muted-foreground">{equipment.length} item{equipment.length !== 1 ? "s" : ""}</p>
@@ -321,8 +335,14 @@ export default function EquipmentListPage() {
                     <td className="px-2 py-2.5 font-mono text-xs text-muted-foreground hidden md:table-cell max-w-[160px] truncate" data-testid={`text-serial-${item.id}`}>
                       {noSerial ? "" : (item.serialNumber || "")}
                     </td>
-                    <td className="px-2 py-2.5 text-xs text-muted-foreground hidden lg:table-cell max-w-[140px] truncate">
-                      {getStationName(item.currentStationId)}
+                    <td className="px-2 py-2.5 text-xs hidden lg:table-cell max-w-[140px] truncate">
+                      {getStation(item.currentStationId)?.isVirtual ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 whitespace-nowrap">
+                          <Inbox className="h-3 w-3" /> Incoming
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">{getStationName(item.currentStationId)}</span>
+                      )}
                     </td>
                     <td className="px-2 py-2.5">
                       <ConditionBadge rating={item.conditionRating} compact />

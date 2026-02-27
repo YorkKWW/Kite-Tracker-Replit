@@ -221,7 +221,9 @@ export default function EquipmentFormPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {stationsList?.map((s) => (
-                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                    <SelectItem key={s.id} value={s.id.toString()}>
+                      {s.isVirtual ? `⬤ ${s.name} (staging)` : s.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

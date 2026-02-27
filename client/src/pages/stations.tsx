@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, MapPin, Pencil, Trash2 } from "lucide-react";
+import { Plus, MapPin, Pencil, Trash2, Inbox } from "lucide-react";
 import type { Station } from "@shared/schema";
 
 export default function StationsPage() {
@@ -116,26 +116,35 @@ export default function StationsPage() {
       ) : (
         <div className="space-y-3">
           {stationsList.map((s) => (
-            <Card key={s.id} data-testid={`card-station-${s.id}`}>
+            <Card key={s.id} data-testid={`card-station-${s.id}`} className={s.isVirtual ? "border-amber-300 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-900/10" : ""}>
               <CardContent className="p-4 flex items-center justify-between gap-1">
                 <Link href={`/stations/${s.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="p-2 rounded-md bg-primary/10 shrink-0">
-                    <MapPin className="h-5 w-5 text-primary" />
+                  <div className={`p-2 rounded-md shrink-0 ${s.isVirtual ? "bg-amber-100 dark:bg-amber-900/30" : "bg-primary/10"}`}>
+                    {s.isVirtual ? <Inbox className="h-5 w-5 text-amber-600 dark:text-amber-400" /> : <MapPin className="h-5 w-5 text-primary" />}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold" data-testid={`text-station-${s.id}`}>{s.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold" data-testid={`text-station-${s.id}`}>{s.name}</p>
+                      {s.isVirtual && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-200 uppercase tracking-wide">Staging</span>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground truncate">
-                      {[s.location, s.country].filter(Boolean).join(", ") || "No location"}
+                      {s.isVirtual ? "Virtual staging location – equipment awaiting assignment" : ([s.location, s.country].filter(Boolean).join(", ") || "No location")}
                     </p>
                   </div>
                 </Link>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(s)} data-testid={`button-edit-station-${s.id}`}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(s.id)} data-testid={`button-delete-station-${s.id}`}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  {!s.isVirtual && (
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(s)} data-testid={`button-edit-station-${s.id}`}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {!s.isVirtual && (
+                    <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(s.id)} data-testid={`button-delete-station-${s.id}`}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -743,7 +743,7 @@ function TransfersSection({
                   </SelectTrigger>
                   <SelectContent>
                     {stations
-                      .filter((s) => s.id !== currentStationId)
+                      .filter((s) => s.id !== currentStationId && !s.isVirtual)
                       .map((s) => (
                         <SelectItem key={s.id} value={s.id.toString()}>
                           {s.name}
