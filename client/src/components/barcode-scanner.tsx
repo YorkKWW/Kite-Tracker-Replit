@@ -16,10 +16,8 @@ function isProductUpc(code: string): boolean {
 
 export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const activeRef = useRef(false);
+  const controlsRef = useRef<{ stop: () => void } | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
@@ -27,10 +25,9 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
   const [scanning, setScanning] = useState(false);
 
   const stopScanner = useCallback(() => {
-    activeRef.current = false;
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+    if (controlsRef.current) {
+      try { controlsRef.current.stop(); } catch {}
+      controlsRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
@@ -47,41 +44,28 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
     setHint(null);
 
     try {
-      // 1. Get camera stream directly — most reliable on Safari iOS
+      // Step 1: get camera stream directly — proven to work on Safari iOS
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
+        video: { facingMode: { ideal: "environment" } },
         audio: false,
       });
-
       streamRef.current = stream;
 
-      const video = videoRef.current;
-      if (!video) { stream.getTracks().forEach((t) => t.stop()); return; }
-
-      video.srcObject = stream;
-      video.setAttribute("playsinline", "true");
-      video.setAttribute("muted", "true");
-      await video.play();
-
+      // Show camera feed immediately while ZXing loads
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute("playsinline", "true");
+        await videoRef.current.play().catch(() => {});
+      }
       setScanning(true);
-      activeRef.current = true;
 
-      // 2. Load ZXing decoder
-      const {
-        MultiFormatReader,
-        RGBLuminanceSource,
-        BinaryBitmap,
-        HybridBinarizer,
-        DecodeHintType,
-        BarcodeFormat,
-        NotFoundException,
-      } = await import("@zxing/library");
+      // Step 2: load ZXing and attach stream-based decoder
+      const { BrowserMultiFormatReader } = await import("@zxing/browser");
+      const { DecodeHintType, BarcodeFormat } = await import("@zxing/library");
 
-      const hints = new Map();
+      if (!streamRef.current) return; // closed while loading
+
+      const hints = new Map<any, any>();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
         BarcodeFormat.CODE_128,
         BarcodeFormat.CODE_39,
@@ -92,71 +76,38 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
       ]);
       hints.set(DecodeHintType.TRY_HARDER, true);
 
-      const reader = new MultiFormatReader();
-      reader.setHints(hints);
+      const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 100 });
 
-      const canvas = canvasRef.current || document.createElement("canvas");
-
-      // 3. Process frames via requestAnimationFrame
-      const processFrame = () => {
-        if (!activeRef.current) return;
-
-        const v = videoRef.current;
-        if (!v || v.readyState < v.HAVE_CURRENT_DATA || v.videoWidth === 0) {
-          rafRef.current = requestAnimationFrame(processFrame);
-          return;
-        }
-
-        canvas.width = v.videoWidth;
-        canvas.height = v.videoHeight;
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        if (!ctx) { rafRef.current = requestAnimationFrame(processFrame); return; }
-
-        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-
-        try {
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const luminance = new RGBLuminanceSource(
-            new Uint8ClampedArray(imageData.data),
-            canvas.width,
-            canvas.height,
-          );
-          const bitmap = new BinaryBitmap(new HybridBinarizer(luminance));
-          const result = reader.decode(bitmap);
+      // Step 3: decode from the stream we already have
+      const controls = await reader.decodeFromStream(
+        streamRef.current,
+        videoRef.current!,
+        (result, _err) => {
+          if (!result) return;
           const text = result.getText();
 
           if (isProductUpc(text)) {
             setHint("UPC-Produktcode erkannt — bitte den UNTEREN Barcode (S/N) scannen");
-            rafRef.current = requestAnimationFrame(processFrame);
             return;
           }
 
-          // Got a serial number
-          activeRef.current = false;
+          // Got serial number — stop and report
+          try { controls?.stop(); } catch {}
           stopScanner();
           onScan(text);
           onClose();
-          return;
-        } catch (e: any) {
-          // NotFoundException is normal — no barcode in this frame
-          if (!(e instanceof NotFoundException)) {
-            console.warn("ZXing decode error:", e?.message);
-          }
-        }
-
-        rafRef.current = requestAnimationFrame(processFrame);
-      };
-
-      rafRef.current = requestAnimationFrame(processFrame);
+        },
+      );
+      controlsRef.current = controls;
     } catch (err: any) {
       setScanning(false);
-      const msg = (err?.message || err?.name || "").toLowerCase();
+      const msg = (err?.message || err?.name || String(err)).toLowerCase();
       if (msg.includes("notallowed") || msg.includes("permission") || msg.includes("denied")) {
-        setError("Kamerazugriff verweigert. Bitte Kameraerlaubnis in den iPhone-Einstellungen erteilen.");
+        setError("Kamerazugriff verweigert. Bitte in den iPhone-Einstellungen → Safari → Kamera erlauben.");
       } else if (msg.includes("notfound") || msg.includes("overconstrained")) {
-        setError("Keine Rückkamera gefunden.");
+        setError("Keine Kamera gefunden.");
       } else {
-        setError(`Kamera-Fehler: ${err?.message || "Unbekannter Fehler"}. Seriennummer manuell eingeben.`);
+        setError(`Fehler: ${err?.message || String(err)}`);
       }
     }
   }, [onScan, onClose, stopScanner]);
@@ -212,7 +163,6 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
                 muted
                 autoPlay
               />
-              <canvas ref={canvasRef} className="hidden" />
 
               {scanning && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-2">
