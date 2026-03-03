@@ -225,13 +225,17 @@ function parseCoreOldInvoice(text: string) {
     const total    = parseGermanNumber(totalStr);
     const unitPriceAfterDiscount = quantity > 0 ? total / quantity : total;
 
-    // Look for serial numbers in the following lines (stop at next item or after 7 lines)
+    // Collect serial numbers from ALL consecutive matching lines within the block.
+    // Serials can span multiple lines (e.g. 7 kites → 2-3 serial lines).
     let serials: string[] = [];
-    for (let j = i + 1; j <= Math.min(i + 7, lines.length - 1); j++) {
+    let foundFirstSerial = false;
+    for (let j = i + 1; j <= Math.min(i + 15, lines.length - 1); j++) {
       if (lines[j].match(itemLineRe)) break;           // next item starts → stop
       if (lines[j].match(serialLineRe)) {
-        serials = lines[j].split(/\s+/).filter(Boolean);
-        break;
+        serials.push(...lines[j].split(/\s+/).filter(Boolean));
+        foundFirstSerial = true;
+      } else if (foundFirstSerial) {
+        break;                                         // non-serial line after serials → done
       }
     }
     if (serials.length === 0) serials = [""];
