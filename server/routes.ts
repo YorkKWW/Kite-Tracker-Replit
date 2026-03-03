@@ -980,6 +980,10 @@ export async function registerRoutes(
     if (!req.file) return res.status(400).json({ message: "No PDF uploaded" });
     try {
       const data = await parsePdfBuffer(req.file.buffer);
+      // Debug: log extracted text so we can tune the parser
+      console.log("=== PDF TEXT PREVIEW (first 3000 chars) ===");
+      console.log(data.text.substring(0, 3000));
+      console.log("=== END PDF TEXT PREVIEW ===");
       // Auto-detect supplier format from PDF content
       const isDuotone = /boards.and.more|B&M\/B2B/i.test(data.text);
       const parsed = isDuotone ? parseDuotoneInvoice(data.text) : parsePdfInvoice(data.text);
