@@ -17,17 +17,18 @@ function isProductUpc(code: string): boolean {
 export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const controlsRef = useRef<{ stop: () => void } | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const activeRef = useRef(false);
 
   const [error, setError] = useState<string | null>(null);
-  const [hint, setHint] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState("");
   const [scanning, setScanning] = useState(false);
 
   const stopScanner = useCallback(() => {
-    if (controlsRef.current) {
-      try { controlsRef.current.stop(); } catch {}
-      controlsRef.current = null;
+    activeRef.current = false;
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
@@ -41,17 +42,15 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
 
   const startScanner = useCallback(async () => {
     setError(null);
-    setHint(null);
+    activeRef.current = true;
 
     try {
-      // Step 1: get camera stream directly — proven to work on Safari iOS
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" } },
         audio: false,
       });
       streamRef.current = stream;
 
-      // Show camera feed immediately while ZXing loads
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.setAttribute("playsinline", "true");
@@ -59,47 +58,68 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
       }
       setScanning(true);
 
-      // Step 2: load ZXing and attach stream-based decoder
       const { BrowserMultiFormatReader } = await import("@zxing/browser");
       const { DecodeHintType, BarcodeFormat } = await import("@zxing/library");
 
-      if (!streamRef.current) return; // closed while loading
+      if (!activeRef.current) return;
 
       const hints = new Map<any, any>();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
         BarcodeFormat.CODE_128,
         BarcodeFormat.CODE_39,
         BarcodeFormat.QR_CODE,
-        BarcodeFormat.EAN_13,
-        BarcodeFormat.EAN_8,
         BarcodeFormat.DATA_MATRIX,
       ]);
       hints.set(DecodeHintType.TRY_HARDER, true);
 
-      const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 100 });
+      const reader = new BrowserMultiFormatReader(hints);
 
-      // Step 3: decode from the stream we already have
-      const controls = await reader.decodeFromStream(
-        streamRef.current,
-        videoRef.current!,
-        (result, _err) => {
-          if (!result) return;
-          const text = result.getText();
+      // Offscreen canvas — we crop to the lower portion of the frame
+      // to physically exclude the EAN-13 product barcode at the top
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d")!;
 
-          if (isProductUpc(text)) {
-            setHint("UPC-Produktcode erkannt — bitte den UNTEREN Barcode (S/N) scannen");
+      const scan = () => {
+        if (!activeRef.current) return;
+        const video = videoRef.current;
+        if (!video || video.readyState < 2 || video.videoWidth === 0) {
+          rafRef.current = requestAnimationFrame(scan);
+          return;
+        }
+
+        const w = video.videoWidth;
+        const h = video.videoHeight;
+
+        // Only decode the middle-to-bottom 55% of the frame.
+        // Core kite labels: EAN-13 is at top, S/N Code128 is below center.
+        const startY = Math.floor(h * 0.38);
+        const cropH = Math.floor(h * 0.55);
+
+        canvas.width = w;
+        canvas.height = cropH;
+        ctx.drawImage(video, 0, startY, w, cropH, 0, 0, w, cropH);
+
+        try {
+          const result = reader.decodeFromCanvas(canvas);
+          const text = result.getText().trim();
+
+          if (!isProductUpc(text) && text.length >= 6) {
+            activeRef.current = false;
+            stopScanner();
+            onScan(text);
+            onClose();
             return;
           }
+        } catch {
+          // No barcode in this frame — keep scanning
+        }
 
-          // Got serial number — stop and report
-          try { controls?.stop(); } catch {}
-          stopScanner();
-          onScan(text);
-          onClose();
-        },
-      );
-      controlsRef.current = controls;
+        rafRef.current = requestAnimationFrame(scan);
+      };
+
+      rafRef.current = requestAnimationFrame(scan);
     } catch (err: any) {
+      activeRef.current = false;
       setScanning(false);
       const msg = (err?.message || err?.name || String(err)).toLowerCase();
       if (msg.includes("notallowed") || msg.includes("permission") || msg.includes("denied")) {
@@ -169,9 +189,9 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
               />
 
               {scanning && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-2">
+                <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none pb-8 gap-2">
                   <div className="relative">
-                    <div className="border-2 border-primary/80 rounded w-64 h-16" />
+                    <div className="border-2 border-primary/80 rounded w-64 h-14" />
                     <div className="absolute -top-0.5 -left-0.5 w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl" />
                     <div className="absolute -top-0.5 -right-0.5 w-4 h-4 border-t-2 border-r-2 border-primary rounded-tr" />
                     <div className="absolute -bottom-0.5 -left-0.5 w-4 h-4 border-b-2 border-l-2 border-primary rounded-bl" />
@@ -183,12 +203,6 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
                   </span>
                 </div>
               )}
-            </div>
-          )}
-
-          {hint && (
-            <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2">
-              <p className="text-xs text-amber-700 dark:text-amber-300">{hint}</p>
             </div>
           )}
 
