@@ -133,7 +133,11 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { stopScanner(); onClose(); } }}>
-      <DialogContent className="max-w-sm p-0 overflow-hidden" aria-describedby="scanner-desc">
+      <DialogContent
+        className="max-w-sm p-0 overflow-hidden"
+        aria-describedby="scanner-desc"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader className="px-4 pt-4 pb-2">
           <DialogTitle className="flex items-center gap-2 text-base">
             <ScanLine className="h-4 w-4 shrink-0" />
