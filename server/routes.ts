@@ -154,10 +154,10 @@ function parseDuotoneInvoice(text: string) {
 
 function detectEquipmentType(name: string, sku: string): { type: string; isSpare: boolean } {
   const text = `${name} ${sku}`.toLowerCase();
-  if (/bladder|bridle|chickenstick|ersatzteil|spare|strut|screw|bolt|pump hose/i.test(text)) {
+  if (/bladder|bridle|chickenstick|ersatzteil|spare|strut|pump hose|fin.?set|\bfins?\b|grab.?handle|equalizer.*fin|leash|kitebag|repair.?kit|screws|washers|set of \d/i.test(text)) {
     return { type: "kite", isSpare: true };
   }
-  if (/\bkite\b|xr\d|gts\d|nexus|rebel|evo|delta|freeride|air pro|foil kite|kap\d|kxr|kgts|knex/i.test(text)) {
+  if (/\bkite\b|xr\d|gts\d|nexus|rebel|evo|delta|freeride|air pro|foil kite|kap\d|kxr|kgts|knex|\bgts\b/i.test(text)) {
     return { type: "kite", isSpare: false };
   }
   if (/\bbar\b|sensor|navigator|control bar|rse\d|click bar|trust bar/i.test(text)) {
@@ -166,7 +166,7 @@ function detectEquipmentType(name: string, sku: string): { type: string; isSpare
   if (/\bfoilboard\b/i.test(text)) {
     return { type: "foilboard", isSpare: false };
   }
-  if (/\bboard\b|twintip|directional/i.test(text)) {
+  if (/\bboard\b|twintip|directional|\bfusion\b|\d{3}x\d{2}/i.test(text)) {
     return { type: "board", isSpare: false };
   }
   if (/\bfoil\b|hydrofoil|wingfoil|wing foil/i.test(text)) {
@@ -185,6 +185,92 @@ function detectEquipmentType(name: string, sku: string): { type: string; isSpare
     return { type: "helmet_safety", isSpare: false };
   }
   return { type: "kite", isSpare: false };
+}
+
+// ─── Core old invoice format (pre-2023) ──────────────────────────────────────
+// Format per item line (single wide line with aligned columns):
+//   SKU                   Product Name                         qty    unitPrice€   discount%   total€
+//   UPC: XXXXXXXXX
+//   Handelsware           description
+//                         SERIALNUMBER  (or multiple space-separated)
+function parseCoreOldInvoice(text: string) {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+
+  const invoiceNumber = text.match(/Rechnung\s+(IN\d+)/)?.[1] || "";
+  const invoiceDate   = text.match(/Datum\s+([\d.]+)/)?.[1] || "";
+  const deliveryDate  = text.match(/Lieferdatum\s+([\d.]+)/)?.[1] || "";
+  const orderNumber   = text.match(/Bestellnummer[^\d]*([\w]+)/)?.[1]
+    || text.match(/Order\s*(?:Number|No\.?)[:\s]+([\w\-]+)/i)?.[1] || "";
+  const totalNetRaw   = text.match(/Subtotal\s+([\d.,]+)\s*€/)?.[1] || "";
+  const totalGrossRaw = text.match(/Gesamtsumme\s+([\d.,]+)\s*€/)?.[1] || "";
+
+  // Main item line pattern:
+  // SKU (all-caps+digits, 2+ chars) followed by 2+ spaces, lazy description,
+  // then 3+ spaces (column gap), qty, unitPrice€, discount%, total€
+  const itemLineRe = /^([A-Z][A-Z0-9]{2,})\s{2,}(.+?)\s{3,}(\d+)\s+([\d.,]+)\s*€\s+(\d+)%\s+([\d.,]+)/;
+
+  // Serial line: all-uppercase alphanumeric tokens that each contain at least one digit
+  // (rules out section headers like "KITEWORLDWIDE BRASILIEN" which are letters-only)
+  const serialLineRe = /^([A-Z]*[0-9][A-Z0-9]{4,}(?:\s+[A-Z]*[0-9][A-Z0-9]{4,})*)$/;
+
+  const items: any[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(itemLineRe);
+    if (!m) continue;
+
+    const [, sku, rawName, qtyStr, , discountStr, totalStr] = m;
+    const quantity = parseInt(qtyStr, 10) || 1;
+    const discount = parseInt(discountStr, 10) || 0;
+    const total    = parseGermanNumber(totalStr);
+    const unitPriceAfterDiscount = quantity > 0 ? total / quantity : total;
+
+    // Look for serial numbers in the following lines (stop at next item or after 7 lines)
+    let serials: string[] = [];
+    for (let j = i + 1; j <= Math.min(i + 7, lines.length - 1); j++) {
+      if (lines[j].match(itemLineRe)) break;           // next item starts → stop
+      if (lines[j].match(serialLineRe)) {
+        serials = lines[j].split(/\s+/).filter(Boolean);
+        break;
+      }
+    }
+    if (serials.length === 0) serials = [""];
+
+    // Extract size from name like "CORE GTS6 5.0 white/black" → "5.0"
+    const sizeMatch = rawName.match(/\s(\d+\.?\d*)\s/);
+    const size  = sizeMatch?.[1] || "";
+    const name  = rawName.trim();
+    const color = "";  // old format doesn't reliably encode color separately
+
+    const { type, isSpare } = detectEquipmentType(name, sku);
+
+    for (const serial of serials) {
+      items.push({
+        sku,
+        name,
+        size,
+        color,
+        quantity,
+        discount,
+        unitPriceAfterDiscount: Math.round(unitPriceAfterDiscount * 100) / 100,
+        serialNumber: serial,
+        type,
+        isSpare,
+        skip: isSpare,
+      });
+    }
+    // Skip to end of the item block (up to the line where we found the serial)
+  }
+
+  return {
+    invoiceNumber,
+    invoiceDate,
+    deliveryDate,
+    orderNumber,
+    totalNet:   totalNetRaw   ? parseGermanNumber(totalNetRaw)   : null,
+    totalGross: totalGrossRaw ? parseGermanNumber(totalGrossRaw) : null,
+    items,
+  };
 }
 
 function parsePdfInvoice(text: string) {
@@ -980,13 +1066,13 @@ export async function registerRoutes(
     if (!req.file) return res.status(400).json({ message: "No PDF uploaded" });
     try {
       const data = await parsePdfBuffer(req.file.buffer);
-      // Debug: log extracted text so we can tune the parser
-      console.log("=== PDF TEXT PREVIEW (first 3000 chars) ===");
-      console.log(data.text.substring(0, 3000));
-      console.log("=== END PDF TEXT PREVIEW ===");
-      // Auto-detect supplier format from PDF content
-      const isDuotone = /boards.and.more|B&M\/B2B/i.test(data.text);
-      const parsed = isDuotone ? parseDuotoneInvoice(data.text) : parsePdfInvoice(data.text);
+      // Auto-detect invoice format:
+      //   Duotone (boards-and-more B2B), new Core format ([SKU] brackets), old Core format (columns)
+      const isDuotone    = /boards.and.more|B&M\/B2B/i.test(data.text);
+      const isNewCore    = /^\[[A-Z0-9]+\]/m.test(data.text);
+      const parsed = isDuotone ? parseDuotoneInvoice(data.text)
+                   : isNewCore ? parsePdfInvoice(data.text)
+                   :             parseCoreOldInvoice(data.text);
 
       // Check for duplicate serials in DB — store ID so frontend can link to existing item
       const allSerial = parsed.items
