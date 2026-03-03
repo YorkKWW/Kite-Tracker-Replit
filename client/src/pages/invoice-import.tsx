@@ -14,7 +14,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 import {
   ArrowLeft, Upload, FileText, CheckCircle2, AlertTriangle,
-  Plus, ChevronRight, SkipForward, Loader2,
+  ChevronRight, SkipForward, Loader2,
 } from "lucide-react";
 import type { Supplier } from "@shared/schema";
 
@@ -46,20 +46,12 @@ type ParseResult = {
 
 const STEP_LABELS = ["Select Supplier", "Upload PDF", "Review Items", "Done"];
 
-const SUPPLIER_COLORS = [
-  "#f97316", "#0ea5e9", "#8b5cf6", "#10b981",
-  "#ef4444", "#f59e0b", "#06b6d4", "#ec4899",
-];
-
 export default function InvoiceImportPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
   const [step, setStep] = useState(1);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
-  const [showAddSupplier, setShowAddSupplier] = useState(false);
-  const [newSupplierName, setNewSupplierName] = useState("");
-  const [newSupplierColor, setNewSupplierColor] = useState(SUPPLIER_COLORS[0]);
 
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [items, setItems] = useState<ParsedItem[]>([]);
@@ -105,19 +97,6 @@ export default function InvoiceImportPage() {
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
-  });
-
-  const addSupplierMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", "/api/suppliers", { name: newSupplierName, color: newSupplierColor }).then((r) => r.json()),
-    onSuccess: (s: Supplier) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
-      setSelectedSupplierId(s.id);
-      setShowAddSupplier(false);
-      setNewSupplierName("");
-      toast({ title: "Supplier added" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const confirmMutation = useMutation({
@@ -240,65 +219,7 @@ export default function InvoiceImportPage() {
               </button>
             ))}
 
-            {!showAddSupplier && (
-              <button
-                data-testid="button-add-supplier"
-                onClick={() => setShowAddSupplier(true)}
-                className="rounded-xl border-2 border-dashed border-border p-4 flex flex-col items-center gap-2 text-muted-foreground hover:border-primary/50 hover:text-primary transition-all"
-              >
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                  <Plus className="h-5 w-5" />
-                </div>
-                <span className="text-sm font-medium">Add Supplier</span>
-              </button>
-            )}
           </div>
-
-          {showAddSupplier && (
-            <Card>
-              <CardContent className="p-4 space-y-3">
-                <h3 className="font-semibold text-sm">New Supplier</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label>Name</Label>
-                    <Input
-                      value={newSupplierName}
-                      onChange={(e) => setNewSupplierName(e.target.value)}
-                      placeholder="e.g. Ozone, Cabrinha"
-                      data-testid="input-supplier-name"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Color</Label>
-                    <div className="flex gap-2 flex-wrap">
-                      {SUPPLIER_COLORS.map((c) => (
-                        <button
-                          key={c}
-                          onClick={() => setNewSupplierColor(c)}
-                          className={`w-7 h-7 rounded-full border-2 transition-all ${newSupplierColor === c ? "border-foreground scale-110" : "border-transparent"}`}
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => addSupplierMutation.mutate()}
-                    disabled={!newSupplierName.trim() || addSupplierMutation.isPending}
-                    data-testid="button-save-supplier"
-                  >
-                    {addSupplierMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                    Save
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowAddSupplier(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           <Button
             onClick={() => setStep(2)}

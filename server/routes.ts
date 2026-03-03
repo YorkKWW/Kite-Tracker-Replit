@@ -974,16 +974,6 @@ export async function registerRoutes(
     res.json(await storage.getAllSuppliers());
   });
 
-  app.post("/api/suppliers", requireHamburg, async (req, res) => {
-    const { name, color } = req.body;
-    if (!name) return res.status(400).json({ message: "name required" });
-    try {
-      const supplier = await storage.createSupplier({ name, color: color || "#6366f1" });
-      res.json(supplier);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
-    }
-  });
 
   // ─── Invoice: Parse PDF ───────────────────────────────────────────────────────
   app.post("/api/invoices/parse", requireHamburg, uploadPdf.single("pdf"), async (req, res) => {
