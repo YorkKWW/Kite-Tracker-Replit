@@ -99,6 +99,7 @@ export interface IStorage {
   cancelTransfer(id: number): Promise<Transfer | undefined>;
 
   getPhotos(equipmentId: number): Promise<Photo[]>;
+  getPhoto(id: number): Promise<Photo | undefined>;
   getFirstPhotos(equipmentIds: number[]): Promise<Record<number, string>>;
   createPhoto(photo: InsertPhoto): Promise<Photo>;
   deletePhoto(id: number): Promise<void>;
@@ -501,6 +502,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(equipment.id, transfer.equipmentId));
 
     return updated;
+  }
+
+  async getPhoto(id: number): Promise<Photo | undefined> {
+    const [photo] = await db.select().from(photos).where(eq(photos.id, id));
+    return photo;
   }
 
   async getPhotos(equipmentId: number): Promise<Photo[]> {

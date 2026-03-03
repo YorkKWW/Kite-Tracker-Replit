@@ -892,7 +892,17 @@ export async function registerRoutes(
   });
 
   app.delete("/api/photos/:id", requireAuth, async (req, res) => {
-    await storage.deletePhoto(parseInt(req.params.id));
+    const photoId = parseInt(req.params.id);
+    const photo = await storage.getPhoto(photoId);
+    if (photo?.url?.startsWith("/objects/")) {
+      try {
+        const objectFile = await objectStorage.getObjectEntityFile(photo.url);
+        await objectFile.delete({ ignoreNotFound: true });
+      } catch {
+        // Object storage cleanup failed — still delete DB record
+      }
+    }
+    await storage.deletePhoto(photoId);
     res.json({ message: "Deleted" });
   });
 
