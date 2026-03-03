@@ -4,7 +4,30 @@ import { db } from "./db";
 import { users, stations, equipment } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
+const DEFAULT_SUPPLIERS = [
+  { name: "Duotone", color: "#8b5cf6" },
+  { name: "Core", color: "#f97316" },
+  { name: "North", color: "#0ea5e9" },
+  { name: "Eleveight", color: "#10b981" },
+  { name: "Cabrinha", color: "#ef4444" },
+  { name: "ION", color: "#64748b" },
+  { name: "Mystic", color: "#f59e0b" },
+  { name: "Manera", color: "#ec4899" },
+];
+
+async function seedSuppliers() {
+  const existing = await storage.getAllSuppliers();
+  if (existing.length > 0) return;
+  console.log("Seeding default suppliers...");
+  for (const s of DEFAULT_SUPPLIERS) {
+    await storage.createSupplier(s);
+  }
+  console.log(`Inserted ${DEFAULT_SUPPLIERS.length} default suppliers.`);
+}
+
 export async function seedDatabase() {
+  await seedSuppliers();
+
   const existingUsers = await storage.getAllUsers();
   if (existingUsers.length > 0) {
     console.log("Database already seeded, skipping...");
