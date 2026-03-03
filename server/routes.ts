@@ -188,13 +188,23 @@ function detectEquipmentType(name: string, sku: string): { type: string; isSpare
 }
 
 // ─── Core old invoice format (pre-2023) ──────────────────────────────────────
-// Format per item line (single wide line with aligned columns):
-//   SKU                   Product Name                         qty    unitPrice€   discount%   total€
+// pdf-parse extracts each column as a separate line (column-split format):
+//   SKU              ← standalone uppercase line
 //   UPC: XXXXXXXXX
-//   Handelsware           description
-//                         SERIALNUMBER  (or multiple space-separated)
+//   Handelsware / Schulungsmaterial
+//   Product description (name)
+//   [extra description lines...]
+//   SERIAL1 SERIAL2  ← one or more serial lines
+//   qty unitPrice€ discount% total€   ← price line
 function parseCoreOldInvoice(text: string) {
-  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  // pdf-parse extracts this format with each column on its own line:
+  //   SKU (standalone uppercase line)
+  //   UPC: xxxxxxx
+  //   Handelsware / Schulungsmaterial
+  //   Product description (name)
+  //   [optional extra description lines]
+  //   [serial line(s)]
+  //   qty unitPrice€ discount% total€   ← price line
 
   const invoiceNumber = text.match(/Rechnung\s+(IN\d+)/)?.[1] || "";
   const invoiceDate   = text.match(/Datum\s+([\d.]+)/)?.[1] || "";
@@ -204,66 +214,70 @@ function parseCoreOldInvoice(text: string) {
   const totalNetRaw   = text.match(/Subtotal\s+([\d.,]+)\s*€/)?.[1] || "";
   const totalGrossRaw = text.match(/Gesamtsumme\s+([\d.,]+)\s*€/)?.[1] || "";
 
-  // Main item line pattern:
-  // SKU (all-caps+digits, 2+ chars) followed by 2+ spaces, lazy description,
-  // then 3+ spaces (column gap), qty, unitPrice€, discount%, total€
-  const itemLineRe = /^([A-Z][A-Z0-9]{2,})\s{2,}(.+?)\s{3,}(\d+)\s+([\d.,]+)\s*€\s+(\d+)%\s+([\d.,]+)/;
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
 
-  // Serial line: all-uppercase alphanumeric tokens that each contain at least one digit
-  // (rules out section headers like "KITEWORLDWIDE BRASILIEN" which are letters-only)
+  // A standalone SKU: uppercase letters/digits only, starts with a letter, min 3 chars
+  const skuLineRe    = /^([A-Z][A-Z0-9]{2,})$/;
+  // Price line: qty unitPrice€ discount% total€
+  const priceLineRe  = /^(\d+)\s+([\d.,]+)\s*€\s+(\d+)%\s+([\d.,]+)\s*€$/;
+  // Serial line: one or more uppercase+digit tokens each with at least one digit
   const serialLineRe = /^([A-Z]*[0-9][A-Z0-9]{4,}(?:\s+[A-Z]*[0-9][A-Z0-9]{4,})*)$/;
+  // Lines to skip within an item block (not name, not serial, not price)
+  const skipLineRe   = /^(UPC:|Handelsware|Schulungsmaterial)/;
 
   const items: any[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(itemLineRe);
-    if (!m) continue;
+    const skuMatch = lines[i].match(skuLineRe);
+    if (!skuMatch) continue;
+    const sku = skuMatch[1];
 
-    const [, sku, rawName, qtyStr, , discountStr, totalStr] = m;
-    const quantity = parseInt(qtyStr, 10) || 1;
-    const discount = parseInt(discountStr, 10) || 0;
-    const total    = parseGermanNumber(totalStr);
-    const unitPriceAfterDiscount = quantity > 0 ? total / quantity : total;
+    let rawName = "";
+    const serials: string[] = [];
 
-    // Collect serial numbers from ALL consecutive matching lines within the block.
-    // Serials can span multiple lines (e.g. 7 kites → 2-3 serial lines).
-    let serials: string[] = [];
-    let foundFirstSerial = false;
-    for (let j = i + 1; j <= Math.min(i + 15, lines.length - 1); j++) {
-      if (lines[j].match(itemLineRe)) break;           // next item starts → stop
-      if (lines[j].match(serialLineRe)) {
-        serials.push(...lines[j].split(/\s+/).filter(Boolean));
-        foundFirstSerial = true;
-      } else if (foundFirstSerial) {
-        break;                                         // non-serial line after serials → done
+    for (let j = i + 1; j <= Math.min(i + 18, lines.length - 1); j++) {
+      const priceMatch = lines[j].match(priceLineRe);
+      if (priceMatch) {
+        // Found the price/quantity line — build items from everything collected so far
+        const quantity  = parseInt(priceMatch[1], 10) || 1;
+        const discount  = parseInt(priceMatch[3], 10) || 0;
+        const total     = parseGermanNumber(priceMatch[4]);
+        const unitPrice = quantity > 0 ? Math.round((total / quantity) * 100) / 100 : total;
+
+        const sizeMatch = rawName.match(/\s(\d+\.?\d*)(?:\s|$)/);
+        const size  = sizeMatch?.[1] || "";
+        const { type, isSpare } = detectEquipmentType(rawName, sku);
+        const serialList = serials.length ? serials : [""];
+
+        for (const serial of serialList) {
+          items.push({
+            sku,
+            name: rawName.trim(),
+            size,
+            color: "",
+            quantity,
+            discount,
+            unitPriceAfterDiscount: unitPrice,
+            serialNumber: serial,
+            type,
+            isSpare,
+            skip: isSpare,
+          });
+        }
+        i = j; // advance outer loop past this item block
+        break;
       }
+
+      if (skipLineRe.test(lines[j])) continue;
+
+      if (serialLineRe.test(lines[j])) {
+        serials.push(...lines[j].split(/\s+/).filter(Boolean));
+        continue;
+      }
+
+      // First non-skip, non-serial, non-price line → product name
+      if (!rawName) rawName = lines[j];
     }
-    if (serials.length === 0) serials = [""];
-
-    // Extract size from name like "CORE GTS6 5.0 white/black" → "5.0"
-    const sizeMatch = rawName.match(/\s(\d+\.?\d*)\s/);
-    const size  = sizeMatch?.[1] || "";
-    const name  = rawName.trim();
-    const color = "";  // old format doesn't reliably encode color separately
-
-    const { type, isSpare } = detectEquipmentType(name, sku);
-
-    for (const serial of serials) {
-      items.push({
-        sku,
-        name,
-        size,
-        color,
-        quantity,
-        discount,
-        unitPriceAfterDiscount: Math.round(unitPriceAfterDiscount * 100) / 100,
-        serialNumber: serial,
-        type,
-        isSpare,
-        skip: isSpare,
-      });
-    }
-    // Skip to end of the item block (up to the line where we found the serial)
   }
 
   return {
