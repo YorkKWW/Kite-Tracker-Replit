@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScanLine } from "lucide-react";
+import { ScanLine, Loader2 } from "lucide-react";
 
 interface BarcodeScannerProps {
   open: boolean;
@@ -10,25 +10,20 @@ interface BarcodeScannerProps {
   onScan: (code: string) => void;
 }
 
-function isProductUpc(code: string): boolean {
-  return /^\d{8,14}$/.test(code.trim());
-}
-
 export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const activeRef = useRef(false);
+  const controlsRef = useRef<{ stop: () => void } | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState("");
   const [scanning, setScanning] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const stopScanner = useCallback(() => {
-    activeRef.current = false;
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+    if (controlsRef.current) {
+      try { controlsRef.current.stop(); } catch {}
+      controlsRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
@@ -38,13 +33,15 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
       videoRef.current.srcObject = null;
     }
     setScanning(false);
+    setLoading(false);
   }, []);
 
   const startScanner = useCallback(async () => {
     setError(null);
-    activeRef.current = true;
+    setLoading(true);
 
     try {
+      // Step 1: get camera stream — proven to work on Safari iOS
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" } },
         audio: false,
@@ -56,12 +53,15 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
         videoRef.current.setAttribute("playsinline", "true");
         await videoRef.current.play().catch(() => {});
       }
+      setLoading(false);
       setScanning(true);
 
+      // Step 2: load ZXing — only Code 128 / QR formats, NO EAN-13/EAN-8
+      // Excluding EAN formats means the top product barcode on kite labels is never detected
       const { BrowserMultiFormatReader } = await import("@zxing/browser");
       const { DecodeHintType, BarcodeFormat } = await import("@zxing/library");
 
-      if (!activeRef.current) return;
+      if (!streamRef.current) return; // closed while loading
 
       const hints = new Map<any, any>();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -69,57 +69,36 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
         BarcodeFormat.CODE_39,
         BarcodeFormat.QR_CODE,
         BarcodeFormat.DATA_MATRIX,
+        BarcodeFormat.AZTEC,
       ]);
       hints.set(DecodeHintType.TRY_HARDER, true);
 
-      const reader = new BrowserMultiFormatReader(hints);
+      const reader = new BrowserMultiFormatReader(hints, {
+        delayBetweenScanAttempts: 150,
+      });
 
-      // Offscreen canvas — we crop to the lower portion of the frame
-      // to physically exclude the EAN-13 product barcode at the top
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d")!;
+      // decodeFromStream works natively on iOS Safari — ZXing handles the
+      // video-to-canvas conversion internally in a way that bypasses the
+      // getImageData security restriction we'd hit doing it manually
+      const controls = await reader.decodeFromStream(
+        streamRef.current,
+        videoRef.current!,
+        (result, err) => {
+          if (!result) return;
 
-      const scan = () => {
-        if (!activeRef.current) return;
-        const video = videoRef.current;
-        if (!video || video.readyState < 2 || video.videoWidth === 0) {
-          rafRef.current = requestAnimationFrame(scan);
-          return;
-        }
-
-        const w = video.videoWidth;
-        const h = video.videoHeight;
-
-        // Only decode the middle-to-bottom 55% of the frame.
-        // Core kite labels: EAN-13 is at top, S/N Code128 is below center.
-        const startY = Math.floor(h * 0.38);
-        const cropH = Math.floor(h * 0.55);
-
-        canvas.width = w;
-        canvas.height = cropH;
-        ctx.drawImage(video, 0, startY, w, cropH, 0, 0, w, cropH);
-
-        try {
-          const result = reader.decodeFromCanvas(canvas);
           const text = result.getText().trim();
+          if (!text || text.length < 4) return;
 
-          if (!isProductUpc(text) && text.length >= 6) {
-            activeRef.current = false;
-            stopScanner();
-            onScan(text);
-            onClose();
-            return;
-          }
-        } catch {
-          // No barcode in this frame — keep scanning
-        }
-
-        rafRef.current = requestAnimationFrame(scan);
-      };
-
-      rafRef.current = requestAnimationFrame(scan);
+          // Got a serial number — stop and report
+          try { controls?.stop(); } catch {}
+          stopScanner();
+          onScan(text);
+          onClose();
+        },
+      );
+      controlsRef.current = controls;
     } catch (err: any) {
-      activeRef.current = false;
+      setLoading(false);
       setScanning(false);
       const msg = (err?.message || err?.name || String(err)).toLowerCase();
       if (msg.includes("notallowed") || msg.includes("permission") || msg.includes("denied")) {
@@ -165,7 +144,6 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
           </DialogTitle>
           <p id="scanner-desc" className="text-xs text-muted-foreground leading-snug mt-0.5">
             Den <strong>unteren Barcode</strong> auf dem Etikett scannen (S/N).
-            Der obere EAN-Barcode wird automatisch ignoriert.
           </p>
         </DialogHeader>
 
@@ -179,6 +157,11 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
               className="relative w-full bg-black rounded-lg overflow-hidden"
               style={{ minHeight: 220 }}
             >
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 text-white animate-spin" />
+                </div>
+              )}
               <video
                 ref={videoRef}
                 className="w-full h-full object-cover"
@@ -187,9 +170,8 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
                 muted
                 autoPlay
               />
-
               {scanning && (
-                <div className="absolute inset-0 flex flex-col items-center justify-end pointer-events-none pb-8 gap-2">
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-2">
                   <div className="relative">
                     <div className="border-2 border-primary/80 rounded w-64 h-14" />
                     <div className="absolute -top-0.5 -left-0.5 w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl" />
@@ -199,7 +181,7 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
                     <div className="absolute inset-x-1 top-1/2 -translate-y-1/2 h-px bg-primary/60 animate-pulse" />
                   </div>
                   <span className="text-[10px] text-white/70 bg-black/50 px-2 py-0.5 rounded">
-                    Unteren S/N Barcode zentrieren
+                    S/N Barcode zentrieren
                   </span>
                 </div>
               )}
