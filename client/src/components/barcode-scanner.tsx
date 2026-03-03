@@ -16,20 +16,27 @@ function isProductUpc(code: string): boolean {
 
 export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const controlsRef = useRef<{ stop: () => void } | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const activeRef = useRef(false);
+
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState("");
   const [scanning, setScanning] = useState(false);
 
   const stopScanner = useCallback(() => {
-    if (controlsRef.current) {
-      try { controlsRef.current.stop(); } catch {}
-      controlsRef.current = null;
+    activeRef.current = false;
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach((t) => t.stop());
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
     setScanning(false);
@@ -40,8 +47,39 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
     setHint(null);
 
     try {
-      const { BrowserMultiFormatReader, NotFoundException } = await import("@zxing/browser");
-      const { BarcodeFormat, DecodeHintType } = await import("@zxing/library");
+      // 1. Get camera stream directly — most reliable on Safari iOS
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+
+      const video = videoRef.current;
+      if (!video) { stream.getTracks().forEach((t) => t.stop()); return; }
+
+      video.srcObject = stream;
+      video.setAttribute("playsinline", "true");
+      video.setAttribute("muted", "true");
+      await video.play();
+
+      setScanning(true);
+      activeRef.current = true;
+
+      // 2. Load ZXing decoder
+      const {
+        MultiFormatReader,
+        RGBLuminanceSource,
+        BinaryBitmap,
+        HybridBinarizer,
+        DecodeHintType,
+        BarcodeFormat,
+        NotFoundException,
+      } = await import("@zxing/library");
 
       const hints = new Map();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -51,54 +89,74 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
         BarcodeFormat.EAN_13,
         BarcodeFormat.EAN_8,
         BarcodeFormat.DATA_MATRIX,
-        BarcodeFormat.UPC_A,
-        BarcodeFormat.UPC_E,
       ]);
       hints.set(DecodeHintType.TRY_HARDER, true);
 
-      const reader = new BrowserMultiFormatReader(hints);
+      const reader = new MultiFormatReader();
+      reader.setHints(hints);
 
-      if (!videoRef.current) return;
+      const canvas = canvasRef.current || document.createElement("canvas");
 
-      setScanning(true);
+      // 3. Process frames via requestAnimationFrame
+      const processFrame = () => {
+        if (!activeRef.current) return;
 
-      const controls = await reader.decodeFromConstraints(
-        {
-          video: {
-            facingMode: "environment",
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
-        },
-        videoRef.current,
-        (result, err) => {
-          if (result) {
-            const text = result.getText();
-            if (isProductUpc(text)) {
-              setHint("UPC-Produktcode erkannt — bitte den UNTEREN Barcode (S/N) scannen");
-              return;
-            }
-            setHint(null);
-            stopScanner();
-            onScan(text);
-            onClose();
+        const v = videoRef.current;
+        if (!v || v.readyState < v.HAVE_CURRENT_DATA || v.videoWidth === 0) {
+          rafRef.current = requestAnimationFrame(processFrame);
+          return;
+        }
+
+        canvas.width = v.videoWidth;
+        canvas.height = v.videoHeight;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) { rafRef.current = requestAnimationFrame(processFrame); return; }
+
+        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+
+        try {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const luminance = new RGBLuminanceSource(
+            new Uint8ClampedArray(imageData.data),
+            canvas.width,
+            canvas.height,
+          );
+          const bitmap = new BinaryBitmap(new HybridBinarizer(luminance));
+          const result = reader.decode(bitmap);
+          const text = result.getText();
+
+          if (isProductUpc(text)) {
+            setHint("UPC-Produktcode erkannt — bitte den UNTEREN Barcode (S/N) scannen");
+            rafRef.current = requestAnimationFrame(processFrame);
+            return;
           }
-          if (err && !(err instanceof NotFoundException)) {
-            console.warn("Scan error:", err);
-          }
-        },
-      );
 
-      controlsRef.current = controls;
+          // Got a serial number
+          activeRef.current = false;
+          stopScanner();
+          onScan(text);
+          onClose();
+          return;
+        } catch (e: any) {
+          // NotFoundException is normal — no barcode in this frame
+          if (!(e instanceof NotFoundException)) {
+            console.warn("ZXing decode error:", e?.message);
+          }
+        }
+
+        rafRef.current = requestAnimationFrame(processFrame);
+      };
+
+      rafRef.current = requestAnimationFrame(processFrame);
     } catch (err: any) {
       setScanning(false);
-      const msg = err?.message?.toLowerCase() || "";
-      if (msg.includes("permission") || msg.includes("notallowed")) {
-        setError("Kamerazugriff verweigert. Bitte Kameraerlaubnis erteilen oder Seriennummer manuell eingeben.");
-      } else if (msg.includes("notfound") || msg.includes("no camera")) {
-        setError("Keine Kamera gefunden. Seriennummer manuell eingeben.");
+      const msg = (err?.message || err?.name || "").toLowerCase();
+      if (msg.includes("notallowed") || msg.includes("permission") || msg.includes("denied")) {
+        setError("Kamerazugriff verweigert. Bitte Kameraerlaubnis in den iPhone-Einstellungen erteilen.");
+      } else if (msg.includes("notfound") || msg.includes("overconstrained")) {
+        setError("Keine Rückkamera gefunden.");
       } else {
-        setError("Kamera konnte nicht gestartet werden. Seriennummer manuell eingeben.");
+        setError(`Kamera-Fehler: ${err?.message || "Unbekannter Fehler"}. Seriennummer manuell eingeben.`);
       }
     }
   }, [onScan, onClose, stopScanner]);
@@ -144,16 +202,17 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
           ) : (
             <div
               className="relative w-full bg-black rounded-lg overflow-hidden"
-              style={{ minHeight: 230 }}
+              style={{ minHeight: 220 }}
             >
               <video
                 ref={videoRef}
                 className="w-full h-full object-cover"
-                style={{ minHeight: 230 }}
-                autoPlay
+                style={{ minHeight: 220 }}
                 playsInline
                 muted
+                autoPlay
               />
+              <canvas ref={canvasRef} className="hidden" />
 
               {scanning && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-2">
