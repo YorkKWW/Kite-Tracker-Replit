@@ -700,8 +700,12 @@ function TransfersSection({
       queryClient.invalidateQueries({ queryKey: ["/api/equipment", equipmentId.toString()] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
-      toast({ title: "Transfer initiated" });
+      toast({ title: "Transfer initiated", description: "Equipment is now in transit." });
       setOpen(false);
+      setToStationId("");
+    },
+    onError: (err: any) => {
+      toast({ title: "Transfer failed", description: err?.message || "Could not initiate transfer", variant: "destructive" });
     },
   });
 

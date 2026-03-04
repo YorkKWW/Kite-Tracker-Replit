@@ -800,9 +800,16 @@ export async function registerRoutes(
 
   app.post("/api/transfers", requireHamburg, async (req, res) => {
     const user = req.user as any;
+    let fromStationId = req.body.fromStationId;
+    if (!fromStationId) {
+      const allStations = await storage.getAllStations();
+      const incoming = allStations.find(s => s.isVirtual && s.name === "Incoming–Not Yet Assigned");
+      fromStationId = incoming?.id ?? allStations.find(s => s.isVirtual)?.id ?? null;
+      if (!fromStationId) return res.status(400).json({ message: "Cannot determine source station" });
+    }
     const transfer = await storage.createTransfer({
       equipmentId: req.body.equipmentId,
-      fromStationId: req.body.fromStationId,
+      fromStationId,
       toStationId: req.body.toStationId,
       initiatedBy: user.id,
     });
