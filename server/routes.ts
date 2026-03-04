@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { createRequire } from "module";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, requireHamburg, hashPassword } from "./auth";
 import passport from "passport";
@@ -8,6 +9,8 @@ import path from "path";
 import fs from "fs";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+
+const _require = createRequire(import.meta.url);
 import { ObjectStorageService, objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { PDFParse } from "pdf-parse";
