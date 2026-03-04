@@ -284,7 +284,8 @@ function parseCoreOldInvoice(text: string) {
       }
 
       // Description continuation lines (contain lowercase — e.g. "24m Line Length, Standard Loop/Stick Set")
-      if (descContRe.test(lines[j])) continue;
+      // Only skip AFTER we already captured the product name
+      if (rawName && descContRe.test(lines[j])) continue;
 
       // Lines like "333(12)" for pad/strap counts — skip
       if (/^\d+\(\d+\)$/.test(lines[j])) continue;
