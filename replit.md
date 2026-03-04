@@ -68,8 +68,18 @@ client/src/
     settings.tsx      - Settings + CSV import
 ```
 
+## Feedback / Bug Report System
+Floating feedback button (bottom-right) visible to all authenticated users. Supports:
+- **Voice recording**: MediaRecorder API for audio messages (stored in Object Storage)
+- **Text messages**: Optional text field
+- **Screenshots/photos**: Optional image attachment (stored in Object Storage)
+- **Auto page tracking**: Current URL/page automatically captured with each submission
+- **Admin view**: `/feedback` page (admin only) with status management (open/in_progress/resolved), filters, audio playback, admin notes
+- **DB Table**: `feedback` (id, userId, pageUrl, message, audioUrl, screenshotUrl, status, adminNotes, createdAt)
+- **Routes**: `GET /api/feedback` (admin), `POST /api/feedback` (all), `PATCH /api/feedback/:id` (admin), `GET /api/feedback/open-count`, `GET /api/feedback/upload-url`
+
 ## Database Tables
-stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices
+stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices, feedback
 
 ## Equipment Types
 kite, board, foil, wing, bar_lines, wetsuit, harness, helmet_safety

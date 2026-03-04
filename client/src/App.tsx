@@ -23,6 +23,7 @@ import ActivityPage from "@/pages/activity";
 import IncidentsPage from "@/pages/incidents";
 import RepairsPage from "@/pages/repairs";
 import SettingsPage from "@/pages/settings";
+import FeedbackAdminPage from "@/pages/feedback-admin";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
@@ -53,6 +54,7 @@ function AuthenticatedRouter() {
         <Route path="/stations/:id" component={StationDetailPage} />
         <Route path="/inventory-check/:id" component={InventoryCheckPage} />
         {isAdmin && <Route path="/users" component={UsersPage} />}
+        {isAdmin && <Route path="/feedback" component={FeedbackAdminPage} />}
         {isAdmin && <Route path="/activity" component={ActivityPage} />}
         <Route path="/incidents" component={IncidentsPage} />
         <Route path="/repairs" component={RepairsPage} />

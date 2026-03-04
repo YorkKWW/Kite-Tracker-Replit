@@ -29,9 +29,11 @@ import {
   Wrench,
   CheckCircle2,
   HelpCircle,
+  MessageSquarePlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BarcodeScanner } from "@/components/barcode-scanner";
+import { FeedbackButton } from "@/components/feedback-button";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 
 interface LayoutProps {
@@ -118,6 +120,7 @@ export default function Layout({ children }: LayoutProps) {
       ? [
           { href: "/stations", label: "Locations", icon: MapPin },
           { href: "/users", label: "Users", icon: Users },
+          { href: "/feedback", label: "Feedback", icon: MessageSquarePlus },
         ]
       : []),
     { href: "/activity", label: "Activity", icon: FileText },
@@ -348,6 +351,8 @@ export default function Layout({ children }: LayoutProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      <FeedbackButton />
 
       <main className="pb-20 md:pb-6">{children}</main>
 

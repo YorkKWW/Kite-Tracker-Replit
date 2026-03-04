@@ -409,6 +409,26 @@ export type DamageReport = typeof damageReports.$inferSelect;
 export type InsertDamageReportPhoto = z.infer<typeof insertDamageReportPhotoSchema>;
 export type DamageReportPhoto = typeof damageReportPhotos.$inferSelect;
 
+// Feedback / bug reports from station leads
+export const feedbackStatusEnum = pgEnum("feedback_status", ["open", "in_progress", "resolved"]);
+
+export const feedback = pgTable("feedback", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  pageUrl: text("page_url").notNull(),
+  message: text("message"),
+  audioUrl: text("audio_url"),
+  screenshotUrl: text("screenshot_url"),
+  status: feedbackStatusEnum("status").notNull().default("open"),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFeedbackSchema = createInsertSchema(feedback).omit({ id: true, createdAt: true });
+
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+export type Feedback = typeof feedback.$inferSelect;
+
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),

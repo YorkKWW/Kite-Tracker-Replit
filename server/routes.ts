@@ -2227,5 +2227,65 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Feedback / Bug Reports ───────────────────────────────────────────────
+  app.get("/api/feedback/upload-url", requireAuth, async (req, res) => {
+    try {
+      const uploadURL = await objectStorage.getObjectEntityUploadURL();
+      const objectPath = objectStorage.normalizeObjectEntityPath(uploadURL);
+      res.json({ uploadURL, objectPath });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to get upload URL: " + err.message });
+    }
+  });
+
+  app.post("/api/feedback", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const schema = z.object({
+        pageUrl: z.string(),
+        message: z.string().optional().nullable(),
+        audioUrl: z.string().optional().nullable(),
+        screenshotUrl: z.string().optional().nullable(),
+      });
+      const data = schema.parse(req.body);
+      if (!data.message && !data.audioUrl) {
+        return res.status(400).json({ message: "Bitte Nachricht oder Sprachnachricht angeben." });
+      }
+      const fb = await storage.createFeedback({
+        userId: user.id,
+        pageUrl: data.pageUrl,
+        message: data.message ?? null,
+        audioUrl: data.audioUrl ?? null,
+        screenshotUrl: data.screenshotUrl ?? null,
+        status: "open",
+      });
+      res.json(fb);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/feedback", requireAdmin, async (req, res) => {
+    const items = await storage.getAllFeedback();
+    res.json(items);
+  });
+
+  app.get("/api/feedback/open-count", requireAuth, async (req, res) => {
+    const count = await storage.getOpenFeedbackCount();
+    res.json({ count });
+  });
+
+  app.patch("/api/feedback/:id", requireAdmin, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const schema = z.object({
+      status: z.enum(["open", "in_progress", "resolved"]).optional(),
+      adminNotes: z.string().optional().nullable(),
+    });
+    const data = schema.parse(req.body);
+    const updated = await storage.updateFeedback(id, data);
+    if (!updated) return res.status(404).json({ message: "Not found" });
+    res.json(updated);
+  });
+
   return httpServer;
 }

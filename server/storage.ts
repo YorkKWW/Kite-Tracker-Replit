@@ -32,7 +32,7 @@ import {
   stations, users, equipment, conditionRatings, repairs, transfers, photos, activityLog,
   inventoryChecks, inventoryCheckItems, suppliers, invoices,
   companySettings, customers, salesInvoices, saleItems, priceLists, priceListItems,
-  damageReports, damageReportPhotos,
+  damageReports, damageReportPhotos, feedback,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -53,6 +53,7 @@ import {
   type PriceListItem, type InsertPriceListItem,
   type DamageReport, type InsertDamageReport,
   type DamageReportPhoto, type InsertDamageReportPhoto,
+  type Feedback, type InsertFeedback,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -160,6 +161,11 @@ export interface IStorage {
   createDamageReport(report: InsertDamageReport): Promise<DamageReport>;
   updateDamageReport(id: number, data: Partial<DamageReport>): Promise<DamageReport | undefined>;
   createDamageReportPhoto(photo: InsertDamageReportPhoto): Promise<DamageReportPhoto>;
+
+  getAllFeedback(): Promise<(Feedback & { userName: string; userRole: string })[]>;
+  createFeedback(fb: InsertFeedback): Promise<Feedback>;
+  updateFeedback(id: number, data: Partial<Feedback>): Promise<Feedback | undefined>;
+  getOpenFeedbackCount(): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -987,6 +993,42 @@ export class DatabaseStorage implements IStorage {
   async createDamageReportPhoto(photo: InsertDamageReportPhoto): Promise<DamageReportPhoto> {
     const [created] = await db.insert(damageReportPhotos).values(photo).returning();
     return created;
+  }
+
+  async getAllFeedback(): Promise<(Feedback & { userName: string; userRole: string })[]> {
+    const rows = await db
+      .select({
+        id: feedback.id,
+        userId: feedback.userId,
+        pageUrl: feedback.pageUrl,
+        message: feedback.message,
+        audioUrl: feedback.audioUrl,
+        screenshotUrl: feedback.screenshotUrl,
+        status: feedback.status,
+        adminNotes: feedback.adminNotes,
+        createdAt: feedback.createdAt,
+        userName: users.name,
+        userRole: users.role,
+      })
+      .from(feedback)
+      .leftJoin(users, eq(feedback.userId, users.id))
+      .orderBy(desc(feedback.createdAt));
+    return rows.map(r => ({ ...r, userName: r.userName ?? "Unknown", userRole: r.userRole ?? "station_lead" }));
+  }
+
+  async createFeedback(fb: InsertFeedback): Promise<Feedback> {
+    const [created] = await db.insert(feedback).values(fb).returning();
+    return created;
+  }
+
+  async updateFeedback(id: number, data: Partial<Feedback>): Promise<Feedback | undefined> {
+    const [updated] = await db.update(feedback).set(data).where(eq(feedback.id, id)).returning();
+    return updated;
+  }
+
+  async getOpenFeedbackCount(): Promise<number> {
+    const [result] = await db.select({ count: sql<number>`count(*)::int` }).from(feedback).where(eq(feedback.status, "open"));
+    return result?.count ?? 0;
   }
 }
 
