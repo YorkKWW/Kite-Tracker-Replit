@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { createRequire } from "module";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, requireHamburg, hashPassword } from "./auth";
 import passport from "passport";
@@ -9,8 +8,7 @@ import path from "path";
 import fs from "fs";
 import { z } from "zod";
 import { randomUUID } from "crypto";
-
-const _require = createRequire(import.meta.url);
+import PDFDocument from "pdfkit";
 import { ObjectStorageService, objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { PDFParse } from "pdf-parse";
@@ -1343,7 +1341,6 @@ export async function registerRoutes(
       if (!sale) return res.status(404).json({ message: "Not found" });
       const settings = await storage.getCompanySettings();
 
-      const PDFDocument = _require("pdfkit");
       const doc = new PDFDocument({ size: "A4", margin: 50, info: { Title: `Rechnung ${sale.invoiceNumber}` } });
 
       res.setHeader("Content-Type", "application/pdf");
@@ -2046,7 +2043,6 @@ export async function registerRoutes(
       } as any, saleItems as any);
 
       // ── Generate PDF ──────────────────────────────────────────────────────
-      const PDFDocument = _require("pdfkit");
       const chunks: Buffer[] = [];
       const doc = new PDFDocument({ size: "A4", margin: 50, info: { Title: `Damage Invoice ${invoiceNumber}` } });
       doc.on("data", (chunk: Buffer) => chunks.push(chunk));
