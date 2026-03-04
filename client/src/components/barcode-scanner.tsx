@@ -10,103 +10,124 @@ interface BarcodeScannerProps {
   onScan: (code: string) => void;
 }
 
+function isProductUpc(code: string): boolean {
+  return /^\d{8,14}$/.test(code.trim());
+}
+
 export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const controlsRef = useRef<{ stop: () => void } | null>(null);
+  const scannerRef = useRef<HTMLDivElement>(null);
+  const quaggaRef = useRef<any>(null);
+  const hasDetectedRef = useRef(false);
 
   const [error, setError] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState("");
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [lastDetected, setLastDetected] = useState<string | null>(null);
 
   const stopScanner = useCallback(() => {
-    if (controlsRef.current) {
-      try { controlsRef.current.stop(); } catch {}
-      controlsRef.current = null;
+    if (quaggaRef.current) {
+      try { quaggaRef.current.stop(); } catch {}
+      quaggaRef.current = null;
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    hasDetectedRef.current = false;
     setScanning(false);
     setLoading(false);
+    setLastDetected(null);
   }, []);
 
   const startScanner = useCallback(async () => {
+    if (!scannerRef.current) return;
     setError(null);
     setLoading(true);
+    hasDetectedRef.current = false;
+    setLastDetected(null);
 
     try {
-      // Step 1: get camera stream — proven to work on Safari iOS
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false,
-      });
-      streamRef.current = stream;
+      const Quagga = (await import("@ericblade/quagga2")).default;
+      quaggaRef.current = Quagga;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute("playsinline", "true");
-        await videoRef.current.play().catch(() => {});
-      }
+      await new Promise<void>((resolve, reject) => {
+        Quagga.init(
+          {
+            inputStream: {
+              type: "LiveStream",
+              target: scannerRef.current!,
+              constraints: {
+                facingMode: "environment",
+                width: { min: 640, ideal: 1280 },
+                height: { min: 480, ideal: 720 },
+              },
+              area: {
+                top: "30%",
+                right: "5%",
+                left: "5%",
+                bottom: "20%",
+              },
+            },
+            locator: {
+              patchSize: "medium",
+              halfSample: true,
+            },
+            decoder: {
+              readers: [
+                "code_128_reader",
+                "code_39_reader",
+              ],
+              multiple: false,
+            },
+            locate: true,
+            frequency: 10,
+          },
+          (err: any) => {
+            if (err) {
+              reject(err);
+              return;
+            }
+            resolve();
+          },
+        );
+      });
+
+      Quagga.start();
       setLoading(false);
       setScanning(true);
 
-      // Step 2: load ZXing — only Code 128 / QR formats, NO EAN-13/EAN-8
-      // Excluding EAN formats means the top product barcode on kite labels is never detected
-      const { BrowserMultiFormatReader } = await import("@zxing/browser");
-      const { DecodeHintType, BarcodeFormat } = await import("@zxing/library");
+      const detectionCounts = new Map<string, number>();
 
-      if (!streamRef.current) return; // closed while loading
+      Quagga.onDetected((result: any) => {
+        if (hasDetectedRef.current) return;
 
-      const hints = new Map<any, any>();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.CODE_128,
-        BarcodeFormat.CODE_39,
-        BarcodeFormat.QR_CODE,
-        BarcodeFormat.DATA_MATRIX,
-        BarcodeFormat.AZTEC,
-      ]);
-      hints.set(DecodeHintType.TRY_HARDER, true);
+        const code = result?.codeResult?.code?.trim();
+        if (!code || code.length < 4) return;
 
-      const reader = new BrowserMultiFormatReader(hints, {
-        delayBetweenScanAttempts: 150,
-      });
+        if (isProductUpc(code)) {
+          setLastDetected("EAN erkannt — bitte den UNTEREN Barcode (S/N) scannen");
+          return;
+        }
 
-      // decodeFromStream works natively on iOS Safari — ZXing handles the
-      // video-to-canvas conversion internally in a way that bypasses the
-      // getImageData security restriction we'd hit doing it manually
-      const controls = await reader.decodeFromStream(
-        streamRef.current,
-        videoRef.current!,
-        (result, err) => {
-          if (!result) return;
+        const count = (detectionCounts.get(code) || 0) + 1;
+        detectionCounts.set(code, count);
 
-          const text = result.getText().trim();
-          if (!text || text.length < 4) return;
-
-          // Got a serial number — stop and report
-          try { controls?.stop(); } catch {}
-          stopScanner();
-          onScan(text);
+        if (count >= 2) {
+          hasDetectedRef.current = true;
+          try { Quagga.stop(); } catch {}
+          onScan(code);
           onClose();
-        },
-      );
-      controlsRef.current = controls;
+        } else {
+          setLastDetected(`Erkannt: ${code} — bestätige...`);
+        }
+      });
     } catch (err: any) {
       setLoading(false);
       setScanning(false);
       const msg = (err?.message || err?.name || String(err)).toLowerCase();
       if (msg.includes("notallowed") || msg.includes("permission") || msg.includes("denied")) {
         setError("Kamerazugriff verweigert. Bitte in den iPhone-Einstellungen → Safari → Kamera erlauben.");
-      } else if (msg.includes("notfound") || msg.includes("overconstrained")) {
+      } else if (msg.includes("notfound") || msg.includes("overconstrained") || msg.includes("notreadable")) {
         setError("Keine Kamera gefunden.");
       } else {
-        setError(`Fehler: ${err?.message || String(err)}`);
+        setError(`Kamera-Fehler: ${err?.message || String(err)}`);
       }
     }
   }, [onScan, onClose, stopScanner]);
@@ -116,8 +137,15 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
       stopScanner();
       return;
     }
-    startScanner();
-    return () => stopScanner();
+
+    const timeout = setTimeout(() => {
+      startScanner();
+    }, 100);
+
+    return () => {
+      clearTimeout(timeout);
+      stopScanner();
+    };
   }, [open]);
 
   const handleManualSubmit = () => {
@@ -155,20 +183,18 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
           ) : (
             <div
               className="relative w-full bg-black rounded-lg overflow-hidden"
-              style={{ minHeight: 220 }}
+              style={{ minHeight: 240 }}
             >
               {loading && (
-                <div className="absolute inset-0 flex items-center justify-center">
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
                   <Loader2 className="h-8 w-8 text-white animate-spin" />
                 </div>
               )}
-              <video
-                ref={videoRef}
-                className="w-full h-full object-cover"
-                style={{ minHeight: 220 }}
-                playsInline
-                muted
-                autoPlay
+              <div
+                ref={scannerRef}
+                className="w-full"
+                style={{ minHeight: 240 }}
+                data-testid="scanner-viewport"
               />
               {scanning && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-2">
@@ -185,6 +211,12 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
                   </span>
                 </div>
               )}
+            </div>
+          )}
+
+          {lastDetected && (
+            <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2">
+              <p className="text-xs text-amber-700 dark:text-amber-300">{lastDetected}</p>
             </div>
           )}
 

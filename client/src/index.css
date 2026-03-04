@@ -286,3 +286,18 @@
     inset: -1px;
   }
 }
+
+[data-testid="scanner-viewport"] video,
+[data-testid="scanner-viewport"] canvas {
+  width: 100% !important;
+  height: auto !important;
+  display: block;
+  object-fit: cover;
+}
+
+[data-testid="scanner-viewport"] canvas.drawingBuffer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
