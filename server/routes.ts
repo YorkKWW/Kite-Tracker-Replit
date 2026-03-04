@@ -218,13 +218,18 @@ function parseCoreOldInvoice(text: string) {
   const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
 
   // A standalone SKU: uppercase letters/digits only, starts with a letter, min 3 chars
-  const skuLineRe    = /^([A-Z][A-Z0-9]{2,})$/;
+  // Must contain at least one digit to exclude words like GERMANY, CORE, etc.
+  const skuLineRe    = /^([A-Z][A-Z0-9]*[0-9][A-Z0-9]*)$/;
   // Price line: qty unitPrice€ discount% total€
   const priceLineRe  = /^(\d+)\s+([\d.,]+)\s*€\s+(\d+)%\s+([\d.,]+)\s*€$/;
   // Serial line: one or more uppercase+digit tokens each with at least one digit
   const serialLineRe = /^([A-Z]*[0-9][A-Z0-9]{4,}(?:\s+[A-Z]*[0-9][A-Z0-9]{4,})*)$/;
   // Lines to skip within an item block (not name, not serial, not price)
-  const skipLineRe   = /^(UPC:|Handelsware|Schulungsmaterial)/;
+  const skipLineRe   = /^(UPC:|Handelsware|Schulungsmaterial|Artikel|Menge|HEK|Summe)/;
+  // Description continuation lines (contain lowercase letters — not product names or serials)
+  const descContRe   = /[a-z]/;
+  // Page footer/header lines to skip entirely
+  const pageBreakRe  = /^(CORE Kiteboarding|Ton Strand|GERMANY|Page|Seite|tel:|email:|surf:|GTC:|IBAN:|SWIFT:|Tax-ID:|VAT-ID:|EORI:|Creditor|CEO:|Comm Register|Company domiciled|VR Bank|Klausdorfer)/;
 
   const items: any[] = [];
 
@@ -235,8 +240,9 @@ function parseCoreOldInvoice(text: string) {
 
     let rawName = "";
     const serials: string[] = [];
+    let foundSerials = false;
 
-    for (let j = i + 1; j <= Math.min(i + 18, lines.length - 1); j++) {
+    for (let j = i + 1; j <= Math.min(i + 120, lines.length - 1); j++) {
       const priceMatch = lines[j].match(priceLineRe);
       if (priceMatch) {
         // Found the price/quantity line — build items from everything collected so far
@@ -269,12 +275,19 @@ function parseCoreOldInvoice(text: string) {
         break;
       }
 
-      if (skipLineRe.test(lines[j])) continue;
+      if (skipLineRe.test(lines[j]) || pageBreakRe.test(lines[j])) continue;
 
       if (serialLineRe.test(lines[j])) {
         serials.push(...lines[j].split(/\s+/).filter(Boolean));
+        foundSerials = true;
         continue;
       }
+
+      // Description continuation lines (contain lowercase — e.g. "24m Line Length, Standard Loop/Stick Set")
+      if (descContRe.test(lines[j])) continue;
+
+      // Lines like "333(12)" for pad/strap counts — skip
+      if (/^\d+\(\d+\)$/.test(lines[j])) continue;
 
       // First non-skip, non-serial, non-price line → product name
       if (!rawName) rawName = lines[j];
