@@ -178,12 +178,13 @@ export default function DashboardPage() {
                 className={`flex items-center py-2 ${idx < stations.length - 1 ? "border-b border-border/50" : ""}`}
                 data-testid={`row-station-fleet-${st.stationId}`}
               >
-                <Link href={`/stations/${st.stationId}`} className="flex-1 min-w-0 pr-2">
+                <Link href={st.stationId === 0 ? `/equipment?stationId=unassigned` : `/stations/${st.stationId}`} className="flex-1 min-w-0 pr-2">
                   <span
-                    className="text-sm font-medium hover:text-primary transition-colors cursor-pointer block truncate"
+                    className={`text-sm font-medium hover:text-primary transition-colors cursor-pointer block truncate ${st.stationId === 0 ? "text-orange-600 dark:text-orange-400" : ""}`}
                     data-testid={`text-station-name-${st.stationId}`}
                   >
                     {st.stationName}
+                    {st.stationId === 0 && <span className="ml-1.5 text-[11px] bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-full px-1.5 py-0.5 font-semibold">{st.count}</span>}
                   </span>
                 </Link>
                 <div className="flex items-center shrink-0" style={{ gap: "6px" }}>

@@ -203,6 +203,7 @@ export default function EquipmentListPage() {
                 <SelectTrigger data-testid="select-station-filter"><SelectValue placeholder="All Locations" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Locations</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
                   {stationsList?.map((s) => (
                     <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                   ))}

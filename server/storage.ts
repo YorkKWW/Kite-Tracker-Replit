@@ -1,4 +1,4 @@
-import { eq, and, desc, ilike, or, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, ilike, or, sql, inArray, isNull } from "drizzle-orm";
 import { db } from "./db";
 
 export interface ActiveRepairItem {
@@ -262,13 +262,16 @@ export class DatabaseStorage implements IStorage {
 
   async getAllEquipment(filters?: {
     stationId?: number;
+    unassigned?: boolean;
     type?: string;
     status?: string;
     conditionRating?: number;
     search?: string;
   }): Promise<Equipment[]> {
     const conditions: any[] = [];
-    if (filters?.stationId) {
+    if (filters?.unassigned) {
+      conditions.push(isNull(equipment.currentStationId));
+    } else if (filters?.stationId) {
       conditions.push(eq(equipment.currentStationId, filters.stationId));
     }
     if (filters?.type) {

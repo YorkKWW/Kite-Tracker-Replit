@@ -582,6 +582,8 @@ export async function registerRoutes(
     const filters: any = {};
     if (user.role === "station_lead") {
       filters.stationId = user.assignedStationId;
+    } else if (req.query.stationId === "unassigned") {
+      filters.unassigned = true;
     } else if (req.query.stationId) {
       filters.stationId = parseInt(req.query.stationId as string);
     }
