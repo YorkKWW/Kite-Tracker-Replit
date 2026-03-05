@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -479,6 +479,12 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
 
   const selectedEquipment = equipmentList?.find(e => e.id === form.equipmentId) ?? null;
 
+  useEffect(() => {
+    if (equipmentId && selectedEquipment && !form.stationId) {
+      setForm(f => ({ ...f, stationId: selectedEquipment.currentStationId ?? f.stationId }));
+    }
+  }, [equipmentId, selectedEquipment]);
+
   const { data: priceInfo } = useQuery<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>({
     queryKey: ["/api/price-lists/lookup", selectedEquipment?.sku, selectedEquipment?.model, (selectedEquipment?.typeSpecificFields as any)?.size],
     queryFn: () => {
@@ -660,8 +666,21 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
       <div className="space-y-3">
         <div>
           <Label htmlFor="dr-equipment" className="text-sm font-medium">Equipment *</Label>
-          {equipmentId ? (
-            <p className="font-medium mt-1">{equipmentList?.find(e => e.id === equipmentId)?.brand ?? ""} {equipmentList?.find(e => e.id === equipmentId)?.model ?? ""}</p>
+          {equipmentId && selectedEquipment ? (
+            <div className="mt-1 rounded-lg border bg-muted/30 p-3 space-y-1">
+              <p className="font-medium">{selectedEquipment.brand} {selectedEquipment.model}</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+                <span className="font-mono">{selectedEquipment.serialNumber}</span>
+                {(selectedEquipment.typeSpecificFields as any)?.size && (
+                  <span>Size: {(selectedEquipment.typeSpecificFields as any).size}</span>
+                )}
+                {selectedEquipment.currentStationId && stationsList && (
+                  <span>@ {stationsList.find(s => s.id === selectedEquipment.currentStationId)?.name}</span>
+                )}
+              </div>
+            </div>
+          ) : equipmentId ? (
+            <p className="font-medium mt-1 text-muted-foreground">Loading equipment...</p>
           ) : (
             <div className="flex gap-2 mt-1">
               <Select value={String(form.equipmentId || "")} onValueChange={v => set("equipmentId", Number(v))}>
