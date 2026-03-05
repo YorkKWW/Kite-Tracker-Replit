@@ -620,6 +620,11 @@ export async function registerRoutes(
 
   app.post("/api/equipment", requireHamburg, async (req, res) => {
     try {
+      if (!req.body.currentStationId) {
+        const allSt = await storage.getAllStations();
+        req.body.currentStationId = allSt.find(s => s.isVirtual && s.name.includes("Incoming"))?.id
+          ?? allSt.find(s => s.isVirtual)?.id ?? null;
+      }
       const item = await storage.createEquipment(req.body);
       await storage.createActivityLog({
         userId: (req.user as any).id,
@@ -1056,6 +1061,10 @@ export async function registerRoutes(
       const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
       const results = { imported: 0, skipped: 0, errors: [] as string[] };
 
+      const allStationsForImport = await storage.getAllStations();
+      const incomingStationId = allStationsForImport.find(s => s.isVirtual && s.name.includes("Incoming"))?.id
+        ?? allStationsForImport.find(s => s.isVirtual)?.id ?? null;
+
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(",").map((v) => v.trim().replace(/['"]/g, ""));
         const row: Record<string, string> = {};
@@ -1083,7 +1092,7 @@ export async function registerRoutes(
             brand: row["brand"] || "Unknown",
             model: row["model"] || "Unknown",
             yearOfPurchase: row["year"] ? parseInt(row["year"]) : null,
-            currentStationId: row["station_id"] ? parseInt(row["station_id"]) : null,
+            currentStationId: row["station_id"] ? parseInt(row["station_id"]) : incomingStationId,
             status: "active",
             conditionRating: row["condition"] ? parseInt(row["condition"]) : 5,
             notes: row["notes"] || null,

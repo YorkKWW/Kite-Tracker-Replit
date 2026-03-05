@@ -454,10 +454,16 @@ export class DatabaseStorage implements IStorage {
 
   async createTransfer(transfer: InsertTransfer): Promise<Transfer> {
     const [created] = await db.insert(transfers).values(transfer).returning();
-    const [inTransferStation] = await db.select().from(stations)
+    let [inTransferStation] = await db.select().from(stations)
       .where(and(eq(stations.isVirtual, true), eq(stations.name, "In Transfer")));
+    if (!inTransferStation) {
+      const [newStation] = await db.insert(stations).values({
+        name: "In Transfer", location: "Virtual", country: "", isVirtual: true, sortOrder: 99,
+      }).returning();
+      inTransferStation = newStation;
+    }
     await db.update(equipment)
-      .set({ status: "in_transfer", currentStationId: inTransferStation?.id ?? null })
+      .set({ status: "in_transfer", currentStationId: inTransferStation.id })
       .where(eq(equipment.id, transfer.equipmentId));
     return created;
   }
@@ -681,6 +687,19 @@ export class DatabaseStorage implements IStorage {
         totalValue: stEq.reduce((sum, e) => sum + (parseFloat(e.currentValue ?? "0") || 0), 0),
       };
     });
+
+    const unassignedEq = allEquipment.filter((e) => e.currentStationId === null && e.status !== "in_transfer");
+    if (unassignedEq.length > 0) {
+      equipmentPerStation.push({
+        stationId: 0,
+        stationName: "Unassigned",
+        count: unassignedEq.length,
+        kites: unassignedEq.filter((e) => e.type === "kite").length,
+        wings: unassignedEq.filter((e) => e.type === "wing").length,
+        boards: unassignedEq.filter((e) => e.type === "board" || e.type === "foilboard").length,
+        totalValue: unassignedEq.reduce((sum, e) => sum + (parseFloat(e.currentValue ?? "0") || 0), 0),
+      });
+    }
 
     const inTransferEq = allEquipment.filter((e) => e.status === "in_transfer");
 
