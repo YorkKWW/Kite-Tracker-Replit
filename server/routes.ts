@@ -622,8 +622,10 @@ export async function registerRoutes(
     try {
       if (!req.body.currentStationId) {
         const allSt = await storage.getAllStations();
-        req.body.currentStationId = allSt.find(s => s.isVirtual && s.name.includes("Incoming"))?.id
-          ?? allSt.find(s => s.isVirtual)?.id ?? null;
+        const fallback = allSt.find(s => s.isVirtual && s.name.includes("Incoming"))
+          ?? allSt.find(s => s.name.toLowerCase().includes("incoming"))
+          ?? allSt.find(s => s.name.toLowerCase().includes("warehouse"));
+        req.body.currentStationId = fallback?.id ?? null;
       }
       const item = await storage.createEquipment(req.body);
       await storage.createActivityLog({
@@ -808,9 +810,14 @@ export async function registerRoutes(
     let fromStationId = req.body.fromStationId;
     if (!fromStationId) {
       const allStations = await storage.getAllStations();
-      const incoming = allStations.find(s => s.isVirtual && s.name === "Incoming–Not Yet Assigned");
-      fromStationId = incoming?.id ?? allStations.find(s => s.isVirtual)?.id ?? null;
-      if (!fromStationId) return res.status(400).json({ message: "Cannot determine source station" });
+      const incoming = allStations.find(s => s.isVirtual && s.name.includes("Incoming"))
+        ?? allStations.find(s => s.name.toLowerCase().includes("incoming"))
+        ?? allStations.find(s => s.name.toLowerCase().includes("warehouse"))
+        ?? allStations.find(s => s.isVirtual);
+      fromStationId = incoming?.id ?? null;
+      if (!fromStationId) {
+        fromStationId = req.body.toStationId;
+      }
     }
     const transfer = await storage.createTransfer({
       equipmentId: req.body.equipmentId,
@@ -1062,8 +1069,10 @@ export async function registerRoutes(
       const results = { imported: 0, skipped: 0, errors: [] as string[] };
 
       const allStationsForImport = await storage.getAllStations();
-      const incomingStationId = allStationsForImport.find(s => s.isVirtual && s.name.includes("Incoming"))?.id
-        ?? allStationsForImport.find(s => s.isVirtual)?.id ?? null;
+      const incomingFallback = allStationsForImport.find(s => s.isVirtual && s.name.includes("Incoming"))
+        ?? allStationsForImport.find(s => s.name.toLowerCase().includes("incoming"))
+        ?? allStationsForImport.find(s => s.name.toLowerCase().includes("warehouse"));
+      const incomingStationId = incomingFallback?.id ?? null;
 
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(",").map((v) => v.trim().replace(/['"]/g, ""));

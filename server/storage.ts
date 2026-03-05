@@ -454,16 +454,8 @@ export class DatabaseStorage implements IStorage {
 
   async createTransfer(transfer: InsertTransfer): Promise<Transfer> {
     const [created] = await db.insert(transfers).values(transfer).returning();
-    let [inTransferStation] = await db.select().from(stations)
-      .where(and(eq(stations.isVirtual, true), eq(stations.name, "In Transfer")));
-    if (!inTransferStation) {
-      const [newStation] = await db.insert(stations).values({
-        name: "In Transfer", location: "Virtual", country: "", isVirtual: true, sortOrder: 99,
-      }).returning();
-      inTransferStation = newStation;
-    }
     await db.update(equipment)
-      .set({ status: "in_transfer", currentStationId: inTransferStation.id })
+      .set({ status: "in_transfer" })
       .where(eq(equipment.id, transfer.equipmentId));
     return created;
   }
