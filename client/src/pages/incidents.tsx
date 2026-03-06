@@ -928,7 +928,7 @@ export default function IncidentsPage() {
   const [location] = useLocation();
   const { toast } = useToast();
 
-  const urlParams = new URLSearchParams(location.split("?")[1] || "");
+  const urlParams = new URLSearchParams(window.location.search);
   const preselectedEquipmentId = urlParams.get("equipment") ? Number(urlParams.get("equipment")) : undefined;
 
   const [showForm, setShowForm] = useState(!!preselectedEquipmentId);
