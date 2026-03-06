@@ -48,7 +48,7 @@ export default function EquipmentDetailPage() {
     staleTime: 0,
     enabled: !!id,
   });
-  const { data: retailPrice } = useQuery<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>({
+  const { data: retailPrice } = useQuery<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId?: number; validFrom?: string | null; validTo?: string | null } | null>({
     queryKey: ["/api/price-lists/lookup", item?.sku, item?.model, (item?.typeSpecificFields as any)?.size],
     queryFn: () => {
       if (!item) return Promise.resolve(null);
@@ -61,6 +61,15 @@ export default function EquipmentDetailPage() {
       return fetch(`/api/price-lists/lookup?${params}`, { credentials: "include" }).then((r) => r.json());
     },
     enabled: !!item,
+  });
+
+  const { data: purchasePriceList } = useQuery<{ id: number; supplier: string; validFrom: string | null; validTo: string | null } | null>({
+    queryKey: ["/api/price-lists", item?.priceListId],
+    queryFn: () => {
+      if (!item?.priceListId) return Promise.resolve(null);
+      return fetch(`/api/price-lists/${item.priceListId}`, { credentials: "include" }).then((r) => r.ok ? r.json() : null);
+    },
+    enabled: !!item?.priceListId,
   });
 
   const getStationName = (sid: number | null) => stationsList?.find((s) => s.id === sid)?.name || "Unknown";
@@ -167,7 +176,30 @@ export default function EquipmentDetailPage() {
             </div>
             {retailPrice && (
               <div className="mt-3 pt-3 border-t">
-                <p className="text-xs text-muted-foreground">Price source: {retailPrice.supplier} · {retailPrice.productName}</p>
+                <p className="text-xs text-muted-foreground">
+                  Price source: {retailPrice.supplier} · {retailPrice.productName}
+                  {(retailPrice.validFrom || retailPrice.validTo) && (
+                    <span className="block mt-0.5">
+                      Valid: {retailPrice.validFrom ? new Date(retailPrice.validFrom).toLocaleDateString("de-DE") : "—"}
+                      {" → "}
+                      {retailPrice.validTo ? new Date(retailPrice.validTo).toLocaleDateString("de-DE") : "—"}
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
+            {isHamburg && purchasePriceList && (
+              <div className="mt-3 pt-3 border-t">
+                <p className="text-xs text-muted-foreground">
+                  Purchase based on: {purchasePriceList.supplier} price list
+                  {(purchasePriceList.validFrom || purchasePriceList.validTo) && (
+                    <span className="block mt-0.5">
+                      Valid: {purchasePriceList.validFrom ? new Date(purchasePriceList.validFrom).toLocaleDateString("de-DE") : "—"}
+                      {" → "}
+                      {purchasePriceList.validTo ? new Date(purchasePriceList.validTo).toLocaleDateString("de-DE") : "—"}
+                    </span>
+                  )}
+                </p>
               </div>
             )}
             {(item as any).invoiceReference && (

@@ -149,11 +149,12 @@ export interface IStorage {
   getAllPriceLists(): Promise<PriceList[]>;
   getPriceList(id: number): Promise<PriceList | undefined>;
   createPriceList(pl: InsertPriceList, items: Omit<InsertPriceListItem, "priceListId">[]): Promise<PriceList>;
+  updatePriceList(id: number, data: { validFrom: Date | null; validTo: Date | null }): Promise<PriceList | undefined>;
   deactivatePriceLists(supplier: string): Promise<void>;
   deletePriceList(id: number): Promise<void>;
   getPriceListItems(priceListId: number): Promise<PriceListItem[]>;
-  lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>;
-  lookupRetailPriceByName(name: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null>;
+  lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId: number; validFrom: Date | null; validTo: Date | null } | null>;
+  lookupRetailPriceByName(name: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId: number; validFrom: Date | null; validTo: Date | null } | null>;
 
   getAllDamageReports(): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[]; invoiceId?: number; invoiceNumber?: string; invoicePdfUrl?: string })[]>;
   getDamageReport(id: number): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[]; invoiceId?: number; invoiceNumber?: string; invoicePdfUrl?: string }) | undefined>;
@@ -871,6 +872,14 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async updatePriceList(id: number, data: { validFrom: Date | null; validTo: Date | null }): Promise<PriceList | undefined> {
+    const [updated] = await db.update(priceLists)
+      .set(data)
+      .where(eq(priceLists.id, id))
+      .returning();
+    return updated;
+  }
+
   async deactivatePriceLists(supplier: string): Promise<void> {
     await db.update(priceLists)
       .set({ isActive: false })
@@ -885,7 +894,7 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(priceListItems).where(eq(priceListItems.priceListId, priceListId));
   }
 
-  async lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null> {
+  async lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId: number; validFrom: Date | null; validTo: Date | null } | null> {
     if (!sku) return null;
     const rows = await db
       .select({
@@ -893,6 +902,9 @@ export class DatabaseStorage implements IStorage {
         dealerPrice: priceListItems.dealerPrice,
         supplier: priceLists.supplier,
         productName: priceListItems.productName,
+        priceListId: priceLists.id,
+        validFrom: priceLists.validFrom,
+        validTo: priceLists.validTo,
       })
       .from(priceListItems)
       .innerJoin(priceLists, and(
@@ -907,10 +919,13 @@ export class DatabaseStorage implements IStorage {
       dealerPrice: rows[0].dealerPrice ?? null,
       supplier: rows[0].supplier,
       productName: rows[0].productName,
+      priceListId: rows[0].priceListId,
+      validFrom: rows[0].validFrom,
+      validTo: rows[0].validTo,
     };
   }
 
-  async lookupRetailPriceByName(name: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string } | null> {
+  async lookupRetailPriceByName(name: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId: number; validFrom: Date | null; validTo: Date | null } | null> {
     if (!name || name.length < 3) return null;
     const rows = await db
       .select({
@@ -918,6 +933,9 @@ export class DatabaseStorage implements IStorage {
         dealerPrice: priceListItems.dealerPrice,
         supplier: priceLists.supplier,
         productName: priceListItems.productName,
+        priceListId: priceLists.id,
+        validFrom: priceLists.validFrom,
+        validTo: priceLists.validTo,
       })
       .from(priceListItems)
       .innerJoin(priceLists, and(
@@ -932,6 +950,9 @@ export class DatabaseStorage implements IStorage {
       dealerPrice: rows[0].dealerPrice ?? null,
       supplier: rows[0].supplier,
       productName: rows[0].productName,
+      priceListId: rows[0].priceListId,
+      validFrom: rows[0].validFrom,
+      validTo: rows[0].validTo,
     };
   }
 

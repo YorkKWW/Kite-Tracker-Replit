@@ -1214,6 +1214,12 @@ export async function registerRoutes(
     const warehouseStation = allStations.find((s) => s.isVirtual) ?? allStations.find((s) => s.name === "Office Hamburg Warehouse");
     const warehouseStationId = warehouseStation?.id ?? null;
 
+    const allPriceLists = await storage.getAllPriceLists();
+    const effectiveBrand = (brand || "").trim();
+    const activePriceList = allPriceLists.find(
+      (pl) => pl.isActive && pl.supplier.toLowerCase() === effectiveBrand.toLowerCase()
+    );
+
     let imported = 0;
     const errors: string[] = [];
     for (const item of toImport) {
@@ -1234,6 +1240,7 @@ export async function registerRoutes(
           typeSpecificFields: { size: item.size || "", color: item.color || "" },
           invoiceId: invoice.id,
           invoiceReference: invoiceNumber || null,
+          priceListId: activePriceList?.id ?? null,
         });
         imported++;
       } catch (err: any) {
@@ -1724,12 +1731,17 @@ export async function registerRoutes(
   app.post("/api/price-lists", requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
-      const { supplier, items } = req.body;
+      const { supplier, items, validFrom, validTo } = req.body;
       if (!supplier || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "supplier and items[] are required" });
       }
       const pl = await storage.createPriceList(
-        { supplier: supplier.trim(), uploadedBy: user.id },
+        {
+          supplier: supplier.trim(),
+          uploadedBy: user.id,
+          validFrom: validFrom ? new Date(validFrom) : null,
+          validTo: validTo ? new Date(validTo) : null,
+        },
         items.map((i: any) => ({ sku: i.sku, productName: i.productName, retailPrice: i.retailPrice, dealerPrice: i.dealerPrice || null, productType: i.productType || null })),
       );
       res.json(pl);
@@ -1743,9 +1755,35 @@ export async function registerRoutes(
     res.json(lists);
   });
 
+  app.get("/api/price-lists/:id", requireHamburg, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid price list ID" });
+    const pl = await storage.getPriceList(id);
+    if (!pl) return res.status(404).json({ message: "Price list not found" });
+    res.json(pl);
+  });
+
   app.get("/api/price-lists/:id/items", requireHamburg, async (req, res) => {
-    const items = await storage.getPriceListItems(parseInt(req.params.id));
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid price list ID" });
+    const items = await storage.getPriceListItems(id);
     res.json(items);
+  });
+
+  app.patch("/api/price-lists/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { validFrom, validTo } = req.body;
+      const vf = validFrom ? new Date(validFrom) : null;
+      const vt = validTo ? new Date(validTo) : null;
+      if (vf && isNaN(vf.getTime())) return res.status(400).json({ message: "Invalid validFrom date" });
+      if (vt && isNaN(vt.getTime())) return res.status(400).json({ message: "Invalid validTo date" });
+      const updated = await storage.updatePriceList(id, { validFrom: vf, validTo: vt });
+      if (!updated) return res.status(404).json({ message: "Price list not found" });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   app.delete("/api/price-lists/:id", requireAdmin, async (req, res) => {

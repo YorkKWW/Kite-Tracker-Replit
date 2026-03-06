@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   Upload, Trash2, Loader2, ChevronDown, ChevronUp,
-  CheckCircle, XCircle, List, FileText, AlertTriangle,
+  CheckCircle, XCircle, List, FileText, AlertTriangle, Calendar, Pencil,
 } from "lucide-react";
 import type { PriceList, PriceListItem } from "@shared/schema";
 
@@ -52,6 +52,8 @@ export default function PriceListsPage() {
   const [supplier, setSupplier] = useState("");
   const [customSupplier, setCustomSupplier] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [validFrom, setValidFrom] = useState("");
+  const [validTo, setValidTo] = useState("");
   const [parsedItems, setParsedItems] = useState<ParsedItem[] | null>(null);
   const [removedRows, setRemovedRows] = useState<Set<number>>(new Set());
   const [expandPreview, setExpandPreview] = useState(false);
@@ -88,7 +90,12 @@ export default function PriceListsPage() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       const confirmed = parsedItems!.filter((_, i) => !removedRows.has(i));
-      const res = await apiRequest("POST", "/api/price-lists", { supplier: effectiveSupplier, items: confirmed });
+      const res = await apiRequest("POST", "/api/price-lists", {
+        supplier: effectiveSupplier,
+        items: confirmed,
+        validFrom: validFrom || null,
+        validTo: validTo || null,
+      });
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
@@ -99,6 +106,8 @@ export default function PriceListsPage() {
       setFile(null);
       setSupplier("");
       setCustomSupplier("");
+      setValidFrom("");
+      setValidTo("");
       setRemovedRows(new Set());
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
@@ -121,6 +130,27 @@ export default function PriceListsPage() {
       return next;
     });
   };
+
+  const [editingDatesId, setEditingDatesId] = useState<number | null>(null);
+  const [editValidFrom, setEditValidFrom] = useState("");
+  const [editValidTo, setEditValidTo] = useState("");
+
+  const updateDatesMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("PATCH", `/api/price-lists/${id}`, {
+        validFrom: editValidFrom || null,
+        validTo: editValidTo || null,
+      });
+      if (!res.ok) throw new Error((await res.json()).message);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/price-lists"] });
+      toast({ title: "Validity dates updated" });
+      setEditingDatesId(null);
+    },
+    onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+  });
 
   // ── Per-list item viewer ─────────────────────────────────────────
   const [viewingId, setViewingId] = useState<number | null>(null);
@@ -175,9 +205,18 @@ export default function PriceListsPage() {
                       <span className="font-medium text-sm">{s}</span>
                     </div>
                     {active ? (
-                      <span className="text-xs text-muted-foreground">
-                        Active · {active.itemCount} items · {active.uploadedAt ? new Date(active.uploadedAt).toLocaleDateString("de-DE") : ""}
-                      </span>
+                      <div className="text-right">
+                        <span className="text-xs text-muted-foreground block">
+                          {active.itemCount} items · {active.uploadedAt ? new Date(active.uploadedAt).toLocaleDateString("de-DE") : ""}
+                        </span>
+                        {(active.validFrom || active.validTo) && (
+                          <span className="text-[10px] text-muted-foreground block">
+                            {active.validFrom ? new Date(active.validFrom).toLocaleDateString("de-DE") : "—"}
+                            {" → "}
+                            {active.validTo ? new Date(active.validTo).toLocaleDateString("de-DE") : "—"}
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">No price list</span>
                     )}
@@ -229,6 +268,27 @@ export default function PriceListsPage() {
                 ref={fileInputRef}
                 onChange={(e) => { setFile(e.target.files?.[0] || null); setParsedItems(null); }}
                 data-testid="input-price-list-file"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1"><Calendar className="h-3 w-3" /> Valid From</Label>
+              <Input
+                type="date"
+                value={validFrom}
+                onChange={(e) => setValidFrom(e.target.value)}
+                data-testid="input-valid-from"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1"><Calendar className="h-3 w-3" /> Valid To</Label>
+              <Input
+                type="date"
+                value={validTo}
+                onChange={(e) => setValidTo(e.target.value)}
+                data-testid="input-valid-to"
               />
             </div>
           </div>
@@ -339,7 +399,7 @@ export default function PriceListsPage() {
             priceLists.map((pl) => (
               <div key={pl.id} className="rounded-lg border px-3 py-2 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
                     <Badge variant={pl.isActive ? "default" : "secondary"} className="shrink-0 text-xs">
                       {pl.isActive ? "Active" : "Inactive"}
                     </Badge>
@@ -349,6 +409,23 @@ export default function PriceListsPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (editingDatesId === pl.id) {
+                          setEditingDatesId(null);
+                        } else {
+                          setEditingDatesId(pl.id);
+                          setEditValidFrom(pl.validFrom ? new Date(pl.validFrom).toISOString().split("T")[0] : "");
+                          setEditValidTo(pl.validTo ? new Date(pl.validTo).toISOString().split("T")[0] : "");
+                        }
+                      }}
+                      data-testid={`button-edit-dates-${pl.id}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      <span className="ml-1 text-xs">Dates</span>
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -372,6 +449,51 @@ export default function PriceListsPage() {
                     )}
                   </div>
                 </div>
+
+                {(pl.validFrom || pl.validTo) && editingDatesId !== pl.id && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <span>
+                      {pl.validFrom ? new Date(pl.validFrom).toLocaleDateString("de-DE") : "—"}
+                      {" → "}
+                      {pl.validTo ? new Date(pl.validTo).toLocaleDateString("de-DE") : "—"}
+                    </span>
+                  </div>
+                )}
+
+                {editingDatesId === pl.id && (
+                  <div className="flex items-end gap-2 p-2 rounded-md bg-muted/50">
+                    <div className="space-y-1 flex-1">
+                      <Label className="text-xs">Valid From</Label>
+                      <Input
+                        type="date"
+                        value={editValidFrom}
+                        onChange={(e) => setEditValidFrom(e.target.value)}
+                        className="h-8 text-xs"
+                        data-testid={`input-edit-valid-from-${pl.id}`}
+                      />
+                    </div>
+                    <div className="space-y-1 flex-1">
+                      <Label className="text-xs">Valid To</Label>
+                      <Input
+                        type="date"
+                        value={editValidTo}
+                        onChange={(e) => setEditValidTo(e.target.value)}
+                        className="h-8 text-xs"
+                        data-testid={`input-edit-valid-to-${pl.id}`}
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      className="h-8"
+                      onClick={() => updateDatesMutation.mutate(pl.id)}
+                      disabled={updateDatesMutation.isPending}
+                      data-testid={`button-save-dates-${pl.id}`}
+                    >
+                      {updateDatesMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                    </Button>
+                  </div>
+                )}
 
                 {viewingId === pl.id && (
                   <div className="overflow-x-auto max-h-60 overflow-y-auto rounded border">

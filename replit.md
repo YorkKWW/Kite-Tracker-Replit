@@ -108,7 +108,7 @@ Each uses a JSONB column `type_specific_fields` for type-specific attributes.
 - PDF invoice generation (pdfkit, server-side) with German GmbH legal footer
 - Company settings management (logo, bank details, invoice prefix, all GmbH required fields)
 - Sales overview with confirm/PDF download per invoice; confirming marks equipment as Sold
-- Price Lists (admin only): upload manufacturer PDF price lists per supplier; heuristic SKU/name/price parser; preview + confirm before saving; one active list per supplier; UVP shown on sale create + equipment detail
+- Price Lists (admin only): upload manufacturer PDF price lists per supplier; heuristic SKU/name/price parser; preview + confirm before saving; one active list per supplier; UVP shown on sale create + equipment detail; validity dates (validFrom/validTo) per price list; equipment.priceListId references which price list was used at purchase time; PATCH /api/price-lists/:id for updating validity dates
 - Activity logging
 - Role-based access control (financial data hidden from managers)
 

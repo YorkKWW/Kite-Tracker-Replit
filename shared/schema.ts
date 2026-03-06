@@ -91,6 +91,7 @@ export const equipment = pgTable("equipment", {
   typeSpecificFields: jsonb("type_specific_fields").$type<Record<string, any>>(),
   invoiceId: integer("invoice_id"),
   invoiceReference: text("invoice_reference"),
+  priceListId: integer("price_list_id").references(() => priceLists.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -312,6 +313,8 @@ export const saleItems = pgTable("sale_items", {
 export const priceLists = pgTable("price_lists", {
   id: serial("id").primaryKey(),
   supplier: text("supplier").notNull(),
+  validFrom: timestamp("valid_from"),
+  validTo: timestamp("valid_to"),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
   itemCount: integer("item_count").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
