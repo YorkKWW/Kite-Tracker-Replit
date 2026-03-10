@@ -256,7 +256,7 @@ function parseEleveightInvoice(text: string) {
         if (parts.length >= 2) {
           const prefix = parts[0];
           const suffixes = parts.slice(1).join("").split(",").map(s => s.trim()).filter(Boolean);
-          serials = suffixes.map(s => `${prefix}${s}`);
+          serials = suffixes.map(s => `${prefix} ${s}`);
         } else {
           serials = ccRaw.split(",").map(s => s.trim()).filter(Boolean);
         }
@@ -280,7 +280,7 @@ function parseEleveightInvoice(text: string) {
         name: brandedName,
         size,
         color: "",
-        quantity,
+        quantity: serials.length > 1 ? 1 : quantity,
         discount,
         unitPriceAfterDiscount: discountedUnitPrice,
         serialNumber: serial,
