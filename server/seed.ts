@@ -36,16 +36,15 @@ export async function seedDatabase() {
 
   console.log("Seeding database...");
 
-  const [fuerteventura, tarifa, zanzibar] = await Promise.all([
-    storage.createStation({ name: "Fuerteventura", location: "Corralejo", country: "Spain" }),
-    storage.createStation({ name: "Tarifa", location: "Tarifa", country: "Spain" }),
-    storage.createStation({ name: "Zanzibar", location: "Paje", country: "Tanzania" }),
+  const [dakhla, tatajuba] = await Promise.all([
+    storage.createStation({ name: "Dakhla", location: "Dakhla", country: "Morocco" }),
+    storage.createStation({ name: "Tatajuba", location: "Tatajuba", country: "Brazil" }),
   ]);
 
   await Promise.all([
-    storage.createStation({ name: "Office Hamburg Warehouse/Incoming", location: "Hamburg", country: "Germany" }),
-    storage.createStation({ name: "Office Hamburg Shop", location: "Hamburg", country: "Germany" }),
+    storage.createStation({ name: "Office Hamburg Warehouse", location: "Hamburg", country: "Germany" }),
     storage.createStation({ name: "Service Center Heidenau", location: "Heidenau", country: "Germany" }),
+    storage.createStation({ name: "Incoming – Not Yet Assigned", location: "Hamburg", country: "Germany" }),
   ]);
 
   const adminPw = await hashPassword("admin123");
@@ -65,7 +64,7 @@ export async function seedDatabase() {
     email: "manager1@kitetracker.com",
     password: mgr1Pw,
     role: "manager",
-    assignedStationId: fuerteventura.id,
+    assignedStationId: dakhla.id,
   });
 
   const manager2 = await storage.createUser({
@@ -73,7 +72,7 @@ export async function seedDatabase() {
     email: "manager2@kitetracker.com",
     password: mgr2Pw,
     role: "manager",
-    assignedStationId: tarifa.id,
+    assignedStationId: tatajuba.id,
   });
 
   const equipmentData = [
@@ -83,7 +82,7 @@ export async function seedDatabase() {
       brand: "Duotone",
       model: "Rebel SLS",
       yearOfPurchase: 2024,
-      currentStationId: fuerteventura.id,
+      currentStationId: dakhla.id,
       status: "active" as const,
       conditionRating: 5,
       purchasePrice: "1499.00",
@@ -96,7 +95,7 @@ export async function seedDatabase() {
       brand: "Duotone",
       model: "Neo SLS",
       yearOfPurchase: 2023,
-      currentStationId: fuerteventura.id,
+      currentStationId: dakhla.id,
       status: "active" as const,
       conditionRating: 4,
       purchasePrice: "1399.00",
@@ -109,7 +108,7 @@ export async function seedDatabase() {
       brand: "North",
       model: "Reach",
       yearOfPurchase: 2024,
-      currentStationId: tarifa.id,
+      currentStationId: tatajuba.id,
       status: "active" as const,
       conditionRating: 5,
       purchasePrice: "1550.00",
@@ -122,7 +121,7 @@ export async function seedDatabase() {
       brand: "Core",
       model: "XR7",
       yearOfPurchase: 2022,
-      currentStationId: zanzibar.id,
+      currentStationId: dakhla.id,
       status: "active" as const,
       conditionRating: 2,
       purchasePrice: "1450.00",
@@ -135,7 +134,7 @@ export async function seedDatabase() {
       brand: "Cabrinha",
       model: "Stylus",
       yearOfPurchase: 2024,
-      currentStationId: fuerteventura.id,
+      currentStationId: dakhla.id,
       status: "active" as const,
       conditionRating: 5,
       purchasePrice: "599.00",
@@ -148,7 +147,7 @@ export async function seedDatabase() {
       brand: "Duotone",
       model: "Select",
       yearOfPurchase: 2023,
-      currentStationId: tarifa.id,
+      currentStationId: tatajuba.id,
       status: "active" as const,
       conditionRating: 3,
       purchasePrice: "649.00",
@@ -161,7 +160,7 @@ export async function seedDatabase() {
       brand: "North",
       model: "Atmos",
       yearOfPurchase: 2024,
-      currentStationId: zanzibar.id,
+      currentStationId: dakhla.id,
       status: "in_repair" as const,
       conditionRating: 2,
       purchasePrice: "799.00",
@@ -174,7 +173,7 @@ export async function seedDatabase() {
       brand: "Duotone",
       model: "Spirit GT",
       yearOfPurchase: 2024,
-      currentStationId: fuerteventura.id,
+      currentStationId: dakhla.id,
       status: "active" as const,
       conditionRating: 5,
       purchasePrice: "2200.00",
@@ -187,7 +186,7 @@ export async function seedDatabase() {
       brand: "Duotone",
       model: "Slick SLS",
       yearOfPurchase: 2024,
-      currentStationId: tarifa.id,
+      currentStationId: tatajuba.id,
       status: "active" as const,
       conditionRating: 4,
       purchasePrice: "1099.00",
@@ -200,7 +199,7 @@ export async function seedDatabase() {
       brand: "Duotone",
       model: "Trust Bar",
       yearOfPurchase: 2024,
-      currentStationId: fuerteventura.id,
+      currentStationId: dakhla.id,
       status: "active" as const,
       conditionRating: 5,
       purchasePrice: "549.00",
@@ -213,7 +212,7 @@ export async function seedDatabase() {
       brand: "Mystic",
       model: "Star Fullsuit 5/3",
       yearOfPurchase: 2024,
-      currentStationId: fuerteventura.id,
+      currentStationId: dakhla.id,
       status: "active" as const,
       conditionRating: 4,
       purchasePrice: "249.00",
@@ -226,7 +225,7 @@ export async function seedDatabase() {
       brand: "ION",
       model: "Element 4/3",
       yearOfPurchase: 2023,
-      currentStationId: tarifa.id,
+      currentStationId: tatajuba.id,
       status: "active" as const,
       conditionRating: 3,
       purchasePrice: "199.00",
@@ -239,7 +238,7 @@ export async function seedDatabase() {
       brand: "Mystic",
       model: "Majestic X",
       yearOfPurchase: 2024,
-      currentStationId: fuerteventura.id,
+      currentStationId: dakhla.id,
       status: "active" as const,
       conditionRating: 5,
       purchasePrice: "299.00",
@@ -252,7 +251,7 @@ export async function seedDatabase() {
       brand: "Manera",
       model: "Exo",
       yearOfPurchase: 2023,
-      currentStationId: zanzibar.id,
+      currentStationId: dakhla.id,
       status: "active" as const,
       conditionRating: 3,
       purchasePrice: "249.00",
@@ -265,7 +264,7 @@ export async function seedDatabase() {
       brand: "Mystic",
       model: "MK8 X Helmet",
       yearOfPurchase: 2024,
-      currentStationId: fuerteventura.id,
+      currentStationId: dakhla.id,
       status: "active" as const,
       conditionRating: 5,
       purchasePrice: "89.00",
@@ -278,7 +277,7 @@ export async function seedDatabase() {
       brand: "ION",
       model: "Collision Vest",
       yearOfPurchase: 2023,
-      currentStationId: tarifa.id,
+      currentStationId: tatajuba.id,
       status: "retired" as const,
       conditionRating: 1,
       purchasePrice: "79.00",
@@ -292,7 +291,7 @@ export async function seedDatabase() {
       brand: "Core",
       model: "Section 4",
       yearOfPurchase: 2023,
-      currentStationId: zanzibar.id,
+      currentStationId: dakhla.id,
       status: "active" as const,
       conditionRating: 3,
       purchasePrice: "1599.00",
@@ -305,7 +304,7 @@ export async function seedDatabase() {
       brand: "Cabrinha",
       model: "Overdrive 1X",
       yearOfPurchase: 2024,
-      currentStationId: zanzibar.id,
+      currentStationId: dakhla.id,
       status: "active" as const,
       conditionRating: 4,
       purchasePrice: "499.00",
@@ -331,16 +330,16 @@ export async function seedDatabase() {
 
   const transfer1 = await storage.createTransfer({
     equipmentId: createdEquipment[1].id,
-    fromStationId: tarifa.id,
-    toStationId: fuerteventura.id,
+    fromStationId: tatajuba.id,
+    toStationId: dakhla.id,
     initiatedBy: manager2.id,
   });
   await storage.confirmTransfer(transfer1.id, manager1.id);
 
   await storage.createTransfer({
     equipmentId: createdEquipment[9].id,
-    fromStationId: fuerteventura.id,
-    toStationId: zanzibar.id,
+    fromStationId: dakhla.id,
+    toStationId: tatajuba.id,
     initiatedBy: manager1.id,
   });
 

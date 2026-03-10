@@ -101,6 +101,29 @@ app.use((req, res, next) => {
         AND type_specific_fields::jsonb->>'size' != (regexp_match(model, ${boardPattern}))[1]
     `);
     console.log(`Equipment size migration: ${typeFixRes.rowCount} type fixes, ${kiteRes.rowCount} kites, ${boardRes.rowCount} boards`);
+
+    const stationFixes = [
+      { oldName: "Fuerteventura", newName: "Dakhla", location: "Dakhla", country: "Morocco" },
+      { oldName: "Zanzibar", newName: "Tatajuba", location: "Tatajuba", country: "Brazil" },
+      { oldName: "Office Hamburg Shop", newName: "Office Hamburg Warehouse", location: "Hamburg", country: "Germany" },
+      { oldName: "Office Hamburg Warehouse/Incoming", newName: "Incoming – Not Yet Assigned", location: "Hamburg", country: "Germany" },
+    ];
+    for (const fix of stationFixes) {
+      const res = await dbInstance.execute(sql`
+        UPDATE stations SET name = ${fix.newName}, location = ${fix.location}, country = ${fix.country}
+        WHERE name = ${fix.oldName}
+      `);
+      if (res.rowCount && res.rowCount > 0) {
+        console.log(`Station renamed: "${fix.oldName}" → "${fix.newName}"`);
+      }
+    }
+    const deleteRes = await dbInstance.execute(sql`
+      DELETE FROM stations WHERE name = 'Tarifa'
+        AND NOT EXISTS (SELECT 1 FROM equipment WHERE current_station_id = stations.id)
+    `);
+    if (deleteRes.rowCount && deleteRes.rowCount > 0) {
+      console.log(`Removed empty station: "Tarifa"`);
+    }
   } catch (e) {
     console.error("Equipment size migration error:", e);
   }
