@@ -251,9 +251,18 @@ function parseCoreOldInvoice(text: string) {
         const total     = parseGermanNumber(priceMatch[4]);
         const unitPrice = quantity > 0 ? Math.round((total / quantity) * 100) / 100 : total;
 
-        const sizeMatch = rawName.match(/\s(\d+\.?\d*)(?:\s|$)/);
-        const size  = sizeMatch?.[1] || "";
         const { type, isSpare } = detectEquipmentType(rawName, sku);
+        const dimMatch = rawName.match(/(\d{2,3})\s*x\s*\d{2,3}/);
+        const decimalMatch = rawName.match(/\s(\d+\.\d+)(?:\s|$)/);
+        const fallbackMatch = rawName.match(/\s(\d+\.?\d*)(?:\s|$)/);
+        let size = "";
+        if (type === "board" || type === "foilboard") {
+          size = dimMatch?.[1] || decimalMatch?.[1] || fallbackMatch?.[1] || "";
+        } else if (type === "kite" || type === "wing") {
+          size = decimalMatch?.[1] || dimMatch?.[1] || fallbackMatch?.[1] || "";
+        } else {
+          size = decimalMatch?.[1] || fallbackMatch?.[1] || "";
+        }
         const serialList = serials.length ? serials : [""];
 
         for (const serial of serialList) {
