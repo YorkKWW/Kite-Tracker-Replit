@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   FileText, Package, Star, Wrench, ArrowLeftRight, UserPlus, MapPin,
-  Camera, ShoppingCart, ClipboardList, LogIn, X, Filter, AlertTriangle, Receipt
+  Camera, ShoppingCart, ClipboardList, LogIn, X, Filter, AlertTriangle, Receipt,
+  Upload, Settings, Users, Trash2, MessageSquare, List, UserMinus, ImageMinus
 } from "lucide-react";
 import type { Station, User } from "@shared/schema";
 
@@ -45,6 +46,26 @@ const ACTION_ICONS: Record<string, React.ReactNode> = {
   inventory_check_started: <ClipboardList className="h-4 w-4 text-amber-500" />,
   inventory_check_completed: <ClipboardList className="h-4 w-4 text-green-500" />,
   invoice_import: <Receipt className="h-4 w-4 text-teal-500" />,
+  invoice_deleted: <Trash2 className="h-4 w-4 text-red-500" />,
+  equipment_csv_import: <Upload className="h-4 w-4 text-teal-500" />,
+  station_updated: <MapPin className="h-4 w-4 text-blue-500" />,
+  station_deleted: <Trash2 className="h-4 w-4 text-red-500" />,
+  user_updated: <Users className="h-4 w-4 text-blue-500" />,
+  user_deleted: <UserMinus className="h-4 w-4 text-red-500" />,
+  repair_updated: <Wrench className="h-4 w-4 text-blue-500" />,
+  transfer_cancelled: <ArrowLeftRight className="h-4 w-4 text-red-400" />,
+  photo_deleted: <ImageMinus className="h-4 w-4 text-red-400" />,
+  settings_updated: <Settings className="h-4 w-4 text-gray-500" />,
+  customer_created: <Users className="h-4 w-4 text-emerald-500" />,
+  customer_updated: <Users className="h-4 w-4 text-blue-500" />,
+  price_list_created: <List className="h-4 w-4 text-teal-500" />,
+  price_list_updated: <List className="h-4 w-4 text-blue-500" />,
+  price_list_deleted: <Trash2 className="h-4 w-4 text-red-500" />,
+  damage_status_changed: <AlertTriangle className="h-4 w-4 text-orange-500" />,
+  damage_photo_added: <Camera className="h-4 w-4 text-red-400" />,
+  feedback_submitted: <MessageSquare className="h-4 w-4 text-blue-500" />,
+  feedback_updated: <MessageSquare className="h-4 w-4 text-gray-500" />,
+  inventory_item_checked: <ClipboardList className="h-4 w-4 text-blue-500" />,
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -66,6 +87,26 @@ const ACTION_LABELS: Record<string, string> = {
   sale_created: "Sale Created",
   sale_confirmed: "Sale Confirmed",
   invoice_import: "Invoice Imported",
+  invoice_deleted: "Invoice Deleted",
+  equipment_csv_import: "CSV Import",
+  station_updated: "Location Updated",
+  station_deleted: "Location Deleted",
+  user_updated: "User Updated",
+  user_deleted: "User Deleted",
+  repair_updated: "Repair Updated",
+  transfer_cancelled: "Transfer Cancelled",
+  photo_deleted: "Photo Deleted",
+  settings_updated: "Settings Updated",
+  customer_created: "Customer Created",
+  customer_updated: "Customer Updated",
+  price_list_created: "Price List Uploaded",
+  price_list_updated: "Price List Updated",
+  price_list_deleted: "Price List Deleted",
+  damage_status_changed: "Damage Status Changed",
+  damage_photo_added: "Damage Photo Added",
+  feedback_submitted: "Feedback Submitted",
+  feedback_updated: "Feedback Updated",
+  inventory_item_checked: "Inventory Item Checked",
   inventory_check_started: "Inventory Check Started",
   inventory_check_completed: "Inventory Check Completed",
   system_seeded: "System Seeded",

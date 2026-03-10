@@ -502,11 +502,22 @@ export async function registerRoutes(
   app.patch("/api/stations/:id", requireAdmin, async (req, res) => {
     const station = await storage.updateStation(parseInt(req.params.id), req.body);
     if (!station) return res.status(404).json({ message: "Station not found" });
+    await storage.createActivityLog({
+      userId: (req.user as any).id,
+      action: "station_updated",
+      details: `Updated station: ${station.name}`,
+    });
     res.json(station);
   });
 
   app.delete("/api/stations/:id", requireAdmin, async (req, res) => {
+    const station = await storage.getStation(parseInt(req.params.id));
     await storage.deleteStation(parseInt(req.params.id));
+    await storage.createActivityLog({
+      userId: (req.user as any).id,
+      action: "station_deleted",
+      details: `Deleted station: ${station?.name || `#${req.params.id}`}`,
+    });
     res.json({ message: "Deleted" });
   });
 
@@ -542,6 +553,11 @@ export async function registerRoutes(
     const user = await storage.updateUser(parseInt(req.params.id), data);
     if (!user) return res.status(404).json({ message: "User not found" });
     const { password, ...safeUser } = user;
+    await storage.createActivityLog({
+      userId: (req.user as any).id,
+      action: "user_updated",
+      details: `Updated user: ${user.email}`,
+    });
     res.json(safeUser);
   });
 
@@ -551,7 +567,13 @@ export async function registerRoutes(
       return res.status(400).json({ message: "You cannot delete your own account." });
     }
     try {
+      const targetUser = await storage.getUser(targetId);
       await storage.deleteUser(targetId);
+      await storage.createActivityLog({
+        userId: (req.user as any).id,
+        action: "user_deleted",
+        details: `Deleted user: ${targetUser?.email || `#${targetId}`}`,
+      });
       res.json({ message: "Deleted" });
     } catch (err: any) {
       console.error("deleteUser error:", err);
@@ -755,6 +777,13 @@ export async function registerRoutes(
     }
     const repair = await storage.updateRepair(parseInt(req.params.id), data);
     if (!repair) return res.status(404).json({ message: "Repair not found" });
+    const repairEq = await storage.getEquipment(repair.equipmentId);
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "repair_updated",
+      equipmentId: repair.equipmentId,
+      details: `Updated repair for ${repairEq ? `${repairEq.brand} ${repairEq.model}` : `equipment #${repair.equipmentId}`}`,
+    });
     res.json(repair);
   });
 
@@ -891,6 +920,11 @@ export async function registerRoutes(
     const user = req.user as any;
     const transfer = await storage.cancelTransfer(parseInt(req.params.id));
     if (!transfer) return res.status(404).json({ message: "Transfer not found" });
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "transfer_cancelled",
+      details: `Cancelled transfer #${transfer.id}`,
+    });
     res.json(transfer);
   });
 
@@ -942,6 +976,7 @@ export async function registerRoutes(
   });
 
   app.delete("/api/photos/:id", requireAuth, async (req, res) => {
+    const user = req.user as any;
     const photoId = parseInt(req.params.id);
     const photo = await storage.getPhoto(photoId);
     if (photo?.url?.startsWith("/objects/")) {
@@ -952,7 +987,17 @@ export async function registerRoutes(
         // Object storage cleanup failed — still delete DB record
       }
     }
+    const eqId = photo?.equipmentId;
     await storage.deletePhoto(photoId);
+    if (eqId) {
+      const eq = await storage.getEquipment(eqId);
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "photo_deleted",
+        equipmentId: eqId,
+        details: `Deleted photo from ${eq ? `${eq.brand} ${eq.model}` : `equipment #${eqId}`}`,
+      });
+    }
     res.json({ message: "Deleted" });
   });
 
@@ -1038,6 +1083,14 @@ export async function registerRoutes(
       ...req.body,
       checkedAt: req.body.checked ? new Date() : undefined,
       checkedBy: req.body.checked ? user.id : undefined,
+    });
+    const eq = await storage.getEquipment(equipmentId);
+    const status = req.body.status || (req.body.checked ? "found" : "pending");
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "inventory_item_checked",
+      equipmentId,
+      details: `Inventory check: ${eq ? `${eq.brand} ${eq.model}` : `#${equipmentId}`} marked as ${status}`,
     });
     res.json(item);
   });
@@ -1133,6 +1186,12 @@ export async function registerRoutes(
       }
 
       fs.unlinkSync(req.file.path);
+      const user = req.user as any;
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "equipment_csv_import",
+        details: `CSV import: ${results.imported} imported, ${results.skipped} skipped, ${results.errors.length} errors`,
+      });
       res.json(results);
     } catch (err: any) {
       res.status(400).json({ message: `Import failed: ${err.message}` });
@@ -1290,6 +1349,11 @@ export async function registerRoutes(
     const inv = await storage.getInvoice(id);
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
     await storage.deleteInvoice(id);
+    await storage.createActivityLog({
+      userId: (req.user as any).id,
+      action: "invoice_deleted",
+      details: `Deleted invoice ${inv.invoiceNumber}`,
+    });
     res.json({ success: true });
   });
 
@@ -1300,6 +1364,11 @@ export async function registerRoutes(
 
   app.put("/api/company-settings", requireAdmin, async (req, res) => {
     const updated = await storage.updateCompanySettings(req.body);
+    await storage.createActivityLog({
+      userId: (req.user as any).id,
+      action: "settings_updated",
+      details: "Updated company settings",
+    });
     res.json(updated);
   });
 
@@ -1314,6 +1383,11 @@ export async function registerRoutes(
       await fetch(uploadURL, { method: "PUT", body: blob, headers: { "Content-Type": req.file.mimetype } });
       const publicUrl = `/api/object-storage/${objectPath}`;
       await storage.updateCompanySettings({ logoUrl: publicUrl });
+      await storage.createActivityLog({
+        userId: (req.user as any).id,
+        action: "settings_updated",
+        details: "Updated company logo",
+      });
       res.json({ logoUrl: publicUrl });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1326,16 +1400,28 @@ export async function registerRoutes(
   });
 
   app.post("/api/customers", requireHamburg, async (req, res) => {
+    const user = req.user as any;
     const { name, companyName, address, email, taxId } = req.body;
     if (!name || !address || !email) return res.status(400).json({ message: "name, address, email required" });
     const customer = await storage.createCustomer({ name, companyName: companyName || null, address, email, taxId: taxId || null });
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "customer_created",
+      details: `Created customer: ${name}`,
+    });
     res.status(201).json(customer);
   });
 
   app.put("/api/customers/:id", requireHamburg, async (req, res) => {
+    const user = req.user as any;
     const id = parseInt(req.params.id);
     const updated = await storage.updateCustomer(id, req.body);
     if (!updated) return res.status(404).json({ message: "Customer not found" });
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "customer_updated",
+      details: `Updated customer: ${updated.name}`,
+    });
     res.json(updated);
   });
 
@@ -1807,6 +1893,11 @@ export async function registerRoutes(
         },
         items.map((i: any) => ({ sku: i.sku, productName: i.productName, retailPrice: i.retailPrice, dealerPrice: i.dealerPrice || null, productType: i.productType || null })),
       );
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "price_list_created",
+        details: `Uploaded price list for ${supplier.trim()}${name ? ` (${name.trim()})` : ""} with ${items.length} items`,
+      });
       res.json(pl);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1843,6 +1934,11 @@ export async function registerRoutes(
       if (vt && isNaN(vt.getTime())) return res.status(400).json({ message: "Invalid validTo date" });
       const updated = await storage.updatePriceList(id, { validFrom: vf, validTo: vt, name: name !== undefined ? (name?.trim() || null) : undefined });
       if (!updated) return res.status(404).json({ message: "Price list not found" });
+      await storage.createActivityLog({
+        userId: (req.user as any).id,
+        action: "price_list_updated",
+        details: `Updated price list: ${updated.supplier}${updated.name ? ` (${updated.name})` : ""}`,
+      });
       res.json(updated);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1850,7 +1946,13 @@ export async function registerRoutes(
   });
 
   app.delete("/api/price-lists/:id", requireAdmin, async (req, res) => {
+    const pl = await storage.getPriceList(parseInt(req.params.id));
     await storage.deletePriceList(parseInt(req.params.id));
+    await storage.createActivityLog({
+      userId: (req.user as any).id,
+      action: "price_list_deleted",
+      details: `Deleted price list: ${pl?.supplier || "Unknown"}${pl?.name ? ` (${pl.name})` : ""}`,
+    });
     res.json({ ok: true });
   });
 
@@ -2061,11 +2163,20 @@ export async function registerRoutes(
   });
 
   app.patch("/api/damage-reports/:id/status", requireHamburg, async (req, res) => {
+    const user = req.user as any;
     const { status } = req.body;
     if (!["open", "in_review", "resolved"].includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
     const updated = await storage.updateDamageReport(parseInt(req.params.id), { status });
+    if (!updated) return res.status(404).json({ message: "Damage report not found" });
+    const eq = updated.equipmentId ? await storage.getEquipment(updated.equipmentId) : null;
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "damage_status_changed",
+      equipmentId: updated.equipmentId || null,
+      details: `Damage report #${req.params.id} status changed to ${status}${eq ? ` (${eq.brand} ${eq.model})` : ""}`,
+    });
     res.json(updated);
   });
 
@@ -2088,6 +2199,11 @@ export async function registerRoutes(
       damageReportId: reportId,
       url,
       uploadedBy: user.id,
+    });
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "damage_photo_added",
+      details: `Added photo to damage report #${reportId}`,
     });
     res.json(photo);
   });
@@ -2400,6 +2516,11 @@ export async function registerRoutes(
         screenshotUrl: data.screenshotUrl ?? null,
         status: "open",
       });
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "feedback_submitted",
+        details: `Feedback submitted from ${data.pageUrl}`,
+      });
       res.json(fb);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
@@ -2425,6 +2546,11 @@ export async function registerRoutes(
     const data = schema.parse(req.body);
     const updated = await storage.updateFeedback(id, data);
     if (!updated) return res.status(404).json({ message: "Not found" });
+    await storage.createActivityLog({
+      userId: (req.user as any).id,
+      action: "feedback_updated",
+      details: `Feedback #${id} ${data.status ? `status → ${data.status}` : "updated"}`,
+    });
     res.json(updated);
   });
 
