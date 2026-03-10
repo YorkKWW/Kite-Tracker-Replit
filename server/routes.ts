@@ -1270,6 +1270,13 @@ export async function registerRoutes(
     res.json(await storage.getAllInvoices());
   });
 
+  app.get("/api/invoices/:id/equipment", requireHamburg, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid invoice id" });
+    const items = await storage.getEquipmentByInvoice(id);
+    res.json(items);
+  });
+
   // ─── Company Settings ──────────────────────────────────────────────────────
   app.get("/api/company-settings", requireAdmin, async (_req, res) => {
     res.json(await storage.getCompanySettings());

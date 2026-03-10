@@ -14,9 +14,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 import {
   ArrowLeft, Upload, FileText, CheckCircle2, AlertTriangle,
-  ChevronRight, SkipForward, Loader2,
+  ChevronRight, ChevronDown, SkipForward, Loader2, Package, Receipt,
 } from "lucide-react";
-import type { Supplier } from "@shared/schema";
+import type { Supplier, Equipment, Invoice } from "@shared/schema";
 
 type ParsedItem = {
   sku: string;
@@ -116,6 +116,7 @@ export default function InvoiceImportPage() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       setImportResult(result);
       setStep(4);
     },
@@ -515,6 +516,136 @@ export default function InvoiceImportPage() {
           </div>
         </div>
       )}
+      <ImportedInvoicesSection />
     </div>
+  );
+}
+
+type InvoiceWithSupplier = Invoice & { supplierName: string };
+
+function ImportedInvoicesSection() {
+  const { data: invoicesList, isLoading } = useQuery<InvoiceWithSupplier[]>({
+    queryKey: ["/api/invoices"],
+    staleTime: 0,
+  });
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  if (isLoading) {
+    return (
+      <div className="mt-8 flex items-center justify-center py-8 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading invoices…
+      </div>
+    );
+  }
+
+  if (!invoicesList || invoicesList.length === 0) return null;
+
+  return (
+    <div className="mt-8 space-y-3" data-testid="imported-invoices-section">
+      <h2 className="text-base font-semibold flex items-center gap-2">
+        <Receipt className="h-4 w-4" />
+        Imported Invoices
+        <Badge variant="secondary" className="text-xs">{invoicesList.length}</Badge>
+      </h2>
+
+      <div className="space-y-2">
+        {invoicesList.map((inv) => (
+          <InvoiceRow
+            key={inv.id}
+            invoice={inv}
+            isExpanded={expandedId === inv.id}
+            onToggle={() => setExpandedId(expandedId === inv.id ? null : inv.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InvoiceRow({ invoice, isExpanded, onToggle }: {
+  invoice: InvoiceWithSupplier;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const [, navigate] = useLocation();
+  const { data: eqItems, isLoading, isError } = useQuery<Equipment[]>({
+    queryKey: [`/api/invoices/${invoice.id}/equipment`],
+    enabled: isExpanded,
+    staleTime: 60_000,
+  });
+
+  const fmtDate = (d: string | null | undefined) => {
+    if (!d) return "—";
+    const p = new Date(d);
+    return isNaN(p.getTime()) ? d : p.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
+
+  const fmtPrice = (v: string | null | undefined) => {
+    if (!v) return "—";
+    const n = parseFloat(v);
+    return isNaN(n) ? "—" : `€${n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  return (
+    <Card
+      className="overflow-hidden"
+      data-testid={`invoice-card-${invoice.id}`}
+    >
+      <button
+        onClick={onToggle}
+        className="w-full text-left px-3 py-2.5 flex items-center gap-2 hover:bg-muted/50 transition-colors"
+        data-testid={`button-toggle-invoice-${invoice.id}`}
+      >
+        {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-sm" data-testid={`text-invoice-number-${invoice.id}`}>{invoice.invoiceNumber}</span>
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{invoice.supplierName}</Badge>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+            <span>{fmtDate(invoice.invoiceDate)}</span>
+            <span>{invoice.itemCount ?? 0} items</span>
+            <span className="font-medium text-foreground">{fmtPrice(invoice.totalGross)}</span>
+          </div>
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="border-t bg-muted/20 px-1">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-4 text-muted-foreground text-sm">
+              <Loader2 className="h-3 w-3 animate-spin mr-2" /> Loading items…
+            </div>
+          ) : isError ? (
+            <div className="py-4 text-center text-sm text-red-500">Failed to load items.</div>
+          ) : !eqItems || eqItems.length === 0 ? (
+            <div className="py-4 text-center text-sm text-muted-foreground">No equipment items found for this invoice.</div>
+          ) : (
+            <table className="w-full text-xs">
+              <tbody>
+                {eqItems.map((eq) => (
+                  <tr
+                    key={eq.id}
+                    className="border-t cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => navigate(`/equipment/${eq.id}`)}
+                    data-testid={`row-invoice-equipment-${eq.id}`}
+                  >
+                    <td className="px-2 py-1.5">
+                      <Badge variant="secondary" className="text-[9px] px-1 py-0">
+                        {EQUIPMENT_TYPE_LABELS[eq.type] ?? eq.type}
+                      </Badge>
+                    </td>
+                    <td className="px-1 py-1.5 truncate max-w-[80px]">{eq.brand}</td>
+                    <td className="px-1 py-1.5 truncate max-w-[100px]">{eq.model}</td>
+                    <td className="px-1 py-1.5 text-muted-foreground">{eq.size || "—"}</td>
+                    <td className="px-1 py-1.5 text-right font-mono">{fmtPrice(eq.purchasePrice)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
