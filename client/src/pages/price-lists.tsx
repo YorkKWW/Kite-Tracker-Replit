@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Upload, Trash2, Loader2, ChevronDown, ChevronUp,
   CheckCircle, XCircle, List, FileText, AlertTriangle, Calendar, Pencil,
+  TrendingUp, TrendingDown, Minus, Plus, ArrowRight,
 } from "lucide-react";
 import type { PriceList, PriceListItem } from "@shared/schema";
 
@@ -58,6 +59,8 @@ export default function PriceListsPage() {
   const [parsedItems, setParsedItems] = useState<ParsedItem[] | null>(null);
   const [removedRows, setRemovedRows] = useState<Set<number>>(new Set());
   const [expandPreview, setExpandPreview] = useState(false);
+  const [oldItems, setOldItems] = useState<PriceListItem[]>([]);
+  const [oldPriceListName, setOldPriceListName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const effectiveSupplier = supplier === "__custom__" ? customSupplier : supplier;
@@ -75,12 +78,26 @@ export default function PriceListsPage() {
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json() as Promise<{ items: ParsedItem[]; rawLineCount: number; detectedName: string | null; detectedValidFrom: string | null }>;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setParsedItems(data.items);
       setRemovedRows(new Set());
       setExpandPreview(true);
       if (data.detectedName) setListName(data.detectedName);
       if (data.detectedValidFrom && !validFrom) setValidFrom(data.detectedValidFrom);
+
+      setOldItems([]);
+      setOldPriceListName(null);
+      const activePl = priceLists.find((pl) => pl.isActive && pl.supplier.toLowerCase() === effectiveSupplier.toLowerCase());
+      if (activePl) {
+        try {
+          const res = await fetch(`/api/price-lists/${activePl.id}/items`, { credentials: "include" });
+          if (res.ok) {
+            setOldItems(await res.json());
+            setOldPriceListName(activePl.name ? `${activePl.supplier} — ${activePl.name}` : activePl.supplier);
+          }
+        } catch { /* ignore — oldItems already cleared above */ }
+      }
+
       if (data.items.length === 0) {
         toast({ title: "No items extracted", description: `Parser processed ${data.rawLineCount} lines but found no matching SKU + price rows. The PDF format may not be supported.`, variant: "destructive" });
       } else {
@@ -115,6 +132,8 @@ export default function PriceListsPage() {
       setValidFrom("");
       setValidTo("");
       setRemovedRows(new Set());
+      setOldItems([]);
+      setOldPriceListName(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
     onError: (e: any) => toast({ title: "Save failed", description: e.message, variant: "destructive" }),
@@ -179,6 +198,31 @@ export default function PriceListsPage() {
   const allSuppliers = Array.from(new Set([...allKnown, ...allPresent]));
 
   const confirmedItems = parsedItems ? parsedItems.filter((_, i) => !removedRows.has(i)) : [];
+
+  const oldSkuMap = useMemo(() => {
+    const map = new Map<string, { retailPrice: string; dealerPrice: string | null; productName: string }>();
+    for (const item of oldItems) {
+      map.set(item.sku, { retailPrice: item.retailPrice, dealerPrice: item.dealerPrice, productName: item.productName });
+    }
+    return map;
+  }, [oldItems]);
+
+  const comparison = useMemo(() => {
+    if (!parsedItems || oldItems.length === 0) return null;
+    const newSkus = new Set(parsedItems.map((i) => i.sku));
+    let priceUp = 0, priceDown = 0, unchanged = 0, newItems = 0;
+    for (const item of parsedItems) {
+      const old = oldSkuMap.get(item.sku);
+      if (!old) { newItems++; continue; }
+      const oldP = parseFloat(old.retailPrice);
+      const newP = parseFloat(item.retailPrice);
+      if (newP > oldP) priceUp++;
+      else if (newP < oldP) priceDown++;
+      else unchanged++;
+    }
+    const removedItems = oldItems.filter((i) => !newSkus.has(i.sku));
+    return { priceUp, priceDown, unchanged, newItems, removedItems };
+  }, [parsedItems, oldItems, oldSkuMap]);
 
   return (
     <div className="p-4 max-w-4xl mx-auto space-y-6">
@@ -345,6 +389,41 @@ export default function PriceListsPage() {
                 </Button>
               </div>
 
+              {comparison && (
+                <div className="rounded-md border bg-muted/30 p-2.5 space-y-1.5" data-testid="comparison-summary">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Compared to active list: {oldPriceListName}
+                  </p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                    {comparison.priceUp > 0 && (
+                      <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                        <TrendingUp className="h-3 w-3" /> {comparison.priceUp} price increase{comparison.priceUp !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {comparison.priceDown > 0 && (
+                      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                        <TrendingDown className="h-3 w-3" /> {comparison.priceDown} price decrease{comparison.priceDown !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {comparison.unchanged > 0 && (
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <Minus className="h-3 w-3" /> {comparison.unchanged} unchanged
+                      </span>
+                    )}
+                    {comparison.newItems > 0 && (
+                      <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                        <Plus className="h-3 w-3" /> {comparison.newItems} new
+                      </span>
+                    )}
+                    {comparison.removedItems.length > 0 && (
+                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                        <AlertTriangle className="h-3 w-3" /> {comparison.removedItems.length} removed
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {expandPreview && parsedItems.length > 0 && (
                 <div className="overflow-x-auto max-h-[60vh] overflow-y-auto rounded border">
                   <table className="w-full text-xs">
@@ -356,28 +435,79 @@ export default function PriceListsPage() {
                         <th className="px-2 py-1.5 text-left font-medium">Product Name</th>
                         <th className="px-2 py-1.5 text-right font-medium">Dealer (net)</th>
                         <th className="px-2 py-1.5 text-right font-medium">UVP (brutto)</th>
+                        {oldItems.length > 0 && <th className="px-2 py-1.5 text-right font-medium">Change</th>}
                       </tr>
                     </thead>
                     <tbody>
-                      {parsedItems.map((item, i) => (
-                        <tr
-                          key={i}
-                          className={`border-t cursor-pointer hover:bg-muted/50 ${removedRows.has(i) ? "opacity-40 line-through" : ""}`}
-                          onClick={() => toggleRow(i)}
-                          data-testid={`row-preview-${i}`}
-                        >
-                          <td className="px-2 py-1">
-                            <input type="checkbox" checked={!removedRows.has(i)} onChange={() => toggleRow(i)} onClick={(e) => e.stopPropagation()} className="h-3 w-3" />
-                          </td>
-                          <td className="px-2 py-1"><TypeBadge type={item.productType} /></td>
-                          <td className="px-2 py-1 font-mono text-[10px]">{item.sku}</td>
-                          <td className="px-2 py-1">{item.productName}</td>
-                          <td className="px-2 py-1 text-right text-muted-foreground">
-                            {item.dealerPrice ? `€${parseFloat(item.dealerPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}` : "—"}
-                          </td>
-                          <td className="px-2 py-1 text-right font-medium">€{parseFloat(item.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                      ))}
+                      {parsedItems.map((item, i) => {
+                        const old = oldSkuMap.get(item.sku);
+                        const isNew = !old;
+                        const oldRetail = old ? parseFloat(old.retailPrice) : 0;
+                        const newRetail = parseFloat(item.retailPrice);
+                        const priceDiff = old ? newRetail - oldRetail : 0;
+                        const pctChange = old && oldRetail > 0 ? ((priceDiff / oldRetail) * 100) : 0;
+                        return (
+                          <tr
+                            key={i}
+                            className={`border-t cursor-pointer hover:bg-muted/50 ${removedRows.has(i) ? "opacity-40 line-through" : ""} ${isNew && oldItems.length > 0 ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}`}
+                            onClick={() => toggleRow(i)}
+                            data-testid={`row-preview-${i}`}
+                          >
+                            <td className="px-2 py-1">
+                              <input type="checkbox" checked={!removedRows.has(i)} onChange={() => toggleRow(i)} onClick={(e) => e.stopPropagation()} className="h-3 w-3" />
+                            </td>
+                            <td className="px-2 py-1"><TypeBadge type={item.productType} /></td>
+                            <td className="px-2 py-1 font-mono text-[10px]">{item.sku}</td>
+                            <td className="px-2 py-1">{item.productName}</td>
+                            <td className="px-2 py-1 text-right text-muted-foreground">
+                              {item.dealerPrice ? `€${parseFloat(item.dealerPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}` : "—"}
+                            </td>
+                            <td className="px-2 py-1 text-right font-medium">€{newRetail.toLocaleString("de-DE", { minimumFractionDigits: 2 })}</td>
+                            {oldItems.length > 0 && (
+                              <td className="px-2 py-1 text-right whitespace-nowrap">
+                                {isNew ? (
+                                  <span className="text-blue-600 dark:text-blue-400 font-medium text-[10px]">NEW</span>
+                                ) : priceDiff === 0 ? (
+                                  <span className="text-muted-foreground text-[10px]">—</span>
+                                ) : (
+                                  <span className={`text-[10px] font-medium ${priceDiff > 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                    {priceDiff > 0 ? "+" : ""}{priceDiff.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} € ({pctChange > 0 ? "+" : ""}{pctChange.toFixed(1)}%)
+                                  </span>
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                      {comparison && comparison.removedItems.length > 0 && (
+                        <>
+                          <tr className="border-t-2 border-amber-300 dark:border-amber-700">
+                            <td colSpan={oldItems.length > 0 ? 7 : 6} className="px-2 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                              <span className="flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                {comparison.removedItems.length} item{comparison.removedItems.length !== 1 ? "s" : ""} from old list not in new list:
+                              </span>
+                            </td>
+                          </tr>
+                          {comparison.removedItems.map((item) => (
+                            <tr key={`removed-${item.id}`} className="border-t opacity-50 bg-amber-50/30 dark:bg-amber-950/10">
+                              <td className="px-2 py-1" />
+                              <td className="px-2 py-1"><TypeBadge type={item.productType} /></td>
+                              <td className="px-2 py-1 font-mono text-[10px]">{item.sku}</td>
+                              <td className="px-2 py-1 line-through">{item.productName}</td>
+                              <td className="px-2 py-1 text-right text-muted-foreground line-through">
+                                {item.dealerPrice ? `€${parseFloat(item.dealerPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}` : "—"}
+                              </td>
+                              <td className="px-2 py-1 text-right line-through">€{parseFloat(item.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}</td>
+                              {oldItems.length > 0 && (
+                                <td className="px-2 py-1 text-right">
+                                  <span className="text-amber-600 dark:text-amber-400 font-medium text-[10px]">REMOVED</span>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </>
+                      )}
                     </tbody>
                   </table>
                 </div>
