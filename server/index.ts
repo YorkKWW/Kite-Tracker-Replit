@@ -131,6 +131,29 @@ app.use((req, res, next) => {
         console.log(`Removed station: "${stName}"`);
       }
     }
+
+    const stationOrder = [
+      { name: "Dakhla", sort: 1 },
+      { name: "Tatajuba", sort: 2 },
+      { name: "Office Hamburg Warehouse", sort: 3 },
+      { name: "Service Center Heidenau", sort: 4 },
+      { name: "Andesheim", sort: 5 },
+    ];
+    for (const so of stationOrder) {
+      await dbInstance.execute(sql`
+        UPDATE stations SET sort_order = ${so.sort} WHERE name = ${so.name}
+      `);
+    }
+    const andesheimExists = await dbInstance.execute(sql`
+      SELECT id FROM stations WHERE name = 'Andesheim'
+    `);
+    if (andesheimExists.rows.length === 0) {
+      await dbInstance.execute(sql`
+        INSERT INTO stations (name, location, country, is_virtual, sort_order)
+        VALUES ('Andesheim', 'Andesheim', 'Germany', false, 5)
+      `);
+      console.log('Created station: "Andesheim"');
+    }
   } catch (e) {
     console.error("Equipment size migration error:", e);
   }
