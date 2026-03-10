@@ -2563,5 +2563,38 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.post("/api/admin/fix-equipment-sizes", requireAdmin, async (req, res) => {
+    const { db: dbInstance } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+
+    const kiteResult = await dbInstance.execute(sql`
+      UPDATE equipment 
+      SET type_specific_fields = jsonb_set(
+        type_specific_fields::jsonb, '{size}', 
+        to_jsonb((regexp_match(model, E'\\s(\\d+\\.\\d+)(?:\\s|$)'))[1])
+      )
+      WHERE type IN ('kite', 'wing') 
+        AND model ~ E'\\s\\d+\\.\\d+(?:\\s|$)'
+        AND type_specific_fields::jsonb->>'size' != (regexp_match(model, E'\\s(\\d+\\.\\d+)(?:\\s|$)'))[1]
+    `);
+
+    const boardResult = await dbInstance.execute(sql`
+      UPDATE equipment 
+      SET type_specific_fields = jsonb_set(
+        type_specific_fields::jsonb, '{size}', 
+        to_jsonb((regexp_match(model, E'(\\d{2,3})\\s*x\\s*\\d{2,3}'))[1])
+      )
+      WHERE type IN ('board', 'foilboard') 
+        AND model ~ E'\\d{2,3}\\s*x\\s*\\d{2,3}'
+        AND type_specific_fields::jsonb->>'size' != (regexp_match(model, E'(\\d{2,3})\\s*x\\s*\\d{2,3}'))[1]
+    `);
+
+    res.json({ 
+      message: "Equipment sizes fixed",
+      kitesFixed: kiteResult.rowCount || 0,
+      boardsFixed: boardResult.rowCount || 0,
+    });
+  });
+
   return httpServer;
 }
