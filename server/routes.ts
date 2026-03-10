@@ -1277,6 +1277,15 @@ export async function registerRoutes(
     res.json(items);
   });
 
+  app.delete("/api/invoices/:id", requireAdmin, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid invoice id" });
+    const inv = await storage.getInvoice(id);
+    if (!inv) return res.status(404).json({ message: "Invoice not found" });
+    await storage.deleteInvoice(id);
+    res.json({ success: true });
+  });
+
   // ─── Company Settings ──────────────────────────────────────────────────────
   app.get("/api/company-settings", requireAdmin, async (_req, res) => {
     res.json(await storage.getCompanySettings());

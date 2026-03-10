@@ -131,6 +131,7 @@ export interface IStorage {
   getInvoice(id: number): Promise<Invoice | undefined>;
   createInvoice(inv: InsertInvoice): Promise<Invoice>;
   getEquipmentByInvoice(invoiceId: number): Promise<Equipment[]>;
+  deleteInvoice(id: number): Promise<void>;
 
   getCompanySettings(): Promise<CompanySettings>;
   updateCompanySettings(data: Partial<InsertCompanySettings>): Promise<CompanySettings>;
@@ -781,6 +782,11 @@ export class DatabaseStorage implements IStorage {
 
   async getEquipmentByInvoice(invoiceId: number): Promise<Equipment[]> {
     return db.select().from(equipment).where(eq(equipment.invoiceId, invoiceId));
+  }
+
+  async deleteInvoice(id: number): Promise<void> {
+    await db.update(equipment).set({ invoiceId: null, invoiceReference: null }).where(eq(equipment.invoiceId, id));
+    await db.delete(invoices).where(eq(invoices.id, id));
   }
 
   async getCompanySettings(): Promise<CompanySettings> {

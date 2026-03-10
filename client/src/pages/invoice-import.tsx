@@ -14,8 +14,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 import {
   ArrowLeft, Upload, FileText, CheckCircle2, AlertTriangle,
-  ChevronRight, ChevronDown, SkipForward, Loader2, Package, Receipt,
+  ChevronRight, ChevronDown, SkipForward, Loader2, Package, Receipt, Trash2,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 import type { Supplier, Equipment, Invoice } from "@shared/schema";
 
 type ParsedItem = {
@@ -568,10 +569,24 @@ function InvoiceRow({ invoice, isExpanded, onToggle }: {
   onToggle: () => void;
 }) {
   const [, navigate] = useLocation();
+  const { isAdmin } = useAuth();
+  const { toast } = useToast();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const { data: eqItems, isLoading, isError } = useQuery<Equipment[]>({
     queryKey: [`/api/invoices/${invoice.id}/equipment`],
     enabled: isExpanded,
     staleTime: 60_000,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/invoices/${invoice.id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      toast({ title: "Invoice deleted", description: `Invoice ${invoice.invoiceNumber} has been deleted. Equipment items are preserved.` });
+      setConfirmDelete(false);
+    },
+    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
   const fmtDate = (d: string | null | undefined) => {
@@ -610,7 +625,44 @@ function InvoiceRow({ invoice, isExpanded, onToggle }: {
         </div>
       </button>
 
-      {isExpanded && (
+      {isAdmin && isExpanded && !confirmDelete && (
+        <div className="px-3 pb-1 flex justify-end">
+          <button
+            onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+            className="text-[10px] text-red-500 hover:text-red-700 flex items-center gap-1"
+            data-testid={`button-delete-invoice-${invoice.id}`}
+          >
+            <Trash2 className="h-3 w-3" /> Delete Invoice
+          </button>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="px-3 py-2 border-t bg-red-50 dark:bg-red-950/30 flex items-center gap-2 text-xs">
+          <span className="text-red-700 dark:text-red-400 flex-1">Delete this invoice? Equipment items will be preserved.</span>
+          <Button
+            size="sm"
+            variant="destructive"
+            className="h-7 text-xs"
+            onClick={() => deleteMutation.mutate()}
+            disabled={deleteMutation.isPending}
+            data-testid={`button-confirm-delete-invoice-${invoice.id}`}
+          >
+            {deleteMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Delete"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => setConfirmDelete(false)}
+            data-testid={`button-cancel-delete-invoice-${invoice.id}`}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+
+      {isExpanded && !confirmDelete && (
         <div className="border-t bg-muted/20 px-1">
           {isLoading ? (
             <div className="flex items-center justify-center py-4 text-muted-foreground text-sm">
