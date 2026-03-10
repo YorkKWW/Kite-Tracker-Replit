@@ -324,37 +324,6 @@ export default function PriceListsPage() {
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs flex items-center gap-1"><FileText className="h-3 w-3" /> Name / Number</Label>
-            <Input
-              placeholder="e.g. #65"
-              value={listName}
-              onChange={(e) => setListName(e.target.value)}
-              data-testid="input-list-name"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs flex items-center gap-1"><Calendar className="h-3 w-3" /> Valid From</Label>
-              <Input
-                type="date"
-                value={validFrom}
-                onChange={(e) => setValidFrom(e.target.value)}
-                data-testid="input-valid-from"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs flex items-center gap-1"><Calendar className="h-3 w-3" /> Valid To</Label>
-              <Input
-                type="date"
-                value={validTo}
-                onChange={(e) => setValidTo(e.target.value)}
-                data-testid="input-valid-to"
-              />
-            </div>
-          </div>
-
           <div className="flex items-center gap-2">
             <Button
               onClick={() => parseMutation.mutate()}
