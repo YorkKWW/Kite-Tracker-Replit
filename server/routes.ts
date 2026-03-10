@@ -279,10 +279,9 @@ function parseEleveightInvoice(text: string) {
         if (boardSerialMatch) {
           serials = boardSerialMatch[2].split(",").map(s => s.trim()).filter(Boolean);
         } else {
-          const barSerialMatch = trimmedNext.match(/^(\d{2}-)(\d{4,5}(?:,\d{4,5})+)$/);
+          const barSerialMatch = trimmedNext.match(/^(?:\d{2}-)(\d{4,5}(?:,\d{4,5})+)$/);
           if (barSerialMatch) {
-            const prefix = barSerialMatch[1];
-            serials = barSerialMatch[2].split(",").map(s => `${prefix}${s.trim()}`).filter(Boolean);
+            serials = barSerialMatch[1].split(",").map(s => s.trim()).filter(Boolean);
           }
         }
       }
