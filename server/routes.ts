@@ -167,7 +167,7 @@ function detectEquipmentType(name: string, sku: string): { type: string; isSpare
   if (/\bboard\b|twintip|directional|\bfusion\b|\bfreeride\b|\bchoice\b|\bdeluxe\b|\d{3}x\d{2}/i.test(text)) {
     return { type: "board", isSpare: false };
   }
-  if (/\bkite\b|xr\d|gts\d|nexus|rebel|evo|delta|air pro|foil kite|kap\d|kxr|kgts|knex|\bgts\b/i.test(text)) {
+  if (/\bkite\b|xr\d|gts\d|nexus|rebel|evo|delta|air pro|foil kite|kap\d|kxr|kgts|knex|\bgts\b|\bos\s+v\d|\brs\s+v\d|\bfs\s+v\d/i.test(text)) {
     return { type: "kite", isSpare: false };
   }
   if (/\bfoil\b|hydrofoil|wingfoil|wing foil/i.test(text)) {
@@ -186,6 +186,122 @@ function detectEquipmentType(name: string, sku: string): { type: string; isSpare
     return { type: "helmet_safety", isSpare: false };
   }
   return { type: "kite", isSpare: false };
+}
+
+// ─── Elevate (Eleveight) invoice format ──────────────────────────────────────
+// Distributed by Elliot GmbH. Format:
+//   Pos  Art.-Nr.  Bezeichnung  Anzahl Einheit  E-Preis  Rabatt %  Gesamt
+//   1  9894076  23 OS V4 10 m  1 Stück  750,09  30,00  525,06
+//   CC: 520 15803                              ← serial(s)
+function parseEleveightInvoice(text: string) {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+
+  const invoiceNumber = text.match(/R\s*E\s*C\s*H\s*N\s*U\s*N\s*G\s*Nr\.\s*(\d+)/)?.[1] || "";
+  const rawDate = text.match(/Datum\s*:\s*([\d.]+)/)?.[1] || "";
+  const invoiceDate = rawDate;
+  const orderNumber = text.match(/Auftragsnummer\s*:\s*([\w\-]+)/)?.[1] || "";
+  const totalNetRaw = text.match(/Netto-Betrag\s+EUR\s+([\d.,]+)/)?.[1] || "";
+  const totalGrossRaw = text.match(/Gesamtbetrag\s+Brutto\s+EUR\s+([\d.,]+)/)?.[1] || "";
+
+  function parseGerman(s: string): number {
+    return parseFloat(s.replace(/\./g, "").replace(",", ".")) || 0;
+  }
+
+  const totalNet = totalNetRaw ? parseGerman(totalNetRaw) : null;
+  const totalGross = totalGrossRaw ? parseGerman(totalGrossRaw) : null;
+
+  const items: any[] = [];
+
+  // pdf-parse reorders columns: "Pos Anzahl Einheit\tArt.-Nr. Bezeichnung E-Preis Rabatt% Gesamt"
+  // Actual line: "1 1 Stück\t9894076 23 OS V4 10 m 750,09 30,00 525,06"
+  const itemLineRe = /^(\d+)\s+(\d+)\s+Stück\t(\d+)\s+(.+?)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)$/;
+  const itemLineNoDiscountRe = /^(\d+)\s+(\d+)\s+Stück\t(\d+)\s+(.+?)\s+([\d.,]+)\s+([\d.,]+)$/;
+
+  for (let i = 0; i < lines.length; i++) {
+    let match = lines[i].match(itemLineRe);
+    let discount = 0;
+    let hasDiscount = true;
+
+    if (!match) {
+      match = lines[i].match(itemLineNoDiscountRe);
+      hasDiscount = false;
+    }
+    if (!match) continue;
+
+    const sku = match[3];
+    const rawName = match[4].trim();
+    const quantity = parseInt(match[2], 10) || 1;
+
+    let unitPrice: number, totalPrice: number;
+    if (hasDiscount) {
+      unitPrice = parseGerman(match[5]);
+      discount = parseFloat(match[6].replace(",", ".")) || 0;
+      totalPrice = parseGerman(match[7]);
+    } else {
+      unitPrice = parseGerman(match[5]);
+      totalPrice = parseGerman(match[6]);
+    }
+
+    const discountedUnitPrice = quantity > 0 ? Math.round((totalPrice / quantity) * 100) / 100 : totalPrice;
+
+    if (/delivery\s*cost|versandkosten|shipping|freight/i.test(rawName)) continue;
+
+    let serials: string[] = [];
+    if (i + 1 < lines.length) {
+      const nextLine = lines[i + 1];
+      const ccMatch = nextLine.match(/^CC:\s*(.+)/i);
+      if (ccMatch) {
+        const ccRaw = ccMatch[1].trim();
+        const parts = ccRaw.split(/\s+/);
+        if (parts.length >= 2) {
+          const prefix = parts[0];
+          const suffixes = parts.slice(1).join("").split(",").map(s => s.trim()).filter(Boolean);
+          serials = suffixes.map(s => `${prefix}${s}`);
+        } else {
+          serials = ccRaw.split(",").map(s => s.trim()).filter(Boolean);
+        }
+      }
+    }
+
+    const sizeMatch = rawName.match(/(\d+(?:\.\d+)?)\s*m\b/);
+    const size = sizeMatch?.[1] || "";
+
+    const yearMatch = rawName.match(/^(\d{2})\s/);
+    const modelYear = yearMatch ? 2000 + parseInt(yearMatch[1], 10) : null;
+
+    const brandedName = `Eleveight ${rawName.replace(/^\d{2}\s+/, "").trim()}`;
+
+    const { type, isSpare } = detectEquipmentType(rawName, sku);
+
+    const serialList = serials.length ? serials : [""];
+    for (const serial of serialList) {
+      items.push({
+        sku,
+        name: brandedName,
+        size,
+        color: "",
+        quantity,
+        discount,
+        unitPriceAfterDiscount: discountedUnitPrice,
+        serialNumber: serial,
+        type,
+        isSpare,
+        skip: isSpare,
+        modelYear,
+      });
+    }
+  }
+
+  return {
+    supplier: "Eleveight",
+    invoiceNumber,
+    invoiceDate,
+    deliveryDate: invoiceDate,
+    orderNumber,
+    totalNet,
+    totalGross,
+    items,
+  };
 }
 
 // ─── Core old invoice format (pre-2023) ──────────────────────────────────────
@@ -1218,13 +1334,14 @@ export async function registerRoutes(
     if (!req.file) return res.status(400).json({ message: "No PDF uploaded" });
     try {
       const data = await parsePdfBuffer(req.file.buffer);
-      // Auto-detect invoice format:
-      //   Duotone (boards-and-more B2B), new Core format ([SKU] brackets), old Core format (columns)
+      // Auto-detect invoice format
       const isDuotone    = /boards.and.more|B&M\/B2B/i.test(data.text);
+      const isEleveight  = /Elliot\s+GmbH|Eleveight|eleveight/i.test(data.text);
       const isNewCore    = /^\[[A-Z0-9]+\]/m.test(data.text);
-      const parsed = isDuotone ? parseDuotoneInvoice(data.text)
-                   : isNewCore ? parsePdfInvoice(data.text)
-                   :             parseCoreOldInvoice(data.text);
+      const parsed = isDuotone    ? parseDuotoneInvoice(data.text)
+                   : isEleveight  ? parseEleveightInvoice(data.text)
+                   : isNewCore    ? parsePdfInvoice(data.text)
+                   :                parseCoreOldInvoice(data.text);
 
       // Check for duplicate serials in DB — store ID so frontend can link to existing item
       const allSerial = parsed.items
@@ -1313,7 +1430,7 @@ export async function registerRoutes(
           brand: brand || item.brand || "Unknown",
           model: item.name || "Unknown",
           purchaseDate: parsedDate,
-          yearOfPurchase: year,
+          yearOfPurchase: item.modelYear || year,
           currentStationId: warehouseStationId,
           status: "active",
           conditionRating: 5,
