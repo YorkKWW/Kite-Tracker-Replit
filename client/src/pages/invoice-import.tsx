@@ -197,29 +197,38 @@ export default function InvoiceImportPage() {
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">Choose the supplier for this invoice.</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {suppliers.map((s) => (
-              <button
-                key={s.id}
-                data-testid={`card-supplier-${s.id}`}
-                onClick={() => setSelectedSupplierId(s.id)}
-                className={`rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all ${
-                  selectedSupplierId === s.id
-                    ? "border-primary shadow-md"
-                    : "border-border hover:border-primary/50"
-                }`}
-              >
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg"
-                  style={{ backgroundColor: s.color }}
+            {suppliers.map((s) => {
+              const supported = ["Core", "Eleveight"].includes(s.name);
+              return (
+                <button
+                  key={s.id}
+                  data-testid={`card-supplier-${s.id}`}
+                  onClick={() => supported && setSelectedSupplierId(s.id)}
+                  disabled={!supported}
+                  className={`rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all ${
+                    !supported
+                      ? "border-border opacity-50 cursor-not-allowed"
+                      : selectedSupplierId === s.id
+                        ? "border-primary shadow-md"
+                        : "border-border hover:border-primary/50"
+                  }`}
                 >
-                  {s.name[0]}
-                </div>
-                <span className="font-semibold text-sm">{s.name}</span>
-                {selectedSupplierId === s.id && (
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
-                )}
-              </button>
-            ))}
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                    style={{ backgroundColor: s.color }}
+                  >
+                    {s.name[0]}
+                  </div>
+                  <span className="font-semibold text-sm">{s.name}</span>
+                  {!supported && (
+                    <span className="text-xs text-muted-foreground">Available soon</span>
+                  )}
+                  {supported && selectedSupplierId === s.id && (
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                  )}
+                </button>
+              );
+            })}
 
           </div>
 
