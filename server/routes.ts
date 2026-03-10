@@ -155,20 +155,25 @@ function parseDuotoneInvoice(text: string) {
 
 function detectEquipmentType(name: string, sku: string): { type: string; isSpare: boolean } {
   const text = `${name} ${sku}`.toLowerCase();
-  if (/bladder|bridle|chickenstick|ersatzteil|spare|strut|pump hose|fin.?set|\bfins?\b|grab.?handle|equalizer.*fin|leash|kitebag|repair.?kit|screws|washers|set of \d/i.test(text)) {
-    return { type: "kite", isSpare: true };
-  }
-  if (/\bbar\b|sensor|navigator|control bar|rse\d|click bar|trust bar/i.test(text)) {
+  const textNoIncl = text.replace(/\(incl\..*?\)/gi, "");
+
+  if (/\bbar\b|sensor|navigator|control bar|rse\d|click bar|trust bar|vary bar/i.test(text)) {
     return { type: "bar_lines", isSpare: false };
   }
   if (/\bfoilboard\b/i.test(text)) {
     return { type: "foilboard", isSpare: false };
   }
-  if (/\bboard\b|twintip|directional|\bfusion\b|\bfreeride\b|\bchoice\b|\bdeluxe\b|\d{3}x\d{2}/i.test(text)) {
+  if (/\bboard\b|twintip|directional|\bfusion\b|\bfreeride\b|\bchoice\b|\bdeluxe\b|\d{3}x\d{2}|\bprocess\b|\bmaster\b|\bignition\b/i.test(text)) {
+    if (/set of pads|pads\s*&\s*straps/i.test(text)) {
+      return { type: "board", isSpare: true };
+    }
     return { type: "board", isSpare: false };
   }
   if (/\bkite\b|xr\d|gts\d|nexus|rebel|evo|delta|air pro|foil kite|kap\d|kxr|kgts|knex|\bgts\b|\bos\s+v\d|\brs\s+v\d|\bfs\s+v\d/i.test(text)) {
     return { type: "kite", isSpare: false };
+  }
+  if (/bladder|bridle|chickenstick|ersatzteil|spare|strut|pump hose|fin.?set|\bfins?\b|grab.?handle|equalizer.*fin|leash|kitebag|repair.?kit|screws|washers|set of \d|set of pads|pads\s*&\s*straps/i.test(textNoIncl)) {
+    return { type: "kite", isSpare: true };
   }
   if (/\bfoil\b|hydrofoil|wingfoil|wing foil/i.test(text)) {
     return { type: "foil", isSpare: false };
@@ -245,6 +250,8 @@ function parseEleveightInvoice(text: string) {
     const discountedUnitPrice = quantity > 0 ? Math.round((totalPrice / quantity) * 100) / 100 : totalPrice;
 
     if (/delivery\s*cost|versandkosten|shipping|freight/i.test(rawName)) continue;
+    if (discount >= 100) continue;
+    if (/t-shirt|cap\b|beach flag|banner\b|\bflag\b|sticker/i.test(rawName)) continue;
 
     let serials: string[] = [];
     let color = "";
@@ -253,7 +260,6 @@ function parseEleveightInvoice(text: string) {
       const ccMatch = nextLine.match(/^CC:\s*(.+)/i);
       if (ccMatch) {
         const ccRaw = ccMatch[1].trim();
-        // Format: "215 - blue 12017,12723" or "520 15803"
         const colorSerialMatch = ccRaw.match(/^\d+\s*-\s*(.+?)\s+([\d,]+)$/);
         if (colorSerialMatch) {
           color = colorSerialMatch[1].trim();
@@ -268,24 +274,35 @@ function parseEleveightInvoice(text: string) {
           }
         }
       } else {
-        // Bars format: "22-02726,02737,02840,02842,02856,05624,05628,05665"
-        const barSerialMatch = nextLine.match(/^(\d{2}-)(\d{4,5}(?:,\d{4,5})+)$/);
-        if (barSerialMatch) {
-          const prefix = barSerialMatch[1];
-          serials = barSerialMatch[2].split(",").map(s => `${prefix}${s.trim()}`).filter(Boolean);
+        const trimmedNext = nextLine.trim();
+        const boardSerialMatch = trimmedNext.match(/^(?:.*?\s)?(\d{3,5})-(\d{5,}(?:,\d{5,})*)\s*$/);
+        if (boardSerialMatch) {
+          serials = boardSerialMatch[2].split(",").map(s => s.trim()).filter(Boolean);
+        } else {
+          const barSerialMatch = trimmedNext.match(/^(\d{2}-)(\d{4,5}(?:,\d{4,5})+)$/);
+          if (barSerialMatch) {
+            const prefix = barSerialMatch[1];
+            serials = barSerialMatch[2].split(",").map(s => `${prefix}${s.trim()}`).filter(Boolean);
+          }
         }
       }
     }
 
-    const sizeMatch = rawName.match(/(\d+(?:\.\d+)?)\s*m\b/);
-    const size = sizeMatch?.[1] || "";
+    const { type: eqType, isSpare } = detectEquipmentType(rawName, sku);
+
+    let size = "";
+    if (eqType === "board") {
+      const cmMatch = rawName.match(/(\d{2,3})\s*(?:cm|x)/);
+      size = cmMatch?.[1] || "";
+    } else {
+      const sizeMatch = rawName.match(/(\d+(?:\.\d+)?)\s*m\b/);
+      size = sizeMatch?.[1] || "";
+    }
 
     const yearMatch = rawName.match(/^(\d{2})\s/);
     const modelYear = yearMatch ? 2000 + parseInt(yearMatch[1], 10) : null;
 
     const brandedName = `Eleveight ${rawName.replace(/^\d{2}\s+/, "").trim()}`;
-
-    const { type, isSpare } = detectEquipmentType(rawName, sku);
 
     const serialList = serials.length ? serials : [""];
     for (const serial of serialList) {
@@ -298,7 +315,7 @@ function parseEleveightInvoice(text: string) {
         discount,
         unitPriceAfterDiscount: discountedUnitPrice,
         serialNumber: serial,
-        type,
+        type: eqType,
         isSpare,
         skip: isSpare,
         modelYear,
