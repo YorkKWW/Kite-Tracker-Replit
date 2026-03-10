@@ -72,6 +72,14 @@ app.use((req, res, next) => {
   try {
     const kitePattern = ' ([0-9]+[.][0-9]+)( |$)';
     const boardPattern = '([0-9]{2,3})x[0-9]{2,3}';
+
+    const typeFixRes = await dbInstance.execute(sql`
+      UPDATE equipment SET type = 'board'
+      WHERE type = 'kite'
+        AND (model ~* 'freeride|choice|deluxe|fusion' OR model ~ '[0-9]{3}x[0-9]{2}')
+        AND model !~* 'nexus|xr[0-9]|gts[0-9]|rebel|evo|delta'
+    `);
+
     const kiteRes = await dbInstance.execute(sql`
       UPDATE equipment 
       SET type_specific_fields = jsonb_set(
@@ -92,7 +100,7 @@ app.use((req, res, next) => {
         AND model ~ ${boardPattern}
         AND type_specific_fields::jsonb->>'size' != (regexp_match(model, ${boardPattern}))[1]
     `);
-    console.log(`Equipment size migration: ${kiteRes.rowCount} kites, ${boardRes.rowCount} boards fixed`);
+    console.log(`Equipment size migration: ${typeFixRes.rowCount} type fixes, ${kiteRes.rowCount} kites, ${boardRes.rowCount} boards`);
   } catch (e) {
     console.error("Equipment size migration error:", e);
   }

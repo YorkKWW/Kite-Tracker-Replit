@@ -158,17 +158,17 @@ function detectEquipmentType(name: string, sku: string): { type: string; isSpare
   if (/bladder|bridle|chickenstick|ersatzteil|spare|strut|pump hose|fin.?set|\bfins?\b|grab.?handle|equalizer.*fin|leash|kitebag|repair.?kit|screws|washers|set of \d/i.test(text)) {
     return { type: "kite", isSpare: true };
   }
-  if (/\bkite\b|xr\d|gts\d|nexus|rebel|evo|delta|freeride|air pro|foil kite|kap\d|kxr|kgts|knex|\bgts\b/i.test(text)) {
-    return { type: "kite", isSpare: false };
-  }
   if (/\bbar\b|sensor|navigator|control bar|rse\d|click bar|trust bar/i.test(text)) {
     return { type: "bar_lines", isSpare: false };
   }
   if (/\bfoilboard\b/i.test(text)) {
     return { type: "foilboard", isSpare: false };
   }
-  if (/\bboard\b|twintip|directional|\bfusion\b|\d{3}x\d{2}/i.test(text)) {
+  if (/\bboard\b|twintip|directional|\bfusion\b|\bfreeride\b|\bchoice\b|\bdeluxe\b|\d{3}x\d{2}/i.test(text)) {
     return { type: "board", isSpare: false };
+  }
+  if (/\bkite\b|xr\d|gts\d|nexus|rebel|evo|delta|air pro|foil kite|kap\d|kxr|kgts|knex|\bgts\b/i.test(text)) {
+    return { type: "kite", isSpare: false };
   }
   if (/\bfoil\b|hydrofoil|wingfoil|wing foil/i.test(text)) {
     return { type: "foil", isSpare: false };
