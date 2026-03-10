@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   FileText, Package, Star, Wrench, ArrowLeftRight, UserPlus, MapPin,
-  Camera, ShoppingCart, ClipboardList, LogIn, X, Filter, AlertTriangle
+  Camera, ShoppingCart, ClipboardList, LogIn, X, Filter, AlertTriangle, Receipt
 } from "lucide-react";
 import type { Station, User } from "@shared/schema";
 
@@ -44,6 +44,7 @@ const ACTION_ICONS: Record<string, React.ReactNode> = {
   sale_confirmed: <ShoppingCart className="h-4 w-4 text-green-600" />,
   inventory_check_started: <ClipboardList className="h-4 w-4 text-amber-500" />,
   inventory_check_completed: <ClipboardList className="h-4 w-4 text-green-500" />,
+  invoice_import: <Receipt className="h-4 w-4 text-teal-500" />,
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -64,6 +65,7 @@ const ACTION_LABELS: Record<string, string> = {
   photo_added: "Photo Added",
   sale_created: "Sale Created",
   sale_confirmed: "Sale Confirmed",
+  invoice_import: "Invoice Imported",
   inventory_check_started: "Inventory Check Started",
   inventory_check_completed: "Inventory Check Completed",
   system_seeded: "System Seeded",

@@ -1262,6 +1262,13 @@ export async function registerRoutes(
       }
     }
 
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "invoice_import",
+      equipmentId: null,
+      details: `Imported invoice ${invoiceNumber || "N/A"} from ${brand || "Unknown"} (${imported} items)`,
+    });
+
     res.json({ invoiceId: invoice.id, imported, errors });
   });
 

@@ -522,7 +522,7 @@ export default function InvoiceImportPage() {
   );
 }
 
-type InvoiceWithSupplier = Invoice & { supplierName: string };
+type InvoiceWithSupplier = Invoice & { supplierName: string; importedByName: string | null };
 
 function ImportedInvoicesSection() {
   const { data: invoicesList, isLoading } = useQuery<InvoiceWithSupplier[]>({
@@ -622,6 +622,11 @@ function InvoiceRow({ invoice, isExpanded, onToggle }: {
             <span>{invoice.itemCount ?? 0} items</span>
             <span className="font-medium text-foreground">{fmtPrice(invoice.totalGross)}</span>
           </div>
+          {(invoice.importedByName || invoice.importedAt) && (
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              Imported{invoice.importedByName ? ` by ${invoice.importedByName}` : ""}{invoice.importedAt ? ` on ${fmtDate(typeof invoice.importedAt === "string" ? invoice.importedAt : new Date(invoice.importedAt).toISOString())}` : ""}
+            </div>
+          )}
         </div>
       </button>
 

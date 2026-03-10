@@ -127,7 +127,7 @@ export interface IStorage {
   createSupplier(s: InsertSupplier): Promise<Supplier>;
   updateSupplier(id: number, data: Partial<InsertSupplier>): Promise<Supplier | undefined>;
 
-  getAllInvoices(): Promise<(Invoice & { supplierName: string })[]>;
+  getAllInvoices(): Promise<(Invoice & { supplierName: string; importedByName: string | null })[]>;
   getInvoice(id: number): Promise<Invoice | undefined>;
   createInvoice(inv: InsertInvoice): Promise<Invoice>;
   getEquipmentByInvoice(invoiceId: number): Promise<Equipment[]>;
@@ -761,13 +761,14 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getAllInvoices(): Promise<(Invoice & { supplierName: string })[]> {
+  async getAllInvoices(): Promise<(Invoice & { supplierName: string; importedByName: string | null })[]> {
     const rows = await db
-      .select({ invoice: invoices, supplierName: suppliers.name })
+      .select({ invoice: invoices, supplierName: suppliers.name, importedByName: users.name })
       .from(invoices)
       .innerJoin(suppliers, eq(invoices.supplierId, suppliers.id))
+      .leftJoin(users, eq(invoices.importedBy, users.id))
       .orderBy(desc(invoices.importedAt));
-    return rows.map((r) => ({ ...r.invoice, supplierName: r.supplierName }));
+    return rows.map((r) => ({ ...r.invoice, supplierName: r.supplierName, importedByName: r.importedByName }));
   }
 
   async getInvoice(id: number): Promise<Invoice | undefined> {
