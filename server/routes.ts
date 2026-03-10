@@ -247,17 +247,32 @@ function parseEleveightInvoice(text: string) {
     if (/delivery\s*cost|versandkosten|shipping|freight/i.test(rawName)) continue;
 
     let serials: string[] = [];
+    let color = "";
     if (i + 1 < lines.length) {
       const nextLine = lines[i + 1];
       const ccMatch = nextLine.match(/^CC:\s*(.+)/i);
       if (ccMatch) {
         const ccRaw = ccMatch[1].trim();
-        const parts = ccRaw.split(/\s+/);
-        if (parts.length >= 2) {
-          const serialsPart = parts.slice(1).join(",");
-          serials = serialsPart.split(",").map(s => s.trim()).filter(Boolean);
+        // Format: "215 - blue 12017,12723" or "520 15803"
+        const colorSerialMatch = ccRaw.match(/^\d+\s*-\s*(.+?)\s+([\d,]+)$/);
+        if (colorSerialMatch) {
+          color = colorSerialMatch[1].trim();
+          serials = colorSerialMatch[2].split(",").map(s => s.trim()).filter(Boolean);
         } else {
-          serials = ccRaw.split(",").map(s => s.trim()).filter(Boolean);
+          const parts = ccRaw.split(/\s+/);
+          if (parts.length >= 2) {
+            const serialsPart = parts.slice(1).join(",");
+            serials = serialsPart.split(",").map(s => s.trim()).filter(Boolean);
+          } else {
+            serials = ccRaw.split(",").map(s => s.trim()).filter(Boolean);
+          }
+        }
+      } else {
+        // Bars format: "22-02726,02737,02840,02842,02856,05624,05628,05665"
+        const barSerialMatch = nextLine.match(/^(\d{2}-)(\d{4,5}(?:,\d{4,5})+)$/);
+        if (barSerialMatch) {
+          const prefix = barSerialMatch[1];
+          serials = barSerialMatch[2].split(",").map(s => `${prefix}${s.trim()}`).filter(Boolean);
         }
       }
     }
@@ -278,7 +293,7 @@ function parseEleveightInvoice(text: string) {
         sku,
         name: brandedName,
         size,
-        color: "",
+        color,
         quantity: serials.length > 1 ? 1 : quantity,
         discount,
         unitPriceAfterDiscount: discountedUnitPrice,
