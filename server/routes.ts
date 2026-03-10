@@ -1650,7 +1650,32 @@ export async function registerRoutes(
     return parseFloat(s);
   }
 
-  function parsePriceListText(text: string): Array<{ sku: string; productName: string; retailPrice: string }> {
+  type PriceListParseResult = {
+    items: Array<{ sku: string; productName: string; retailPrice: string; dealerPrice: string | null; productType: string | null }>;
+    detectedName: string | null;
+    detectedValidFrom: string | null;
+  };
+
+  function parsePriceListText(text: string): PriceListParseResult {
+    let detectedName: string | null = null;
+    let detectedValidFrom: string | null = null;
+
+    const metaRx = /#(\d+),\s*valid\s+from\s+(\d{4}\/\d{2}\/\d{2}|\d{2}\.\d{2}\.\d{4})/i;
+    for (const line of text.split(/\r?\n|\r/).slice(0, 40)) {
+      const m = line.trim().match(metaRx);
+      if (m) {
+        detectedName = `#${m[1]}`;
+        const raw = m[2];
+        if (raw.includes("/")) {
+          detectedValidFrom = raw.replace(/\//g, "-");
+        } else {
+          const [d, mo, y] = raw.split(".");
+          detectedValidFrom = `${y}-${mo}-${d}`;
+        }
+        break;
+      }
+    }
+
     // Blocklist — spare parts, fins, bags, pumps, leashes, accessories
     const EXCLUDE_KEYWORDS = [
       "spare", "part", "ersatz", "ersatzteil", "repair", "reparatur",
@@ -1724,7 +1749,7 @@ export async function registerRoutes(
       items.push({ sku, productName, retailPrice: retailPrice.toFixed(2), dealerPrice: dealerPrice !== null ? dealerPrice.toFixed(2) : null, productType: inferProductType(productName) });
     }
 
-    return items;
+    return { items, detectedName, detectedValidFrom };
   }
 
   // Parse PDF → preview (no DB save)
@@ -1734,8 +1759,8 @@ export async function registerRoutes(
       const { text } = await parsePdfBuffer(req.file.buffer);
       const rawLineCount = text.split(/\r?\n|\r/).filter((l) => l.trim().length > 0).length;
 
-      const items = parsePriceListText(text);
-      res.json({ items, rawLineCount });
+      const { items, detectedName, detectedValidFrom } = parsePriceListText(text);
+      res.json({ items, rawLineCount, detectedName, detectedValidFrom });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -1745,7 +1770,7 @@ export async function registerRoutes(
   app.post("/api/price-lists", requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
-      const { supplier, items, validFrom, validTo } = req.body;
+      const { supplier, items, validFrom, validTo, name } = req.body;
       if (!supplier || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "supplier and items[] are required" });
       }
@@ -1755,6 +1780,7 @@ export async function registerRoutes(
           uploadedBy: user.id,
           validFrom: validFrom ? new Date(validFrom) : null,
           validTo: validTo ? new Date(validTo) : null,
+          name: name?.trim() || null,
         },
         items.map((i: any) => ({ sku: i.sku, productName: i.productName, retailPrice: i.retailPrice, dealerPrice: i.dealerPrice || null, productType: i.productType || null })),
       );
@@ -1787,12 +1813,12 @@ export async function registerRoutes(
   app.patch("/api/price-lists/:id", requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { validFrom, validTo } = req.body;
+      const { validFrom, validTo, name } = req.body;
       const vf = validFrom ? new Date(validFrom) : null;
       const vt = validTo ? new Date(validTo) : null;
       if (vf && isNaN(vf.getTime())) return res.status(400).json({ message: "Invalid validFrom date" });
       if (vt && isNaN(vt.getTime())) return res.status(400).json({ message: "Invalid validTo date" });
-      const updated = await storage.updatePriceList(id, { validFrom: vf, validTo: vt });
+      const updated = await storage.updatePriceList(id, { validFrom: vf, validTo: vt, name: name !== undefined ? (name?.trim() || null) : undefined });
       if (!updated) return res.status(404).json({ message: "Price list not found" });
       res.json(updated);
     } catch (err: any) {

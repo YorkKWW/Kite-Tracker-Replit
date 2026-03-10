@@ -149,7 +149,7 @@ export interface IStorage {
   getAllPriceLists(): Promise<PriceList[]>;
   getPriceList(id: number): Promise<PriceList | undefined>;
   createPriceList(pl: InsertPriceList, items: Omit<InsertPriceListItem, "priceListId">[]): Promise<PriceList>;
-  updatePriceList(id: number, data: { validFrom: Date | null; validTo: Date | null }): Promise<PriceList | undefined>;
+  updatePriceList(id: number, data: { validFrom: Date | null; validTo: Date | null; name?: string | null }): Promise<PriceList | undefined>;
   deactivatePriceLists(supplier: string): Promise<void>;
   deletePriceList(id: number): Promise<void>;
   getPriceListItems(priceListId: number): Promise<PriceListItem[]>;
@@ -898,9 +898,11 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updatePriceList(id: number, data: { validFrom: Date | null; validTo: Date | null }): Promise<PriceList | undefined> {
+  async updatePriceList(id: number, data: { validFrom: Date | null; validTo: Date | null; name?: string | null }): Promise<PriceList | undefined> {
+    const setData: Record<string, any> = { validFrom: data.validFrom, validTo: data.validTo };
+    if (data.name !== undefined) setData.name = data.name;
     const [updated] = await db.update(priceLists)
-      .set(data)
+      .set(setData)
       .where(eq(priceLists.id, id))
       .returning();
     return updated;

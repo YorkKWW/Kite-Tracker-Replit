@@ -312,6 +312,7 @@ export const saleItems = pgTable("sale_items", {
 
 export const priceLists = pgTable("price_lists", {
   id: serial("id").primaryKey(),
+  name: text("name"),
   supplier: text("supplier").notNull(),
   validFrom: timestamp("valid_from"),
   validTo: timestamp("valid_to"),

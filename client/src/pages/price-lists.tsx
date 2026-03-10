@@ -52,6 +52,7 @@ export default function PriceListsPage() {
   const [supplier, setSupplier] = useState("");
   const [customSupplier, setCustomSupplier] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [listName, setListName] = useState("");
   const [validFrom, setValidFrom] = useState("");
   const [validTo, setValidTo] = useState("");
   const [parsedItems, setParsedItems] = useState<ParsedItem[] | null>(null);
@@ -72,16 +73,19 @@ export default function PriceListsPage() {
         credentials: "include",
       });
       if (!res.ok) throw new Error((await res.json()).message);
-      return res.json() as Promise<{ items: ParsedItem[]; rawLineCount: number }>;
+      return res.json() as Promise<{ items: ParsedItem[]; rawLineCount: number; detectedName: string | null; detectedValidFrom: string | null }>;
     },
     onSuccess: (data) => {
       setParsedItems(data.items);
       setRemovedRows(new Set());
       setExpandPreview(true);
+      if (data.detectedName) setListName(data.detectedName);
+      if (data.detectedValidFrom && !validFrom) setValidFrom(data.detectedValidFrom);
       if (data.items.length === 0) {
         toast({ title: "No items extracted", description: `Parser processed ${data.rawLineCount} lines but found no matching SKU + price rows. The PDF format may not be supported.`, variant: "destructive" });
       } else {
-        toast({ title: `Extracted ${data.items.length} items`, description: `From ${data.rawLineCount} text lines in the PDF. Review below, then confirm to save.` });
+        const autoMsg = data.detectedName ? ` Detected: ${data.detectedName}` : "";
+        toast({ title: `Extracted ${data.items.length} items`, description: `From ${data.rawLineCount} text lines in the PDF.${autoMsg} Review below, then confirm to save.` });
       }
     },
     onError: (e: any) => toast({ title: "Parse failed", description: e.message, variant: "destructive" }),
@@ -95,6 +99,7 @@ export default function PriceListsPage() {
         items: confirmed,
         validFrom: validFrom || null,
         validTo: validTo || null,
+        name: listName || null,
       });
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
@@ -106,6 +111,7 @@ export default function PriceListsPage() {
       setFile(null);
       setSupplier("");
       setCustomSupplier("");
+      setListName("");
       setValidFrom("");
       setValidTo("");
       setRemovedRows(new Set());
@@ -132,12 +138,14 @@ export default function PriceListsPage() {
   };
 
   const [editingDatesId, setEditingDatesId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
   const [editValidFrom, setEditValidFrom] = useState("");
   const [editValidTo, setEditValidTo] = useState("");
 
   const updateDatesMutation = useMutation({
     mutationFn: async (id: number) => {
       const res = await apiRequest("PATCH", `/api/price-lists/${id}`, {
+        name: editName || null,
         validFrom: editValidFrom || null,
         validTo: editValidTo || null,
       });
@@ -146,7 +154,7 @@ export default function PriceListsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/price-lists"] });
-      toast({ title: "Validity dates updated" });
+      toast({ title: "Price list updated" });
       setEditingDatesId(null);
     },
     onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
@@ -266,10 +274,20 @@ export default function PriceListsPage() {
                 type="file"
                 accept=".pdf,application/pdf"
                 ref={fileInputRef}
-                onChange={(e) => { setFile(e.target.files?.[0] || null); setParsedItems(null); }}
+                onChange={(e) => { setFile(e.target.files?.[0] || null); setParsedItems(null); setListName(""); }}
                 data-testid="input-price-list-file"
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs flex items-center gap-1"><FileText className="h-3 w-3" /> Name / Number</Label>
+            <Input
+              placeholder="e.g. #65"
+              value={listName}
+              onChange={(e) => setListName(e.target.value)}
+              data-testid="input-list-name"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -403,7 +421,7 @@ export default function PriceListsPage() {
                     <Badge variant={pl.isActive ? "default" : "secondary"} className="shrink-0 text-xs">
                       {pl.isActive ? "Active" : "Inactive"}
                     </Badge>
-                    <span className="font-medium text-sm truncate">{pl.supplier}</span>
+                    <span className="font-medium text-sm truncate">{pl.supplier}{pl.name ? ` — ${pl.name}` : ""}</span>
                     <span className="text-xs text-muted-foreground shrink-0">
                       {pl.itemCount} items · {pl.uploadedAt ? new Date(pl.uploadedAt).toLocaleDateString("de-DE") : ""}
                     </span>
@@ -417,6 +435,7 @@ export default function PriceListsPage() {
                           setEditingDatesId(null);
                         } else {
                           setEditingDatesId(pl.id);
+                          setEditName(pl.name || "");
                           setEditValidFrom(pl.validFrom ? new Date(pl.validFrom).toISOString().split("T")[0] : "");
                           setEditValidTo(pl.validTo ? new Date(pl.validTo).toISOString().split("T")[0] : "");
                         }
@@ -424,7 +443,7 @@ export default function PriceListsPage() {
                       data-testid={`button-edit-dates-${pl.id}`}
                     >
                       <Pencil className="h-3.5 w-3.5" />
-                      <span className="ml-1 text-xs">Dates</span>
+                      <span className="ml-1 text-xs">Edit</span>
                     </Button>
                     <Button
                       variant="ghost"
@@ -462,36 +481,48 @@ export default function PriceListsPage() {
                 )}
 
                 {editingDatesId === pl.id && (
-                  <div className="flex items-end gap-2 p-2 rounded-md bg-muted/50">
-                    <div className="space-y-1 flex-1">
-                      <Label className="text-xs">Valid From</Label>
+                  <div className="space-y-2 p-2 rounded-md bg-muted/50">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Name / Number</Label>
                       <Input
-                        type="date"
-                        value={editValidFrom}
-                        onChange={(e) => setEditValidFrom(e.target.value)}
+                        placeholder="e.g. #65"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
                         className="h-8 text-xs"
-                        data-testid={`input-edit-valid-from-${pl.id}`}
+                        data-testid={`input-edit-name-${pl.id}`}
                       />
                     </div>
-                    <div className="space-y-1 flex-1">
-                      <Label className="text-xs">Valid To</Label>
-                      <Input
-                        type="date"
-                        value={editValidTo}
-                        onChange={(e) => setEditValidTo(e.target.value)}
-                        className="h-8 text-xs"
-                        data-testid={`input-edit-valid-to-${pl.id}`}
-                      />
+                    <div className="flex items-end gap-2">
+                      <div className="space-y-1 flex-1">
+                        <Label className="text-xs">Valid From</Label>
+                        <Input
+                          type="date"
+                          value={editValidFrom}
+                          onChange={(e) => setEditValidFrom(e.target.value)}
+                          className="h-8 text-xs"
+                          data-testid={`input-edit-valid-from-${pl.id}`}
+                        />
+                      </div>
+                      <div className="space-y-1 flex-1">
+                        <Label className="text-xs">Valid To</Label>
+                        <Input
+                          type="date"
+                          value={editValidTo}
+                          onChange={(e) => setEditValidTo(e.target.value)}
+                          className="h-8 text-xs"
+                          data-testid={`input-edit-valid-to-${pl.id}`}
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        className="h-8"
+                        onClick={() => updateDatesMutation.mutate(pl.id)}
+                        disabled={updateDatesMutation.isPending}
+                        data-testid={`button-save-dates-${pl.id}`}
+                      >
+                        {updateDatesMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      className="h-8"
-                      onClick={() => updateDatesMutation.mutate(pl.id)}
-                      disabled={updateDatesMutation.isPending}
-                      data-testid={`button-save-dates-${pl.id}`}
-                    >
-                      {updateDatesMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
-                    </Button>
                   </div>
                 )}
 
