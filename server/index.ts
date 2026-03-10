@@ -117,12 +117,19 @@ app.use((req, res, next) => {
         console.log(`Station renamed: "${fix.oldName}" → "${fix.newName}"`);
       }
     }
-    const deleteRes = await dbInstance.execute(sql`
-      DELETE FROM stations WHERE name = 'Tarifa'
-        AND NOT EXISTS (SELECT 1 FROM equipment WHERE current_station_id = stations.id)
-    `);
-    if (deleteRes.rowCount && deleteRes.rowCount > 0) {
-      console.log(`Removed empty station: "Tarifa"`);
+    const stationsToRemove = ['Tarifa', 'Incoming – Not Yet Assigned'];
+    for (const stName of stationsToRemove) {
+      await dbInstance.execute(sql`
+        UPDATE equipment SET current_station_id = NULL WHERE current_station_id IN (
+          SELECT id FROM stations WHERE name = ${stName}
+        )
+      `);
+      const delRes = await dbInstance.execute(sql`
+        DELETE FROM stations WHERE name = ${stName}
+      `);
+      if (delRes.rowCount && delRes.rowCount > 0) {
+        console.log(`Removed station: "${stName}"`);
+      }
     }
   } catch (e) {
     console.error("Equipment size migration error:", e);

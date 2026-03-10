@@ -1439,9 +1439,7 @@ export async function registerRoutes(
     const parsedDate = parseDateDE(deliveryDate) || parseDateDE(invoiceDate);
     const year = parsedDate ? parsedDate.getFullYear() : new Date().getFullYear();
 
-    const allStations = await storage.getAllStations();
-    const warehouseStation = allStations.find((s) => s.isVirtual) ?? allStations.find((s) => s.name === "Office Hamburg Warehouse");
-    const warehouseStationId = warehouseStation?.id ?? null;
+    const warehouseStationId = null;
 
     const allPriceLists = await storage.getAllPriceLists();
     const effectiveBrand = (brand || "").trim();
