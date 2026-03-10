@@ -128,9 +128,9 @@ function formatTime(ts: string | null) {
 
 export default function ActivityPage() {
   const { isAdmin, isHamburg } = useAuth();
-  const [userId, setUserId] = useState("");
-  const [action, setAction] = useState("");
-  const [stationId, setStationId] = useState("");
+  const [userId, setUserId] = useState("__all__");
+  const [action, setAction] = useState("__all__");
+  const [stationId, setStationId] = useState("__all__");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -145,9 +145,9 @@ export default function ActivityPage() {
   });
 
   const params = new URLSearchParams();
-  if (userId) params.set("userId", userId);
-  if (action) params.set("action", action);
-  if (stationId) params.set("stationId", stationId);
+  if (userId && userId !== "__all__") params.set("userId", userId);
+  if (action && action !== "__all__") params.set("action", action);
+  if (stationId && stationId !== "__all__") params.set("stationId", stationId);
   if (dateFrom) params.set("dateFrom", new Date(dateFrom).toISOString());
   if (dateTo) {
     const d = new Date(dateTo);
@@ -167,12 +167,12 @@ export default function ActivityPage() {
     staleTime: 0,
   });
 
-  const hasFilters = userId || action || stationId || dateFrom || dateTo;
+  const hasFilters = (userId && userId !== "__all__") || (action && action !== "__all__") || (stationId && stationId !== "__all__") || dateFrom || dateTo;
 
   function clearFilters() {
-    setUserId("");
-    setAction("");
-    setStationId("");
+    setUserId("__all__");
+    setAction("__all__");
+    setStationId("__all__");
     setDateFrom("");
     setDateTo("");
   }
@@ -190,7 +190,7 @@ export default function ActivityPage() {
           )}
           <Button variant="outline" size="sm" onClick={() => setShowFilters(f => !f)} data-testid="button-toggle-filters">
             <Filter className="h-4 w-4 mr-1.5" />
-            Filters {hasFilters ? `(${[userId, action, stationId, dateFrom, dateTo].filter(Boolean).length})` : ""}
+            Filters {hasFilters ? `(${[userId !== "__all__" && userId, action !== "__all__" && action, stationId !== "__all__" && stationId, dateFrom, dateTo].filter(Boolean).length})` : ""}
           </Button>
         </div>
       </div>
@@ -206,7 +206,7 @@ export default function ActivityPage() {
                     <SelectValue placeholder="All users" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All users</SelectItem>
+                    <SelectItem value="__all__">All users</SelectItem>
                     {users?.map(u => <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -219,7 +219,7 @@ export default function ActivityPage() {
                   <SelectValue placeholder="All actions" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All actions</SelectItem>
+                  <SelectItem value="__all__">All actions</SelectItem>
                   {Object.entries(ACTION_LABELS).map(([key, label]) => (
                     <SelectItem key={key} value={key}>{label}</SelectItem>
                   ))}
@@ -234,7 +234,7 @@ export default function ActivityPage() {
                     <SelectValue placeholder="All locations" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All locations</SelectItem>
+                    <SelectItem value="__all__">All locations</SelectItem>
                     {stations?.map(s => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
