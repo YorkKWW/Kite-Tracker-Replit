@@ -254,9 +254,8 @@ function parseEleveightInvoice(text: string) {
         const ccRaw = ccMatch[1].trim();
         const parts = ccRaw.split(/\s+/);
         if (parts.length >= 2) {
-          const prefix = parts[0];
-          const suffixes = parts.slice(1).join("").split(",").map(s => s.trim()).filter(Boolean);
-          serials = suffixes.map(s => `${prefix} ${s}`);
+          const serialsPart = parts.slice(1).join(",");
+          serials = serialsPart.split(",").map(s => s.trim()).filter(Boolean);
         } else {
           serials = ccRaw.split(",").map(s => s.trim()).filter(Boolean);
         }
