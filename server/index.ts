@@ -70,27 +70,29 @@ app.use((req, res, next) => {
   const { db: dbInstance } = await import("./db");
   const { sql } = await import("drizzle-orm");
   try {
-    await dbInstance.execute(sql`
+    const kitePattern = ' ([0-9]+[.][0-9]+)( |$)';
+    const boardPattern = '([0-9]{2,3})x[0-9]{2,3}';
+    const kiteRes = await dbInstance.execute(sql`
       UPDATE equipment 
       SET type_specific_fields = jsonb_set(
         type_specific_fields::jsonb, '{size}', 
-        to_jsonb((regexp_match(model, E'\\s(\\d+\\.\\d+)(?:\\s|$)'))[1])
+        to_jsonb((regexp_match(model, ${kitePattern}))[1])
       )
       WHERE type IN ('kite', 'wing') 
-        AND model ~ E'\\s\\d+\\.\\d+(?:\\s|$)'
-        AND type_specific_fields::jsonb->>'size' != (regexp_match(model, E'\\s(\\d+\\.\\d+)(?:\\s|$)'))[1]
+        AND model ~ ${kitePattern}
+        AND type_specific_fields::jsonb->>'size' != (regexp_match(model, ${kitePattern}))[1]
     `);
-    await dbInstance.execute(sql`
+    const boardRes = await dbInstance.execute(sql`
       UPDATE equipment 
       SET type_specific_fields = jsonb_set(
         type_specific_fields::jsonb, '{size}', 
-        to_jsonb((regexp_match(model, E'(\\d{2,3})\\s*x\\s*\\d{2,3}'))[1])
+        to_jsonb((regexp_match(model, ${boardPattern}))[1])
       )
       WHERE type IN ('board', 'foilboard') 
-        AND model ~ E'\\d{2,3}\\s*x\\s*\\d{2,3}'
-        AND type_specific_fields::jsonb->>'size' != (regexp_match(model, E'(\\d{2,3})\\s*x\\s*\\d{2,3}'))[1]
+        AND model ~ ${boardPattern}
+        AND type_specific_fields::jsonb->>'size' != (regexp_match(model, ${boardPattern}))[1]
     `);
-    console.log("Equipment size migration completed");
+    console.log(`Equipment size migration: ${kiteRes.rowCount} kites, ${boardRes.rowCount} boards fixed`);
   } catch (e) {
     console.error("Equipment size migration error:", e);
   }

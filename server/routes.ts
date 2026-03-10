@@ -2567,26 +2567,29 @@ export async function registerRoutes(
     const { db: dbInstance } = await import("./db");
     const { sql } = await import("drizzle-orm");
 
+    const kitePattern = ' ([0-9]+[.][0-9]+)( |$)';
+    const boardPattern = '([0-9]{2,3})x[0-9]{2,3}';
+
     const kiteResult = await dbInstance.execute(sql`
       UPDATE equipment 
       SET type_specific_fields = jsonb_set(
         type_specific_fields::jsonb, '{size}', 
-        to_jsonb((regexp_match(model, E'\\s(\\d+\\.\\d+)(?:\\s|$)'))[1])
+        to_jsonb((regexp_match(model, ${kitePattern}))[1])
       )
       WHERE type IN ('kite', 'wing') 
-        AND model ~ E'\\s\\d+\\.\\d+(?:\\s|$)'
-        AND type_specific_fields::jsonb->>'size' != (regexp_match(model, E'\\s(\\d+\\.\\d+)(?:\\s|$)'))[1]
+        AND model ~ ${kitePattern}
+        AND type_specific_fields::jsonb->>'size' != (regexp_match(model, ${kitePattern}))[1]
     `);
 
     const boardResult = await dbInstance.execute(sql`
       UPDATE equipment 
       SET type_specific_fields = jsonb_set(
         type_specific_fields::jsonb, '{size}', 
-        to_jsonb((regexp_match(model, E'(\\d{2,3})\\s*x\\s*\\d{2,3}'))[1])
+        to_jsonb((regexp_match(model, ${boardPattern}))[1])
       )
       WHERE type IN ('board', 'foilboard') 
-        AND model ~ E'\\d{2,3}\\s*x\\s*\\d{2,3}'
-        AND type_specific_fields::jsonb->>'size' != (regexp_match(model, E'(\\d{2,3})\\s*x\\s*\\d{2,3}'))[1]
+        AND model ~ ${boardPattern}
+        AND type_specific_fields::jsonb->>'size' != (regexp_match(model, ${boardPattern}))[1]
     `);
 
     res.json({ 
