@@ -1,16 +1,20 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConditionBadge, StatusBadge } from "@/components/condition-badge";
-import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp, Inbox, ArrowRightLeft } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp, Inbox, ArrowRightLeft, CheckSquare, Trash2 } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPES_WITHOUT_SERIAL } from "@shared/schema";
 import { BarcodeScanner } from "@/components/barcode-scanner";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
   kite:          { label: "K",  cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
@@ -39,6 +43,48 @@ export default function EquipmentListPage() {
   const [sortCol, setSortCol] = useState("brand");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [, navigate] = useLocation();
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { toast } = useToast();
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const res = await apiRequest("POST", "/api/equipment/bulk-delete", { ids });
+      return res.json();
+    },
+    onSuccess: (data: { deleted: number; errors: string[] }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      toast({ title: `${data.deleted} item${data.deleted !== 1 ? "s" : ""} deleted` });
+      if (data.errors.length > 0) {
+        toast({ title: "Some items failed to delete", description: data.errors.join(", "), variant: "destructive" });
+      } else {
+        setSelectedIds(new Set());
+        setSelectMode(false);
+      }
+    },
+    onError: () => {
+      toast({ title: "Bulk delete failed", description: "Please try again.", variant: "destructive" });
+    },
+  });
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!sortedEquipment.length) return;
+    if (selectedIds.size === sortedEquipment.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sortedEquipment.map((e) => e.id)));
+    }
+  };
 
   const buildQuery = () => {
     const params = new URLSearchParams();
@@ -136,22 +182,35 @@ export default function EquipmentListPage() {
     <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
       <div className="flex items-center justify-between gap-1 flex-wrap">
         <h1 className="text-2xl font-bold tracking-tight" data-testid="text-equipment-title">Equipment</h1>
-        {isHamburg && (
-          <div className="flex gap-2">
-            <Link href="/invoice-import">
-              <Button variant="outline" size="sm" data-testid="button-import-invoice">
-                <FileUp className="h-4 w-4 mr-1.5" />
-                Import
-              </Button>
-            </Link>
-            <Link href="/equipment/new">
-              <Button size="sm" data-testid="button-add-equipment">
-                <Plus className="h-4 w-4 mr-1.5" />
-                Add
-              </Button>
-            </Link>
-          </div>
-        )}
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Button
+              variant={selectMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}
+              data-testid="button-toggle-select-mode"
+            >
+              <CheckSquare className="h-4 w-4 mr-1.5" />
+              {selectMode ? "Cancel" : "Select"}
+            </Button>
+          )}
+          {isHamburg && !selectMode && (
+            <>
+              <Link href="/invoice-import">
+                <Button variant="outline" size="sm" data-testid="button-import-invoice">
+                  <FileUp className="h-4 w-4 mr-1.5" />
+                  Import
+                </Button>
+              </Link>
+              <Link href="/equipment/new">
+                <Button size="sm" data-testid="button-add-equipment">
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add
+                </Button>
+              </Link>
+            </>
+          )}
+        </div>
       </div>
 
       <BarcodeScanner open={scannerOpen} onClose={() => setScannerOpen(false)} onScan={handleScan} />
@@ -276,6 +335,15 @@ export default function EquipmentListPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50 text-xs">
+                {selectMode && (
+                  <th className="w-10 pl-3 pr-1 py-2.5">
+                    <Checkbox
+                      checked={sortedEquipment.length > 0 && selectedIds.size === sortedEquipment.length}
+                      onCheckedChange={toggleSelectAll}
+                      data-testid="checkbox-select-all"
+                    />
+                  </th>
+                )}
                 <th className="w-9 pl-2 pr-1 py-2.5" />
                 <SortTh col="type"      label="Type"    sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="w-12 pl-1 pr-2 py-2.5" />
                 <SortTh col="brand"     label="Brand"   sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5" />
@@ -298,9 +366,18 @@ export default function EquipmentListPage() {
                   <tr
                     key={item.id}
                     className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                    onClick={() => navigate(`/equipment/${item.id}`)}
+                    onClick={() => selectMode ? toggleSelect(item.id) : navigate(`/equipment/${item.id}`)}
                     data-testid={`row-equipment-${item.id}`}
                   >
+                    {selectMode && (
+                      <td className="pl-3 pr-1 py-2.5 w-10" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(item.id)}
+                          onCheckedChange={() => toggleSelect(item.id)}
+                          data-testid={`checkbox-equipment-${item.id}`}
+                        />
+                      </td>
+                    )}
                     <td className="pl-2 pr-1 py-1.5 w-9">
                       {firstPhotos?.[item.id] ? (
                         <img
@@ -365,6 +442,45 @@ export default function EquipmentListPage() {
           </table>
         </div>
       )}
+
+      {selectMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t shadow-lg p-3 flex items-center justify-between gap-3 safe-area-bottom">
+          <span className="text-sm font-medium" data-testid="text-selected-count">
+            {selectedIds.size} selected
+          </span>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setShowDeleteConfirm(true)}
+            data-testid="button-bulk-delete"
+          >
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            Delete
+          </Button>
+        </div>
+      )}
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} item{selectedIds.size !== 1 ? "s" : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the selected equipment and all related data (photos, repairs, transfers, damage reports). This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+              disabled={bulkDeleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {bulkDeleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

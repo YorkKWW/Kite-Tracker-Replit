@@ -668,6 +668,20 @@ export async function registerRoutes(
     res.json({ message: "Deleted" });
   });
 
+  app.post("/api/equipment/bulk-delete", requireAdmin, async (req, res) => {
+    const ids: number[] = req.body.ids;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "ids array is required" });
+    }
+    const result = await storage.bulkDeleteEquipment(ids);
+    await storage.createActivityLog({
+      userId: (req.user as any).id,
+      action: "equipment_bulk_deleted",
+      details: `Bulk deleted ${result.deleted} equipment items (IDs: ${ids.join(", ")})`,
+    });
+    res.json(result);
+  });
+
   app.get("/api/equipment/:id/ratings", requireAuth, async (req, res) => {
     const equipmentId = parseInt(req.params.id);
     if (!(await checkEquipmentAccess(req, equipmentId))) {
