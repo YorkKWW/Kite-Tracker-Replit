@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useAuth } from "@/lib/auth";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -7,12 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileSpreadsheet, Loader2, Building2, Image } from "lucide-react";
+import { Upload, FileSpreadsheet, Loader2, Building2, Image, MapPin, Users, FileText, MessageSquarePlus, ChevronRight } from "lucide-react";
 import type { CompanySettings } from "@shared/schema";
 
 export default function SettingsPage() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isSuperAdmin } = useAuth();
   const { toast } = useToast();
+
+  const { data: feedbackCountData } = useQuery<{ count: number }>({
+    queryKey: ["/api/feedback/open-count"],
+    staleTime: 0,
+    enabled: isAdmin,
+  });
   const fileRef = useRef<HTMLInputElement>(null);
   const logoRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
@@ -92,9 +99,40 @@ export default function SettingsPage() {
     </div>
   );
 
+  const adminLinks = [
+    ...(isAdmin ? [{ href: "/stations", label: "Locations", icon: MapPin, description: "Manage stations & locations" }] : []),
+    ...(isAdmin ? [{ href: "/users", label: "Users", icon: Users, description: "Manage user accounts & roles" }] : []),
+    { href: "/activity", label: "Activity Log", icon: FileText, description: "View system activity & audit trail" },
+    ...(isAdmin ? [{ href: "/feedback", label: "Feedback & Bug Reports", icon: MessageSquarePlus, description: "Review user feedback", badge: feedbackCountData?.count }] : []),
+  ];
+
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold tracking-tight" data-testid="text-settings-title">Settings</h1>
+
+      <Card>
+        <CardContent className="p-0 divide-y">
+          {adminLinks.map((link) => (
+            <Link key={link.href} href={link.href}>
+              <button className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/50 transition-colors" data-testid={`link-settings-${link.label.toLowerCase().replace(/\s+/g, "-")}`}>
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <link.icon className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm">{link.label}</p>
+                    {link.badge && link.badge > 0 ? (
+                      <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">{link.badge}</span>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{link.description}</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              </button>
+            </Link>
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-2"><h2 className="font-semibold">Account</h2></CardHeader>
@@ -110,7 +148,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Role</p>
-              <p className="font-medium capitalize">{user?.role}</p>
+              <p className="font-medium capitalize">{isSuperAdmin ? "Super Admin" : user?.role === "admin" ? "Admin" : user?.role === "manager" ? "Hamburg Manager" : "Station Lead"}</p>
             </div>
           </div>
         </CardContent>
