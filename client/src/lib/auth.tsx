@@ -10,6 +10,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  isSuperAdmin: boolean;
   isAdmin: boolean;
   isHamburg: boolean;
   isStationLead: boolean;
@@ -56,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         logout,
+        isSuperAdmin: user?.role === "admin" && user?.isSuperAdmin === true,
         isAdmin: user?.role === "admin",
         isHamburg: user?.role === "admin" || user?.role === "manager",
         isStationLead: user?.role === "station_lead",

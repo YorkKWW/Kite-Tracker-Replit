@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Users, Pencil, Trash2 } from "lucide-react";
+import { Plus, Users, Pencil, Trash2, Shield, ShieldCheck, ShieldAlert, Check, X } from "lucide-react";
 import type { Station } from "@shared/schema";
 
 interface SafeUser {
@@ -20,11 +20,111 @@ interface SafeUser {
   email: string;
   role: string;
   assignedStationId: number | null;
+  isSuperAdmin?: boolean;
+}
+
+function getRoleLabel(u: SafeUser) {
+  if (u.role === "admin" && u.isSuperAdmin) return "Super Admin";
+  if (u.role === "admin") return "Admin";
+  if (u.role === "manager") return "Hamburg Manager";
+  return "Station Lead";
+}
+
+function getRoleBadgeVariant(u: SafeUser): "default" | "secondary" | "outline" {
+  if (u.role === "admin" && u.isSuperAdmin) return "default";
+  if (u.role === "admin") return "secondary";
+  return "outline";
+}
+
+const PERMISSIONS = [
+  { label: "Equipment anzeigen", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Equipment anlegen & bearbeiten", superAdmin: true, admin: true, manager: true, stationLead: false },
+  { label: "Equipment endgültig löschen", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "Rechnungen importieren", superAdmin: true, admin: true, manager: true, stationLead: false },
+  { label: "Rechnungen löschen", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "Transfers starten & bestätigen", superAdmin: true, admin: true, manager: true, stationLead: false },
+  { label: "Verkäufe bestätigen & abschließen", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Preislisten verwalten", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Einkaufspreise & Werte sehen", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Activity Log einsehen", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Stationen anlegen", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Stationen löschen", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "Benutzer anlegen, bearbeiten & löschen", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "Damage Reports erstellen", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Reparaturen verwalten", superAdmin: true, admin: true, manager: true, stationLead: false },
+  { label: "Inventur durchführen", superAdmin: true, admin: true, manager: true, stationLead: true },
+];
+
+function PermissionsTable() {
+  return (
+    <Card className="overflow-hidden" data-testid="card-permissions-overview">
+      <CardContent className="p-0">
+        <div className="p-4 border-b">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Rechte-Übersicht
+          </h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="text-left p-3 font-medium min-w-[200px]">Berechtigung</th>
+                <th className="text-center p-3 font-medium w-24">
+                  <div className="flex flex-col items-center gap-1">
+                    <ShieldAlert className="h-4 w-4 text-primary" />
+                    <span className="text-xs">Super Admin</span>
+                  </div>
+                </th>
+                <th className="text-center p-3 font-medium w-24">
+                  <div className="flex flex-col items-center gap-1">
+                    <ShieldCheck className="h-4 w-4" />
+                    <span className="text-xs">Admin</span>
+                  </div>
+                </th>
+                <th className="text-center p-3 font-medium w-24">
+                  <div className="flex flex-col items-center gap-1">
+                    <Users className="h-4 w-4" />
+                    <span className="text-xs">Manager</span>
+                  </div>
+                </th>
+                <th className="text-center p-3 font-medium w-24">
+                  <div className="flex flex-col items-center gap-1">
+                    <Users className="h-4 w-4" />
+                    <span className="text-xs">Station Lead</span>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {PERMISSIONS.map((p, i) => (
+                <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/30"}>
+                  <td className="p-3 font-medium">{p.label}</td>
+                  <td className="text-center p-3">
+                    {p.superAdmin ? <Check className="h-4 w-4 text-green-600 mx-auto" /> : <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />}
+                  </td>
+                  <td className="text-center p-3">
+                    {p.admin ? <Check className="h-4 w-4 text-green-600 mx-auto" /> : <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />}
+                  </td>
+                  <td className="text-center p-3">
+                    {p.manager ? <Check className="h-4 w-4 text-green-600 mx-auto" /> : <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />}
+                  </td>
+                  <td className="text-center p-3">
+                    {p.stationLead ? <Check className="h-4 w-4 text-green-600 mx-auto" /> : <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function UsersPage() {
   const { toast } = useToast();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isSuperAdmin } = useAuth();
   const { data: usersList, isLoading } = useQuery<SafeUser[]>({ queryKey: ["/api/users"] });
   const { data: stationsList } = useQuery<Station[]>({ queryKey: ["/api/stations"] });
 
@@ -35,6 +135,7 @@ export default function UsersPage() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("manager");
   const [stationId, setStationId] = useState("");
+  const [superAdminFlag, setSuperAdminFlag] = useState(false);
 
   const openCreate = () => {
     setEditUser(null);
@@ -43,6 +144,7 @@ export default function UsersPage() {
     setPassword("");
     setRole("manager");
     setStationId("");
+    setSuperAdminFlag(false);
     setOpen(true);
   };
 
@@ -53,6 +155,7 @@ export default function UsersPage() {
     setPassword("");
     setRole(u.role);
     setStationId(u.assignedStationId?.toString() || "none");
+    setSuperAdminFlag(u.isSuperAdmin || false);
     setOpen(true);
   };
 
@@ -64,6 +167,7 @@ export default function UsersPage() {
         password,
         role,
         assignedStationId: stationId && stationId !== "none" ? parseInt(stationId) : null,
+        isSuperAdmin: role === "admin" ? superAdminFlag : false,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -82,6 +186,7 @@ export default function UsersPage() {
         email,
         role,
         assignedStationId: stationId && stationId !== "none" ? parseInt(stationId) : null,
+        isSuperAdmin: role === "admin" ? superAdminFlag : false,
       };
       if (password) data.password = password;
       return apiRequest("PATCH", `/api/users/${editUser!.id}`, data);
@@ -120,13 +225,15 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between gap-1">
         <h1 className="text-2xl font-bold tracking-tight" data-testid="text-users-title">Users</h1>
-        <Button onClick={openCreate} data-testid="button-add-user">
-          <Plus className="h-4 w-4 mr-2" />
-          Add User
-        </Button>
+        {isSuperAdmin && (
+          <Button onClick={openCreate} data-testid="button-add-user">
+            <Plus className="h-4 w-4 mr-2" />
+            Add User
+          </Button>
+        )}
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -149,7 +256,7 @@ export default function UsersPage() {
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
-              <Select value={role} onValueChange={setRole}>
+              <Select value={role} onValueChange={(v) => { setRole(v); if (v !== "admin") setSuperAdminFlag(false); }}>
                 <SelectTrigger data-testid="select-user-role">
                   <SelectValue />
                 </SelectTrigger>
@@ -160,6 +267,23 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
             </div>
+            {role === "admin" && (
+              <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                <input
+                  type="checkbox"
+                  id="super-admin-flag"
+                  checked={superAdminFlag}
+                  onChange={(e) => setSuperAdminFlag(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                  data-testid="checkbox-super-admin"
+                />
+                <label htmlFor="super-admin-flag" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-primary" />
+                  Super Admin
+                  <span className="text-xs text-muted-foreground font-normal">(can manage users, delete equipment/invoices/stations)</span>
+                </label>
+              </div>
+            )}
             {(role === "manager" || role === "station_lead") && (
               <div className="space-y-2">
                 <Label>Assigned Location</Label>
@@ -203,16 +327,17 @@ export default function UsersPage() {
             <Card key={u.id} data-testid={`card-user-${u.id}`}>
               <CardContent className="p-4 flex items-center justify-between gap-1">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-sm font-semibold text-primary">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${u.isSuperAdmin ? "bg-primary text-primary-foreground" : "bg-primary/10"}`}>
+                    <span className={`text-sm font-semibold ${u.isSuperAdmin ? "" : "text-primary"}`}>
                       {u.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
                     </span>
                   </div>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold" data-testid={`text-user-name-${u.id}`}>{u.name}</p>
-                      <Badge variant="secondary" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
-                        {u.role === "admin" ? "Admin" : u.role === "manager" ? "Hamburg Manager" : "Station Lead"}
+                      <Badge variant={getRoleBadgeVariant(u)} className="text-[10px] no-default-hover-elevate no-default-active-elevate">
+                        {u.isSuperAdmin && <ShieldAlert className="h-3 w-3 mr-1" />}
+                        {getRoleLabel(u)}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{u.email}</p>
@@ -221,19 +346,23 @@ export default function UsersPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(u)} data-testid={`button-edit-user-${u.id}`}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(u)} data-testid={`button-delete-user-${u.id}`} disabled={deleteMutation.isPending}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
+                {isSuperAdmin && (
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(u)} data-testid={`button-edit-user-${u.id}`}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(u)} data-testid={`button-delete-user-${u.id}`} disabled={deleteMutation.isPending}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <PermissionsTable />
     </div>
   );
 }

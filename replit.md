@@ -11,10 +11,18 @@ Full-stack web application for managing kitesurf school equipment across multipl
 - **Routing**: wouter (frontend), Express (backend)
 - **State**: TanStack Query v5
 
-## User Roles
-- **Admin** (`admin`): Full access, user/station management, all financial data, full activity log
-- **Hamburg Manager** (`manager`): Broad access (equipment CRUD, transfers, invoices, price lists), no user management
+## User Roles (4 tiers)
+- **Super Admin** (`admin` + `isSuperAdmin=true`): Everything an Admin can do, plus: user CRUD, station deletion, equipment deletion, invoice deletion
+- **Admin** (`admin`): Full access to features (equipment, imports, transfers, sales, price lists, activity log, stations), but cannot manage users or delete equipment/invoices/stations
+- **Hamburg Manager** (`manager`): Equipment CRUD, transfers, invoice imports — no user management, no financial data, no activity log
 - **Station Lead** (`station_lead`): Own station only, no purchase prices, no transfers/equipment creation, sees station activity
+
+### Super-Admin-only actions (requireSuperAdmin middleware)
+- POST/PATCH/DELETE `/api/users` — user CRUD
+- DELETE `/api/stations/:id` — station deletion
+- DELETE `/api/equipment/:id` — equipment deletion
+- POST `/api/equipment/bulk-delete` — bulk equipment deletion
+- DELETE `/api/invoices/:id` — invoice deletion
 
 ## Damage Report / Incidents Module
 Full damage reporting workflow for station leads and managers.

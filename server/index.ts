@@ -147,6 +147,13 @@ app.use((req, res, next) => {
       DELETE FROM stations WHERE name = 'Andesheim'
         AND NOT EXISTS (SELECT 1 FROM equipment WHERE current_station_id = stations.id)
     `);
+
+    await dbInstance.execute(sql`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_super_admin boolean NOT NULL DEFAULT false
+    `);
+    await dbInstance.execute(sql`
+      UPDATE users SET is_super_admin = true WHERE email = 'admin@kitetracker.com' AND is_super_admin = false
+    `);
   } catch (e) {
     console.error("Equipment size migration error:", e);
   }

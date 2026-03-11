@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, requireAuth, requireAdmin, requireHamburg, hashPassword } from "./auth";
+import { setupAuth, requireAuth, requireAdmin, requireSuperAdmin, requireHamburg, hashPassword } from "./auth";
 import passport from "passport";
 import multer from "multer";
 import path from "path";
@@ -665,7 +665,7 @@ export async function registerRoutes(
     res.json(station);
   });
 
-  app.delete("/api/stations/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/stations/:id", requireSuperAdmin, async (req, res) => {
     const station = await storage.getStation(parseInt(req.params.id));
     await storage.deleteStation(parseInt(req.params.id));
     await storage.createActivityLog({
@@ -681,7 +681,7 @@ export async function registerRoutes(
     res.json(usersList.map(({ password, ...u }) => u));
   });
 
-  app.post("/api/users", requireAdmin, async (req, res) => {
+  app.post("/api/users", requireSuperAdmin, async (req, res) => {
     try {
       const hashed = await hashPassword(req.body.password);
       const user = await storage.createUser({ ...req.body, password: hashed });
@@ -700,7 +700,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/users/:id", requireAdmin, async (req, res) => {
+  app.patch("/api/users/:id", requireSuperAdmin, async (req, res) => {
     const data = { ...req.body };
     if (data.password) {
       data.password = await hashPassword(data.password);
@@ -716,7 +716,7 @@ export async function registerRoutes(
     res.json(safeUser);
   });
 
-  app.delete("/api/users/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/users/:id", requireSuperAdmin, async (req, res) => {
     const targetId = parseInt(req.params.id);
     if (targetId === (req.user as any)?.id) {
       return res.status(400).json({ message: "You cannot delete your own account." });
@@ -835,7 +835,7 @@ export async function registerRoutes(
     res.json(item);
   });
 
-  app.delete("/api/equipment/:id", requireHamburg, async (req, res) => {
+  app.delete("/api/equipment/:id", requireSuperAdmin, async (req, res) => {
     await storage.deleteEquipment(parseInt(req.params.id));
     await storage.createActivityLog({
       userId: (req.user as any).id,
@@ -845,7 +845,7 @@ export async function registerRoutes(
     res.json({ message: "Deleted" });
   });
 
-  app.post("/api/equipment/bulk-delete", requireAdmin, async (req, res) => {
+  app.post("/api/equipment/bulk-delete", requireSuperAdmin, async (req, res) => {
     const ids: number[] = req.body.ids;
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ message: "ids array is required" });
@@ -1507,7 +1507,7 @@ export async function registerRoutes(
     res.json(items);
   });
 
-  app.delete("/api/invoices/:id", requireAdmin, async (req, res) => {
+  app.delete("/api/invoices/:id", requireSuperAdmin, async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid invoice id" });
     const inv = await storage.getInvoice(id);

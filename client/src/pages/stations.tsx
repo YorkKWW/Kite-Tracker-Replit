@@ -10,9 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, MapPin, Pencil, Trash2, Inbox, ArrowRightLeft } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 import type { Station } from "@shared/schema";
 
 export default function StationsPage() {
+  const { isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const { data: stationsList, isLoading } = useQuery<Station[]>({ queryKey: ["/api/stations"] });
   const [open, setOpen] = useState(false);
@@ -151,7 +153,7 @@ export default function StationsPage() {
                       <Pencil className="h-4 w-4" />
                     </Button>
                   )}
-                  {!s.isVirtual && (
+                  {!s.isVirtual && isSuperAdmin && (
                     <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(s.id)} data-testid={`button-delete-station-${s.id}`}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>

@@ -96,6 +96,17 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+export function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+  const user = req.user as any;
+  if (user.role !== "admin" || !user.isSuperAdmin) {
+    return res.status(403).json({ message: "Super Admin access required" });
+  }
+  next();
+}
+
 export function requireHamburg(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Not authenticated" });

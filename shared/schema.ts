@@ -69,6 +69,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: userRoleEnum("role").notNull().default("manager"),
   assignedStationId: integer("assigned_station_id").references(() => stations.id),
+  isSuperAdmin: boolean("is_super_admin").notNull().default(false),
 });
 
 export const equipment = pgTable("equipment", {

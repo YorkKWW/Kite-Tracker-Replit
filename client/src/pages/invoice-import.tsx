@@ -587,7 +587,7 @@ function InvoiceRow({ invoice, isExpanded, onToggle }: {
   onToggle: () => void;
 }) {
   const [, navigate] = useLocation();
-  const { isAdmin } = useAuth();
+  const { isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { data: eqItems, isLoading, isError } = useQuery<Equipment[]>({
@@ -648,7 +648,7 @@ function InvoiceRow({ invoice, isExpanded, onToggle }: {
         </div>
       </button>
 
-      {isAdmin && isExpanded && !confirmDelete && (
+      {isSuperAdmin && isExpanded && !confirmDelete && (
         <div className="px-3 pb-1 flex justify-end">
           <button
             onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}

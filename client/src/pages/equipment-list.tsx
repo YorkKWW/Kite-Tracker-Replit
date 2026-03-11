@@ -30,7 +30,7 @@ const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
 
 
 export default function EquipmentListPage() {
-  const { isAdmin, isHamburg } = useAuth();
+  const { isAdmin, isHamburg, isSuperAdmin } = useAuth();
   const urlParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const [search, setSearch] = useState(urlParams.get("search") || "");
   const [typeFilter, setTypeFilter] = useState<string>(urlParams.get("type") || "all");
@@ -183,7 +183,7 @@ export default function EquipmentListPage() {
       <div className="flex items-center justify-between gap-1 flex-wrap">
         <h1 className="text-2xl font-bold tracking-tight" data-testid="text-equipment-title">Equipment</h1>
         <div className="flex gap-2">
-          {isAdmin && (
+          {isSuperAdmin && (
             <Button
               variant={selectMode ? "default" : "outline"}
               size="sm"
