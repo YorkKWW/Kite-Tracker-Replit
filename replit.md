@@ -125,7 +125,8 @@ Photos uploaded via Replit Object Storage presigned URL flow:
 1. Client GETs upload URL from /api/equipment/:id/photos/upload-url
 2. Client PUTs file directly to presigned URL
 3. Client POSTs {url} to /api/equipment/:id/photos to save metadata
-Served via /objects/:path proxy route.
+Served via `/objects/{*objectPath}` route which redirects to a signed GET URL (not streamed).
+URLs stored in DB already include `/objects/` prefix — do NOT double-prefix in UI templates.
 
 ## Inventory Check Flow
 POST /api/stations/:id/inventory-checks → creates check + items for all station equipment

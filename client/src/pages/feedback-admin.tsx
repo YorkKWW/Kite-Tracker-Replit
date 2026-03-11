@@ -105,7 +105,7 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
           <div className="flex items-center gap-2">
             <Mic className="h-4 w-4 text-red-500 shrink-0" />
             <audio
-              src={`/objects/${item.audioUrl}`}
+              src={item.audioUrl}
               controls
               className="h-8 flex-1"
               data-testid={`audio-feedback-${item.id}`}
@@ -123,9 +123,9 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
         {item.screenshotUrl && (
           <div className="flex gap-2">
             <Image className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-            <a href={`/objects/${item.screenshotUrl}`} target="_blank" rel="noopener noreferrer">
+            <a href={item.screenshotUrl} target="_blank" rel="noopener noreferrer">
               <img
-                src={`/objects/${item.screenshotUrl}`}
+                src={item.screenshotUrl}
                 alt="Screenshot"
                 className="max-h-40 rounded-md border object-contain cursor-pointer hover:opacity-80"
                 data-testid={`img-feedback-screenshot-${item.id}`}
