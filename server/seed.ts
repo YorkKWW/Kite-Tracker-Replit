@@ -17,12 +17,14 @@ const DEFAULT_SUPPLIERS = [
 
 async function seedSuppliers() {
   const existing = await storage.getAllSuppliers();
-  if (existing.length > 0) return;
-  console.log("Seeding default suppliers...");
-  for (const s of DEFAULT_SUPPLIERS) {
+  const existingNames = new Set(existing.map(s => s.name));
+  const missing = DEFAULT_SUPPLIERS.filter(s => !existingNames.has(s.name));
+  if (missing.length === 0) return;
+  console.log(`Adding ${missing.length} missing suppliers...`);
+  for (const s of missing) {
     await storage.createSupplier(s);
   }
-  console.log(`Inserted ${DEFAULT_SUPPLIERS.length} default suppliers.`);
+  console.log(`Inserted ${missing.length} suppliers: ${missing.map(s => s.name).join(", ")}`);
 }
 
 export async function seedDatabase() {
