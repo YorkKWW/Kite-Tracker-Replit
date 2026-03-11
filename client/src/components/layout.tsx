@@ -30,6 +30,8 @@ import {
   CheckCircle2,
   HelpCircle,
   MessageSquarePlus,
+  ClipboardCheck,
+  MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -119,6 +121,24 @@ export default function Layout({ children }: LayoutProps) {
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
+  const stationLeadBottomTabs = [
+    { href: "/equipment", label: "Equipment", icon: Package },
+    { href: "/incidents", label: "Incidents", icon: AlertTriangle },
+    { href: "/repairs", label: "Repairs", icon: Wrench },
+    ...(user?.assignedStationId
+      ? [{ href: `/stations/${user.assignedStationId}`, label: "Inventur", icon: ClipboardCheck }]
+      : []),
+  ];
+
+  const defaultBottomTabs = [
+    { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/equipment", label: "Equipment", icon: Package },
+    { href: "/sales", label: "Sales", icon: ShoppingCart },
+    { href: "/incidents", label: "Incidents", icon: AlertTriangle },
+  ];
+
+  const bottomTabs = isStationLead ? stationLeadBottomTabs : defaultBottomTabs;
+
   const { data: openCountData } = useQuery<{ count: number }>({
     queryKey: ["/api/damage-reports/open-count"],
     staleTime: 0,
@@ -186,7 +206,7 @@ export default function Layout({ children }: LayoutProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden"
+              className="hidden"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               data-testid="button-mobile-menu"
             >
@@ -195,28 +215,7 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </div>
 
-        {mobileMenuOpen && (
-          <nav className="md:hidden border-t bg-background p-2 space-y-1">
-            {navItems.map((item) => (
-              <Link key={item.href} href={item.href}>
-                <Button
-                  variant={isActive(item.href) ? "secondary" : "ghost"}
-                  className="w-full justify-start gap-3 relative"
-                  onClick={() => setMobileMenuOpen(false)}
-                  data-testid={`link-mobile-nav-${item.label.toLowerCase()}`}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                  {item.href === "/incidents" && openDamageCount > 0 && (
-                    <span className="ml-auto h-5 min-w-[20px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
-                      {openDamageCount > 9 ? "9+" : openDamageCount}
-                    </span>
-                  )}
-                </Button>
-              </Link>
-            ))}
-          </nav>
-        )}
+        
       </header>
 
       <BarcodeScanner open={scannerOpen} onClose={() => setScannerOpen(false)} onScan={handleScan} />
@@ -348,22 +347,66 @@ export default function Layout({ children }: LayoutProps) {
 
       <main className="pb-20 md:pb-6">{children}</main>
 
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-40 bg-black/30" onClick={() => setMobileMenuOpen(false)} />
+      )}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed bottom-16 left-0 right-0 z-40 bg-background border-t rounded-t-xl shadow-lg p-2 space-y-1 max-h-[60vh] overflow-y-auto safe-area-bottom">
+          {navItems
+            .filter((item) => !bottomTabs.some((bt) => bt.href === item.href))
+            .map((item) => (
+            <Link key={item.href} href={item.href}>
+              <Button
+                variant={isActive(item.href) ? "secondary" : "ghost"}
+                className="w-full justify-start gap-3 relative"
+                onClick={() => setMobileMenuOpen(false)}
+                data-testid={`link-mobile-nav-${item.label.toLowerCase()}`}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+                {item.href === "/incidents" && openDamageCount > 0 && (
+                  <span className="ml-auto h-5 min-w-[20px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                    {openDamageCount > 9 ? "9+" : openDamageCount}
+                  </span>
+                )}
+              </Button>
+            </Link>
+          ))}
+        </div>
+      )}
+
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center justify-around h-16 px-2">
-          {navItems.slice(0, 4).map((item) => (
+          {bottomTabs.map((item) => (
             <Link key={item.href} href={item.href}>
               <button
                 className={cn(
-                  "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors min-w-[60px]",
+                  "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors min-w-[60px] relative",
                   isActive(item.href) ? "text-primary" : "text-muted-foreground"
                 )}
                 data-testid={`link-bottom-nav-${item.label.toLowerCase()}`}
               >
                 <item.icon className="h-5 w-5" />
+                {item.href === "/incidents" && openDamageCount > 0 && (
+                  <span className="absolute top-1 right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {openDamageCount > 9 ? "9+" : openDamageCount}
+                  </span>
+                )}
                 <span className="text-[10px] font-medium">{item.label}</span>
               </button>
             </Link>
           ))}
+          <button
+            className={cn(
+              "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors min-w-[60px]",
+              mobileMenuOpen ? "text-primary" : "text-muted-foreground"
+            )}
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            data-testid="link-bottom-nav-more"
+          >
+            <MoreHorizontal className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Mehr</span>
+          </button>
         </div>
       </nav>
     </div>
