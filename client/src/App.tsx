@@ -49,13 +49,13 @@ function AuthenticatedRouter() {
         <Route path="/equipment" component={EquipmentListPage} />
         {isHamburg && <Route path="/equipment/new" component={EquipmentFormPage} />}
         <Route path="/equipment/:id" component={EquipmentDetailPage} />
-        {isHamburg && <Route path="/transfers" component={TransfersPage} />}
+        <Route path="/transfers" component={TransfersPage} />
         {isAdmin && <Route path="/stations" component={StationsPage} />}
         <Route path="/stations/:id" component={StationDetailPage} />
         <Route path="/inventory-check/:id" component={InventoryCheckPage} />
         {isAdmin && <Route path="/users" component={UsersPage} />}
         {isAdmin && <Route path="/feedback" component={FeedbackAdminPage} />}
-        {isAdmin && <Route path="/activity" component={ActivityPage} />}
+        <Route path="/activity" component={ActivityPage} />
         <Route path="/incidents" component={IncidentsPage} />
         <Route path="/repairs" component={RepairsPage} />
         {isHamburg && <Route path="/invoice-import" component={InvoiceImportPage} />}

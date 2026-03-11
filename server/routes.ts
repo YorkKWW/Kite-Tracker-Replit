@@ -1005,7 +1005,7 @@ export async function registerRoutes(
     res.json(transfersList);
   });
 
-  app.post("/api/transfers", requireHamburg, async (req, res) => {
+  app.post("/api/transfers", requireAuth, async (req, res) => {
     const user = req.user as any;
     let fromStationId = req.body.fromStationId;
     if (!fromStationId) {
@@ -1071,7 +1071,7 @@ export async function registerRoutes(
     res.json(transfer);
   });
 
-  app.post("/api/transfers/:id/cancel", requireHamburg, async (req, res) => {
+  app.post("/api/transfers/:id/cancel", requireAuth, async (req, res) => {
     const user = req.user as any;
     const transfer = await storage.cancelTransfer(parseInt(req.params.id));
     if (!transfer) return res.status(404).json({ message: "Transfer not found" });

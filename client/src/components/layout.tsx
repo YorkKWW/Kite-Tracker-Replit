@@ -106,7 +106,7 @@ export default function Layout({ children }: LayoutProps) {
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/equipment", label: "Equipment", icon: Package },
-    ...(isHamburg ? [{ href: "/transfers", label: "Transfers", icon: ArrowLeftRight }] : []),
+    { href: "/transfers", label: "Transfers", icon: ArrowLeftRight },
     { href: "/sales", label: "Sales", icon: ShoppingCart },
     { href: "/incidents", label: "Incidents", icon: AlertTriangle },
     { href: "/repairs", label: "Repairs", icon: Wrench },
