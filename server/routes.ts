@@ -1448,7 +1448,7 @@ export async function registerRoutes(
     );
 
     let imported = 0;
-    const errors: string[] = [];
+    const errors: { serial: string; name: string; message: string; existingId: number | null }[] = [];
     for (const item of toImport) {
       try {
         await storage.createEquipment({
@@ -1471,7 +1471,17 @@ export async function registerRoutes(
         });
         imported++;
       } catch (err: any) {
-        errors.push(`${item.serialNumber || item.sku}: ${err.message}`);
+        let existingId: number | null = null;
+        if (err.message?.includes("equipment_serial_number_unique") && item.serialNumber) {
+          const existing = await storage.getEquipmentBySerial(item.serialNumber);
+          existingId = existing?.id ?? null;
+        }
+        errors.push({
+          serial: item.serialNumber || item.sku || "",
+          name: item.name || "",
+          message: err.message,
+          existingId,
+        });
       }
     }
 

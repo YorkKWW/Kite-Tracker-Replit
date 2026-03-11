@@ -14,7 +14,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 import {
   ArrowLeft, Upload, FileText, CheckCircle2, AlertTriangle,
-  ChevronRight, ChevronDown, SkipForward, Loader2, Package, Receipt, Trash2,
+  ChevronRight, ChevronDown, SkipForward, Loader2, Package, Receipt, Trash2, ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import type { Supplier, Equipment, Invoice } from "@shared/schema";
@@ -57,7 +57,7 @@ export default function InvoiceImportPage() {
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [items, setItems] = useState<ParsedItem[]>([]);
   const [isParsing, setIsParsing] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; errors: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; errors: { serial: string; name: string; message: string; existingId: number | null }[] } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -497,9 +497,18 @@ export default function InvoiceImportPage() {
                 </p>
               </CardHeader>
               <CardContent>
-                <ul className="text-xs text-left space-y-1 text-muted-foreground">
+                <ul className="text-xs text-left space-y-2 text-muted-foreground">
                   {importResult.errors.map((e, i) => (
-                    <li key={i}>• {e}</li>
+                    <li key={i} className="space-y-0.5">
+                      <div className="font-medium text-foreground">{e.serial}{e.name ? ` — ${e.name}` : ""}</div>
+                      <div>{e.message.includes("equipment_serial_number_unique") ? "Duplicate serial number already exists in database" : e.message}</div>
+                      {e.existingId && (
+                        <Link href={`/equipment/${e.existingId}`} className="inline-flex items-center gap-1 text-primary hover:underline font-medium" data-testid={`link-duplicate-${e.serial}`}>
+                          <ExternalLink className="h-3 w-3" />
+                          View existing equipment #{e.existingId}
+                        </Link>
+                      )}
+                    </li>
                   ))}
                 </ul>
               </CardContent>
