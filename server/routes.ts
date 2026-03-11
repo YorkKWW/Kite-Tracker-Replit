@@ -681,13 +681,19 @@ export async function registerRoutes(
     res.json(usersList.map(({ password, ...u }) => u));
   });
 
-  app.post("/api/users", requireSuperAdmin, async (req, res) => {
+  app.post("/api/users", requireAdmin, async (req, res) => {
     try {
+      const currentUser = req.user as any;
+      const targetRole = req.body.role;
+      const targetIsSuperAdmin = req.body.isSuperAdmin;
+      if (!currentUser.isSuperAdmin && (targetRole === "admin" || targetIsSuperAdmin)) {
+        return res.status(403).json({ message: "Only Super Admins can create Admin accounts" });
+      }
       const hashed = await hashPassword(req.body.password);
       const user = await storage.createUser({ ...req.body, password: hashed });
       const { password, ...safeUser } = user;
       await storage.createActivityLog({
-        userId: (req.user as any).id,
+        userId: currentUser.id,
         action: "user_created",
         details: `Created user: ${user.email}`,
       });
@@ -700,7 +706,17 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/users/:id", requireSuperAdmin, async (req, res) => {
+  app.patch("/api/users/:id", requireAdmin, async (req, res) => {
+    const currentUser = req.user as any;
+    const targetRole = req.body.role;
+    const targetIsSuperAdmin = req.body.isSuperAdmin;
+    if (!currentUser.isSuperAdmin && (targetRole === "admin" || targetIsSuperAdmin)) {
+      return res.status(403).json({ message: "Only Super Admins can assign Admin roles" });
+    }
+    const existingUser = await storage.getUser(parseInt(req.params.id));
+    if (existingUser && existingUser.role === "admin" && !currentUser.isSuperAdmin) {
+      return res.status(403).json({ message: "Only Super Admins can edit Admin accounts" });
+    }
     const data = { ...req.body };
     if (data.password) {
       data.password = await hashPassword(data.password);
@@ -709,7 +725,7 @@ export async function registerRoutes(
     if (!user) return res.status(404).json({ message: "User not found" });
     const { password, ...safeUser } = user;
     await storage.createActivityLog({
-      userId: (req.user as any).id,
+      userId: currentUser.id,
       action: "user_updated",
       details: `Updated user: ${user.email}`,
     });

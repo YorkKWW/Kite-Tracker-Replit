@@ -49,7 +49,9 @@ const PERMISSIONS = [
   { label: "Preislisten einsehen", superAdmin: true, admin: true, manager: true, stationLead: false },
   { label: "Stationen anlegen & bearbeiten", superAdmin: true, admin: true, manager: false, stationLead: false },
   { label: "Stationen löschen", superAdmin: true, admin: false, manager: false, stationLead: false },
-  { label: "Benutzer anlegen, bearbeiten & löschen", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "Manager & Station Leads anlegen & bearbeiten", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Admins anlegen & bearbeiten", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "Benutzer löschen", superAdmin: true, admin: false, manager: false, stationLead: false },
   { label: "Benutzer anzeigen", superAdmin: true, admin: true, manager: false, stationLead: false },
   { label: "Damage Reports erstellen", superAdmin: true, admin: true, manager: true, stationLead: true },
   { label: "Damage Reports Status ändern", superAdmin: true, admin: true, manager: true, stationLead: false },
@@ -236,12 +238,10 @@ export default function UsersPage() {
     <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between gap-1">
         <h1 className="text-2xl font-bold tracking-tight" data-testid="text-users-title">Users</h1>
-        {isSuperAdmin && (
-          <Button onClick={openCreate} data-testid="button-add-user">
-            <Plus className="h-4 w-4 mr-2" />
-            Add User
-          </Button>
-        )}
+        <Button onClick={openCreate} data-testid="button-add-user">
+          <Plus className="h-4 w-4 mr-2" />
+          Add User
+        </Button>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -269,7 +269,7 @@ export default function UsersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  {isSuperAdmin && <SelectItem value="admin">Admin</SelectItem>}
                   <SelectItem value="manager">Hamburg Manager</SelectItem>
                   <SelectItem value="station_lead">Station Lead</SelectItem>
                 </SelectContent>
@@ -354,16 +354,18 @@ export default function UsersPage() {
                     )}
                   </div>
                 </div>
-                {isSuperAdmin && (
-                  <div className="flex gap-1">
+                <div className="flex gap-1">
+                  {(isSuperAdmin || u.role !== "admin") && (
                     <Button variant="ghost" size="icon" onClick={() => openEdit(u)} data-testid={`button-edit-user-${u.id}`}>
                       <Pencil className="h-4 w-4" />
                     </Button>
+                  )}
+                  {isSuperAdmin && (
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(u)} data-testid={`button-delete-user-${u.id}`} disabled={deleteMutation.isPending}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
