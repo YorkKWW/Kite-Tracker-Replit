@@ -57,14 +57,18 @@ async function uploadBlob(blob: Blob, uploadURL: string): Promise<void> {
   if (!res.ok) throw new Error("Upload fehlgeschlagen");
 }
 
+interface AttachmentItem {
+  blob: Blob;
+  preview: string;
+}
+
 export function FeedbackButton() {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [screenshotBlob, setScreenshotBlob] = useState<Blob | null>(null);
-  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -82,18 +86,15 @@ export function FeedbackButton() {
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl);
     }
-    if (screenshotPreview) {
-      URL.revokeObjectURL(screenshotPreview);
-    }
-  }, [audioUrl, screenshotPreview]);
+    attachments.forEach(a => URL.revokeObjectURL(a.preview));
+  }, [audioUrl, attachments]);
 
   const reset = useCallback(() => {
     revokeUrls();
     setMessage("");
     setAudioBlob(null);
     setAudioUrl(null);
-    setScreenshotBlob(null);
-    setScreenshotPreview(null);
+    setAttachments([]);
     setRecording(false);
     setRecordingDuration(0);
     if (streamRef.current) {
@@ -170,17 +171,28 @@ export function FeedbackButton() {
   };
 
   const handleScreenshot = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (screenshotPreview) URL.revokeObjectURL(screenshotPreview);
-    setScreenshotBlob(file);
-    setScreenshotPreview(URL.createObjectURL(file));
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newAttachments: AttachmentItem[] = [];
+    for (let i = 0; i < files.length; i++) {
+      newAttachments.push({
+        blob: files[i],
+        preview: URL.createObjectURL(files[i]),
+      });
+    }
+    setAttachments(prev => [...prev, ...newAttachments]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
-  const removeScreenshot = () => {
-    if (screenshotPreview) URL.revokeObjectURL(screenshotPreview);
-    setScreenshotBlob(null);
-    setScreenshotPreview(null);
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => {
+      const updated = [...prev];
+      URL.revokeObjectURL(updated[index].preview);
+      updated.splice(index, 1);
+      return updated;
+    });
   };
 
   const submitMutation = useMutation({
@@ -188,7 +200,7 @@ export function FeedbackButton() {
       setUploading(true);
       try {
         let audioPath: string | null = null;
-        let screenshotPath: string | null = null;
+        const attachmentPaths: string[] = [];
 
         if (audioBlob) {
           const { uploadURL, objectPath } = await getUploadUrl();
@@ -196,17 +208,17 @@ export function FeedbackButton() {
           audioPath = objectPath;
         }
 
-        if (screenshotBlob) {
+        for (const att of attachments) {
           const { uploadURL, objectPath } = await getUploadUrl();
-          await uploadBlob(screenshotBlob, uploadURL);
-          screenshotPath = objectPath;
+          await uploadBlob(att.blob, uploadURL);
+          attachmentPaths.push(objectPath);
         }
 
         return apiRequest("POST", "/api/feedback", {
           pageUrl: location,
           message: message.trim() || null,
           audioUrl: audioPath,
-          screenshotUrl: screenshotPath,
+          attachmentUrls: attachmentPaths,
         });
       } finally {
         setUploading(false);
@@ -223,7 +235,7 @@ export function FeedbackButton() {
     },
   });
 
-  const canSubmit = (message.trim().length > 0 || audioBlob !== null) && !uploading;
+  const canSubmit = (message.trim().length > 0 || audioBlob !== null || attachments.length > 0) && !uploading;
 
   const formatDuration = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
@@ -323,35 +335,37 @@ export function FeedbackButton() {
             </div>
 
             <div className="space-y-2">
-              {!screenshotBlob && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="gap-2 w-full"
-                  data-testid="button-add-screenshot"
-                >
-                  <Camera className="h-4 w-4" />
-                  Screenshot / Foto anhängen
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="gap-2 w-full"
+                data-testid="button-add-screenshot"
+              >
+                <Camera className="h-4 w-4" />
+                Screenshot / Foto anhängen{attachments.length > 0 ? ` (${attachments.length})` : ""}
+              </Button>
 
-              {screenshotPreview && (
-                <div className="relative inline-block">
-                  <img
-                    src={screenshotPreview}
-                    alt="Screenshot"
-                    className="h-20 rounded-md border object-cover"
-                    data-testid="img-screenshot-preview"
-                  />
-                  <button
-                    onClick={removeScreenshot}
-                    className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center text-xs"
-                    data-testid="button-remove-screenshot"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {attachments.map((att, index) => (
+                    <div key={index} className="relative inline-block">
+                      <img
+                        src={att.preview}
+                        alt={`Anhang ${index + 1}`}
+                        className="h-20 rounded-md border object-cover"
+                        data-testid={`img-screenshot-preview-${index}`}
+                      />
+                      <button
+                        onClick={() => removeAttachment(index)}
+                        className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center text-xs"
+                        data-testid={`button-remove-screenshot-${index}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -360,6 +374,7 @@ export function FeedbackButton() {
                 type="file"
                 accept="image/*"
                 capture="environment"
+                multiple
                 className="hidden"
                 onChange={handleScreenshot}
               />

@@ -2766,19 +2766,28 @@ export async function registerRoutes(
         message: z.string().optional().nullable(),
         audioUrl: z.string().optional().nullable(),
         screenshotUrl: z.string().optional().nullable(),
+        attachmentUrls: z.array(z.string()).optional(),
       });
       const data = schema.parse(req.body);
-      if (!data.message && !data.audioUrl) {
-        return res.status(400).json({ message: "Bitte Nachricht oder Sprachnachricht angeben." });
+      const hasAttachments = (data.attachmentUrls && data.attachmentUrls.length > 0) || data.screenshotUrl;
+      if (!data.message && !data.audioUrl && !hasAttachments) {
+        return res.status(400).json({ message: "Bitte Nachricht, Sprachnachricht oder Screenshot/Foto angeben." });
       }
       const fb = await storage.createFeedback({
         userId: user.id,
         pageUrl: data.pageUrl,
         message: data.message ?? null,
         audioUrl: data.audioUrl ?? null,
-        screenshotUrl: data.screenshotUrl ?? null,
+        screenshotUrl: null,
         status: "open",
       });
+      const allAttachmentUrls = [...(data.attachmentUrls || [])];
+      if (data.screenshotUrl) {
+        allAttachmentUrls.push(data.screenshotUrl);
+      }
+      if (allAttachmentUrls.length > 0) {
+        await storage.createFeedbackAttachments(fb.id, allAttachmentUrls);
+      }
       await storage.createActivityLog({
         userId: user.id,
         action: "feedback_submitted",

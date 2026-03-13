@@ -24,9 +24,9 @@ import {
   Send,
   MessageCircle,
 } from "lucide-react";
-import type { Feedback, FeedbackComment } from "@shared/schema";
+import type { Feedback, FeedbackAttachment, FeedbackComment } from "@shared/schema";
 
-type FeedbackWithUser = Feedback & { userName: string; userRole: string };
+type FeedbackWithUser = Feedback & { userName: string; userRole: string; attachments: FeedbackAttachment[] };
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof AlertCircle }> = {
   open: { label: "Offen", variant: "destructive", icon: AlertCircle },
@@ -189,17 +189,31 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
           </div>
         )}
 
-        {item.screenshotUrl && (
+        {(item.attachments?.length > 0 || item.screenshotUrl) && (
           <div className="flex gap-2">
             <Image className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-            <a href={item.screenshotUrl} target="_blank" rel="noopener noreferrer">
-              <img
-                src={item.screenshotUrl}
-                alt="Screenshot"
-                className="max-h-40 rounded-md border object-contain cursor-pointer hover:opacity-80"
-                data-testid={`img-feedback-screenshot-${item.id}`}
-              />
-            </a>
+            <div className="flex flex-wrap gap-2">
+              {item.attachments?.map((att, idx) => (
+                <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={att.url}
+                    alt={`Anhang ${idx + 1}`}
+                    className="max-h-40 rounded-md border object-contain cursor-pointer hover:opacity-80"
+                    data-testid={`img-feedback-attachment-${item.id}-${idx}`}
+                  />
+                </a>
+              ))}
+              {item.screenshotUrl && !item.attachments?.some(att => att.url === item.screenshotUrl) && (
+                <a href={item.screenshotUrl} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={item.screenshotUrl}
+                    alt="Screenshot"
+                    className="max-h-40 rounded-md border object-contain cursor-pointer hover:opacity-80"
+                    data-testid={`img-feedback-screenshot-${item.id}`}
+                  />
+                </a>
+              )}
+            </div>
           </div>
         )}
 

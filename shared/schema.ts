@@ -434,6 +434,18 @@ export const insertFeedbackSchema = createInsertSchema(feedback).omit({ id: true
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 export type Feedback = typeof feedback.$inferSelect;
 
+export const feedbackAttachments = pgTable("feedback_attachments", {
+  id: serial("id").primaryKey(),
+  feedbackId: integer("feedback_id").notNull().references(() => feedback.id),
+  url: text("url").notNull(),
+  type: text("type").default("image"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFeedbackAttachmentSchema = createInsertSchema(feedbackAttachments).omit({ id: true, createdAt: true });
+export type InsertFeedbackAttachment = z.infer<typeof insertFeedbackAttachmentSchema>;
+export type FeedbackAttachment = typeof feedbackAttachments.$inferSelect;
+
 export const feedbackComments = pgTable("feedback_comments", {
   id: serial("id").primaryKey(),
   feedbackId: integer("feedback_id").notNull().references(() => feedback.id),

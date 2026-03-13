@@ -32,7 +32,7 @@ import {
   stations, users, equipment, conditionRatings, repairs, transfers, photos, activityLog,
   inventoryChecks, inventoryCheckItems, suppliers, invoices,
   companySettings, customers, salesInvoices, saleItems, priceLists, priceListItems,
-  damageReports, damageReportPhotos, feedback, feedbackComments, notifications,
+  damageReports, damageReportPhotos, feedback, feedbackAttachments, feedbackComments, notifications,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -54,6 +54,7 @@ import {
   type DamageReport, type InsertDamageReport,
   type DamageReportPhoto, type InsertDamageReportPhoto,
   type Feedback, type InsertFeedback,
+  type FeedbackAttachment, type InsertFeedbackAttachment,
   type FeedbackComment, type InsertFeedbackComment,
   type Notification, type InsertNotification,
 } from "@shared/schema";
@@ -167,10 +168,12 @@ export interface IStorage {
   updateDamageReport(id: number, data: Partial<DamageReport>): Promise<DamageReport | undefined>;
   createDamageReportPhoto(photo: InsertDamageReportPhoto): Promise<DamageReportPhoto>;
 
-  getAllFeedback(): Promise<(Feedback & { userName: string; userRole: string })[]>;
+  getAllFeedback(): Promise<(Feedback & { userName: string; userRole: string; attachments: FeedbackAttachment[] })[]>;
   createFeedback(fb: InsertFeedback): Promise<Feedback>;
   updateFeedback(id: number, data: Partial<Feedback>): Promise<Feedback | undefined>;
   getOpenFeedbackCount(): Promise<number>;
+  createFeedbackAttachments(feedbackId: number, urls: string[]): Promise<FeedbackAttachment[]>;
+  getFeedbackAttachments(feedbackId: number): Promise<FeedbackAttachment[]>;
 
   getFeedbackComments(feedbackId: number): Promise<(FeedbackComment & { userName: string })[]>;
   createFeedbackComment(comment: InsertFeedbackComment): Promise<FeedbackComment>;
@@ -1082,7 +1085,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getAllFeedback(): Promise<(Feedback & { userName: string; userRole: string })[]> {
+  async getAllFeedback(): Promise<(Feedback & { userName: string; userRole: string; attachments: FeedbackAttachment[] })[]> {
     const rows = await db
       .select({
         id: feedback.id,
@@ -1100,7 +1103,21 @@ export class DatabaseStorage implements IStorage {
       .from(feedback)
       .leftJoin(users, eq(feedback.userId, users.id))
       .orderBy(desc(feedback.createdAt));
-    return rows.map(r => ({ ...r, userName: r.userName ?? "Unknown", userRole: r.userRole ?? "station_lead" }));
+
+    const allAttachments = await db.select().from(feedbackAttachments).orderBy(feedbackAttachments.createdAt);
+    const attachmentsByFeedback = new Map<number, FeedbackAttachment[]>();
+    for (const att of allAttachments) {
+      const list = attachmentsByFeedback.get(att.feedbackId) || [];
+      list.push(att);
+      attachmentsByFeedback.set(att.feedbackId, list);
+    }
+
+    return rows.map(r => ({
+      ...r,
+      userName: r.userName ?? "Unknown",
+      userRole: r.userRole ?? "station_lead",
+      attachments: attachmentsByFeedback.get(r.id) || [],
+    }));
   }
 
   async createFeedback(fb: InsertFeedback): Promise<Feedback> {
@@ -1116,6 +1133,16 @@ export class DatabaseStorage implements IStorage {
   async getOpenFeedbackCount(): Promise<number> {
     const [result] = await db.select({ count: sql<number>`count(*)::int` }).from(feedback).where(eq(feedback.status, "open"));
     return result?.count ?? 0;
+  }
+
+  async createFeedbackAttachments(feedbackId: number, urls: string[]): Promise<FeedbackAttachment[]> {
+    if (urls.length === 0) return [];
+    const values = urls.map(url => ({ feedbackId, url, type: "image" as const }));
+    return db.insert(feedbackAttachments).values(values).returning();
+  }
+
+  async getFeedbackAttachments(feedbackId: number): Promise<FeedbackAttachment[]> {
+    return db.select().from(feedbackAttachments).where(eq(feedbackAttachments.feedbackId, feedbackId)).orderBy(feedbackAttachments.createdAt);
   }
 
   async getFeedbackComments(feedbackId: number): Promise<(FeedbackComment & { userName: string })[]> {
