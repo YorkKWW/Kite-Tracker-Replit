@@ -1041,6 +1041,69 @@ export async function registerRoutes(
     res.json(transfersList);
   });
 
+  app.post("/api/transfers/bulk", requireHamburg, async (req, res) => {
+    const user = req.user as any;
+    const { equipmentIds, toStationId } = req.body;
+    if (!Array.isArray(equipmentIds) || equipmentIds.length === 0 || !equipmentIds.every((id: any) => typeof id === "number" && Number.isInteger(id) && id > 0)) {
+      return res.status(400).json({ message: "equipmentIds must be a non-empty array of positive integers" });
+    }
+    if (typeof toStationId !== "number" || !Number.isInteger(toStationId) || toStationId <= 0) {
+      return res.status(400).json({ message: "toStationId must be a positive integer" });
+    }
+
+    const allStations = await storage.getAllStations();
+    const destStation = allStations.find(s => s.id === toStationId);
+    if (!destStation || destStation.isVirtual) {
+      return res.status(400).json({ message: "Invalid destination station" });
+    }
+
+    const results: { transferred: number; errors: string[] } = { transferred: 0, errors: [] };
+
+    for (const eqId of equipmentIds) {
+      try {
+        const item = await storage.getEquipment(eqId);
+        if (!item) {
+          results.errors.push(`Equipment #${eqId} not found`);
+          continue;
+        }
+        if (item.status === "in_transfer") {
+          results.errors.push(`${item.brand} ${item.model} (${item.serialNumber}) is already in transfer`);
+          continue;
+        }
+        let fromStationId = item.currentStationId;
+        if (!fromStationId) {
+          const incoming = allStations.find(s => s.isVirtual && s.name.includes("Incoming"))
+            ?? allStations.find(s => s.name.toLowerCase().includes("incoming"))
+            ?? allStations.find(s => s.name.toLowerCase().includes("warehouse"))
+            ?? allStations.find(s => s.isVirtual);
+          fromStationId = incoming?.id ?? toStationId;
+        }
+        await storage.createTransfer({
+          equipmentId: eqId,
+          fromStationId,
+          toStationId,
+          initiatedBy: user.id,
+        });
+        try {
+          await storage.createActivityLog({
+            userId: user.id,
+            action: "transfer_initiated",
+            equipmentId: eqId,
+            details: `Bulk transfer initiated to station ${toStationId}`,
+          });
+        } catch (_logErr) {
+          // Activity log failure is non-fatal
+        }
+        results.transferred++;
+      } catch (err: any) {
+        console.error(`Bulk transfer error for equipment #${eqId}:`, err);
+        results.errors.push(`Equipment #${eqId}: Transfer failed`);
+      }
+    }
+
+    res.json(results);
+  });
+
   app.post("/api/transfers", requireAuth, async (req, res) => {
     const user = req.user as any;
     let fromStationId = req.body.fromStationId;

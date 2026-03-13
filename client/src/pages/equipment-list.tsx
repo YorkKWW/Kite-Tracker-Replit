@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConditionBadge, StatusBadge } from "@/components/condition-badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp, Inbox, ArrowRightLeft, CheckSquare, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp, Inbox, ArrowRightLeft, CheckSquare, Trash2, Send } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPES_WITHOUT_SERIAL } from "@shared/schema";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -46,6 +47,8 @@ export default function EquipmentListPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const [transferStationId, setTransferStationId] = useState<string>("");
   const { toast } = useToast();
 
   const bulkDeleteMutation = useMutation({
@@ -65,6 +68,30 @@ export default function EquipmentListPage() {
     },
     onError: () => {
       toast({ title: "Bulk delete failed", description: "Please try again.", variant: "destructive" });
+    },
+  });
+
+  const bulkTransferMutation = useMutation({
+    mutationFn: async ({ equipmentIds, toStationId }: { equipmentIds: number[]; toStationId: number }) => {
+      const res = await apiRequest("POST", "/api/transfers/bulk", { equipmentIds, toStationId });
+      return res.json();
+    },
+    onSuccess: (data: { transferred: number; errors: string[] }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
+      toast({ title: `${data.transferred} item${data.transferred !== 1 ? "s" : ""} transferred` });
+      if (data.errors.length > 0) {
+        toast({ title: "Some items could not be transferred", description: data.errors.join("\n"), variant: "destructive" });
+      }
+      if (data.transferred > 0) {
+        setSelectedIds(new Set());
+        setSelectMode(false);
+      }
+      setShowTransferDialog(false);
+      setTransferStationId("");
+    },
+    onError: () => {
+      toast({ title: "Bulk transfer failed", description: "Please try again.", variant: "destructive" });
     },
   });
 
@@ -183,7 +210,7 @@ export default function EquipmentListPage() {
       <div className="flex items-center justify-between gap-1 flex-wrap">
         <h1 className="text-2xl font-bold tracking-tight" data-testid="text-equipment-title">Equipment</h1>
         <div className="flex gap-2">
-          {isSuperAdmin && (
+          {(isSuperAdmin || isHamburg) && (
             <Button
               variant={selectMode ? "default" : "outline"}
               size="sm"
@@ -448,15 +475,29 @@ export default function EquipmentListPage() {
           <span className="text-sm font-medium" data-testid="text-selected-count">
             {selectedIds.size} selected
           </span>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setShowDeleteConfirm(true)}
-            data-testid="button-bulk-delete"
-          >
-            <Trash2 className="h-4 w-4 mr-1.5" />
-            Delete
-          </Button>
+          <div className="flex items-center gap-2">
+            {isHamburg && (
+              <Button
+                size="sm"
+                onClick={() => setShowTransferDialog(true)}
+                data-testid="button-bulk-transfer"
+              >
+                <Send className="h-4 w-4 mr-1.5" />
+                Transfer
+              </Button>
+            )}
+            {isSuperAdmin && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowDeleteConfirm(true)}
+                data-testid="button-bulk-delete"
+              >
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                Delete
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -481,6 +522,41 @@ export default function EquipmentListPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showTransferDialog} onOpenChange={(open) => { setShowTransferDialog(open); if (!open) setTransferStationId(""); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle data-testid="text-transfer-dialog-title">Transfer {selectedIds.size} item{selectedIds.size !== 1 ? "s" : ""}</DialogTitle>
+            <DialogDescription>
+              Select the destination station for the selected equipment.
+            </DialogDescription>
+          </DialogHeader>
+          <Select value={transferStationId} onValueChange={setTransferStationId}>
+            <SelectTrigger data-testid="select-transfer-station">
+              <SelectValue placeholder="Select station" />
+            </SelectTrigger>
+            <SelectContent>
+              {stationsList?.filter(s => !s.isVirtual).map(s => (
+                <SelectItem key={s.id} value={s.id.toString()} data-testid={`option-station-${s.id}`}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowTransferDialog(false); setTransferStationId(""); }} data-testid="button-cancel-transfer">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => bulkTransferMutation.mutate({ equipmentIds: Array.from(selectedIds), toStationId: parseInt(transferStationId) })}
+              disabled={!transferStationId || bulkTransferMutation.isPending}
+              data-testid="button-confirm-transfer"
+            >
+              {bulkTransferMutation.isPending ? "Transferring..." : "Transfer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
