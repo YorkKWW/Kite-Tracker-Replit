@@ -137,7 +137,6 @@ export default function Layout({ children }: LayoutProps) {
     { href: "/equipment", label: "Equipment", icon: Package },
     { href: "/sales", label: "Sales", icon: ShoppingCart },
     { href: "/incidents", label: "Incidents", icon: AlertTriangle },
-    ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
   ];
 
   const bottomTabs = isStationLead ? stationLeadBottomTabs : defaultBottomTabs;
