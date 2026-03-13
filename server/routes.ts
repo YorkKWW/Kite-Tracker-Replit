@@ -2722,10 +2722,10 @@ export async function registerRoutes(
         details: `Feedback submitted from ${data.pageUrl}`,
       });
       const allUsers = await storage.getAllUsers();
-      const admins = allUsers.filter(u => u.role === "admin" && u.id !== user.id);
-      for (const admin of admins) {
+      const superAdmins = allUsers.filter(u => u.role === "admin" && u.isSuperAdmin && u.id !== user.id);
+      for (const sa of superAdmins) {
         await storage.createNotification({
-          userId: admin.id,
+          userId: sa.id,
           type: "feedback_new",
           title: `Neues Feedback von ${user.name}`,
           message: data.message
@@ -2735,11 +2735,11 @@ export async function registerRoutes(
           read: false,
         });
       }
-      const adminEmails = admins.map(a => a.email);
-      if (adminEmails.length) {
+      const superAdminEmails = superAdmins.map(a => a.email);
+      if (superAdminEmails.length) {
         const msgPreview = data.message || "Sprachnachricht gesendet";
         sendNotificationEmail(
-          adminEmails,
+          superAdminEmails,
           `Neues Feedback von ${user.name}`,
           `${user.name} hat neues Feedback eingereicht:\n\nSeite: ${data.pageUrl}\nNachricht: ${msgPreview}\n\nÖffne KiteTracker um zu antworten.`
         );
