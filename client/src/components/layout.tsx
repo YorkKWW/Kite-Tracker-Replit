@@ -119,6 +119,7 @@ export default function Layout({ children }: LayoutProps) {
           { href: "/invoice-import", label: "Import Invoice", icon: FileUp },
         ]
       : []),
+    ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
@@ -216,6 +217,11 @@ export default function Layout({ children }: LayoutProps) {
                   {item.href === "/incidents" && openDamageCount > 0 && (
                     <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center" data-testid="badge-open-incidents">
                       {openDamageCount > 9 ? "9+" : openDamageCount}
+                    </span>
+                  )}
+                  {item.href === "/feedback" && openFeedbackCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center" data-testid="badge-open-feedback">
+                      {openFeedbackCount > 9 ? "9+" : openFeedbackCount}
                     </span>
                   )}
                 </Button>
