@@ -196,6 +196,16 @@ app.use((req, res, next) => {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+
+    await dbInstance.execute(sql`
+      ALTER TABLE feedback ADD COLUMN IF NOT EXISTS ticket_number TEXT
+    `);
+
+    // Assign ticket numbers to existing feedback that don't have one
+    await dbInstance.execute(sql`
+      UPDATE feedback SET ticket_number = 'FB-' || LPAD(id::text, 4, '0')
+      WHERE ticket_number IS NULL
+    `);
   } catch (e) {
     console.error("Equipment size migration error:", e);
   }

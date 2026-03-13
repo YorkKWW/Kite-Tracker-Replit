@@ -420,6 +420,7 @@ export const feedbackStatusEnum = pgEnum("feedback_status", ["open", "in_progres
 
 export const feedback = pgTable("feedback", {
   id: serial("id").primaryKey(),
+  ticketNumber: text("ticket_number"),
   userId: integer("user_id").notNull().references(() => users.id),
   pageUrl: text("page_url").notNull(),
   message: text("message"),

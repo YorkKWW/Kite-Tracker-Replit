@@ -15,20 +15,24 @@ import { PDFParse } from "pdf-parse";
 
 async function sendNotificationEmail(to: string | string[], subject: string, body: string) {
   try {
-    if (!process.env.RESEND_API_KEY) return;
+    if (!process.env.RESEND_API_KEY) {
+      console.log("Skipping email: RESEND_API_KEY not set");
+      return;
+    }
     const { Resend } = await import("resend");
     const resend = new Resend(process.env.RESEND_API_KEY);
     const recipients = Array.isArray(to) ? to : [to];
     const fromAddress = process.env.EMAIL_FROM || "KiteTracker <onboarding@resend.dev>";
-    await resend.emails.send({
+    console.log(`Sending email to ${recipients.join(", ")} from ${fromAddress}: ${subject}`);
+    const result = await resend.emails.send({
       from: fromAddress,
       to: recipients,
       subject: `[KiteTracker] ${subject}`,
       text: body,
     });
-    console.log(`Notification email sent to ${recipients.join(", ")}: ${subject}`);
-  } catch (e) {
-    console.error("Notification email error:", e);
+    console.log(`Email result:`, JSON.stringify(result));
+  } catch (e: any) {
+    console.error("Notification email error:", e?.message || e);
   }
 }
 
@@ -2797,11 +2801,12 @@ export async function registerRoutes(
       });
       const allUsers = await storage.getAllUsers();
       const superAdmins = allUsers.filter(u => u.role === "admin" && u.isSuperAdmin && u.id !== user.id);
+      const ticketLabel = fb.ticketNumber || `FB-${fb.id}`;
       for (const sa of superAdmins) {
         await storage.createNotification({
           userId: sa.id,
           type: "feedback_new",
-          title: `Neues Feedback von ${user.name}`,
+          title: `${ticketLabel}: Neues Feedback von ${user.name}`,
           message: data.message
             ? (data.message.length > 80 ? data.message.slice(0, 80) + "…" : data.message)
             : "Sprachnachricht gesendet",
@@ -2814,8 +2819,8 @@ export async function registerRoutes(
         const msgPreview = data.message || "Sprachnachricht gesendet";
         sendNotificationEmail(
           superAdminEmails,
-          `Neues Feedback von ${user.name}`,
-          `${user.name} hat neues Feedback eingereicht:\n\nSeite: ${data.pageUrl}\nNachricht: ${msgPreview}\n\nÖffne KiteTracker um zu antworten.`
+          `${ticketLabel}: Neues Feedback von ${user.name}`,
+          `${user.name} hat neues Feedback eingereicht (${ticketLabel}):\n\nSeite: ${data.pageUrl}\nNachricht: ${msgPreview}\n\nÖffne KiteTracker um zu antworten.`
         );
       }
       res.json(fb);
@@ -2855,14 +2860,15 @@ export async function registerRoutes(
       details: `Feedback #${id} ${data.status ? `status → ${data.status}` : "updated"}`,
     });
     if (updated.userId !== adminUser.id) {
+      const ticketLabel = updated.ticketNumber || `FB-${updated.id}`;
       const statusLabels: Record<string, string> = { open: "Offen", in_progress: "In Bearbeitung", resolved: "Erledigt" };
       const statusMsg = data.status
-        ? `Dein Feedback wurde auf „${statusLabels[data.status] ?? data.status}" gesetzt.`
-        : "Dein Feedback wurde bearbeitet.";
+        ? `${ticketLabel}: Status → „${statusLabels[data.status] ?? data.status}"`
+        : `${ticketLabel}: Feedback wurde bearbeitet.`;
       await storage.createNotification({
         userId: updated.userId,
         type: "feedback_status",
-        title: "Feedback aktualisiert",
+        title: `${ticketLabel}: Feedback aktualisiert`,
         message: statusMsg,
         link: "/feedback",
         read: false,
@@ -2871,7 +2877,7 @@ export async function registerRoutes(
       if (feedbackAuthor) {
         sendNotificationEmail(
           feedbackAuthor.email,
-          "Feedback aktualisiert",
+          `${ticketLabel}: Feedback aktualisiert`,
           `Hallo ${feedbackAuthor.name},\n\n${statusMsg}\n\nÖffne KiteTracker um Details zu sehen.`
         );
       }
@@ -2893,13 +2899,14 @@ export async function registerRoutes(
     const allFeedback = await storage.getAllFeedback();
     const fb = allFeedback.find(f => f.id === feedbackId);
     if (fb) {
+      const ticketLabel = fb.ticketNumber || `FB-${fb.id}`;
       const msgPreview = message.length > 80 ? message.slice(0, 80) + "…" : message;
       if (user.role === "admin") {
         if (fb.userId !== user.id) {
           await storage.createNotification({
             userId: fb.userId,
             type: "feedback_comment",
-            title: "Neue Antwort auf dein Feedback",
+            title: `${ticketLabel}: Neue Antwort auf dein Feedback`,
             message: msgPreview,
             link: "/feedback",
             read: false,
@@ -2908,8 +2915,8 @@ export async function registerRoutes(
           if (author) {
             sendNotificationEmail(
               author.email,
-              "Neue Antwort auf dein Feedback",
-              `Hallo ${author.name},\n\n${user.name} hat auf dein Feedback geantwortet:\n\n„${message}"\n\nÖffne KiteTracker um zu antworten.`
+              `${ticketLabel}: Neue Antwort auf dein Feedback`,
+              `Hallo ${author.name},\n\n${user.name} hat auf dein Feedback geantwortet (${ticketLabel}):\n\n„${message}"\n\nÖffne KiteTracker um zu antworten.`
             );
           }
         }
@@ -2920,7 +2927,7 @@ export async function registerRoutes(
           await storage.createNotification({
             userId: admin.id,
             type: "feedback_comment",
-            title: `Neue Nachricht von ${user.name}`,
+            title: `${ticketLabel}: Neue Nachricht von ${user.name}`,
             message: msgPreview,
             link: "/feedback",
             read: false,
@@ -2930,8 +2937,8 @@ export async function registerRoutes(
         if (adminEmails.length) {
           sendNotificationEmail(
             adminEmails,
-            `Neue Nachricht von ${user.name}`,
-            `${user.name} hat auf ein Feedback geantwortet:\n\n„${message}"\n\nÖffne KiteTracker um zu antworten.`
+            `${ticketLabel}: Neue Nachricht von ${user.name}`,
+            `${user.name} hat auf Feedback ${ticketLabel} geantwortet:\n\n„${message}"\n\nÖffne KiteTracker um zu antworten.`
           );
         }
       }

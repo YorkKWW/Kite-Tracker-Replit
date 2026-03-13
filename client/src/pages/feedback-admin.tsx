@@ -148,6 +148,9 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 text-sm">
+            {item.ticketNumber && (
+              <span className="font-mono text-xs font-bold text-primary" data-testid={`text-ticket-${item.id}`}>{item.ticketNumber}</span>
+            )}
             <User className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium">{item.userName}</span>
             <Badge variant="outline" className="text-[10px]">{item.userRole}</Badge>

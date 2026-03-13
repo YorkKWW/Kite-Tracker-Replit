@@ -1089,6 +1089,7 @@ export class DatabaseStorage implements IStorage {
     const rows = await db
       .select({
         id: feedback.id,
+        ticketNumber: feedback.ticketNumber,
         userId: feedback.userId,
         pageUrl: feedback.pageUrl,
         message: feedback.message,
@@ -1122,7 +1123,9 @@ export class DatabaseStorage implements IStorage {
 
   async createFeedback(fb: InsertFeedback): Promise<Feedback> {
     const [created] = await db.insert(feedback).values(fb).returning();
-    return created;
+    const ticketNumber = `FB-${String(created.id).padStart(4, '0')}`;
+    const [updated] = await db.update(feedback).set({ ticketNumber }).where(eq(feedback.id, created.id)).returning();
+    return updated;
   }
 
   async updateFeedback(id: number, data: Partial<Feedback>): Promise<Feedback | undefined> {
