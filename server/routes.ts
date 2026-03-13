@@ -13,6 +13,26 @@ import { ObjectStorageService, objectStorageClient } from "./replit_integrations
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { PDFParse } from "pdf-parse";
 
+async function sendNotificationEmail(to: string | string[], subject: string, body: string) {
+  try {
+    const nodemailer = await import("nodemailer").catch(() => null);
+    if (!nodemailer || !process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+    const transporter = nodemailer.default.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: parseInt(process.env.SMTP_PORT || "587"),
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+    await transporter.sendMail({
+      from: process.env.SMTP_USER || "noreply@kitetracker.com",
+      to: Array.isArray(to) ? to.join(", ") : to,
+      subject: `[KiteTracker] ${subject}`,
+      text: body,
+    });
+  } catch (e) {
+    console.error("Notification email error:", e);
+  }
+}
+
 async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string }> {
   const parser = new PDFParse({ data: buffer });
   const result = await parser.getText();
@@ -2701,20 +2721,28 @@ export async function registerRoutes(
         action: "feedback_submitted",
         details: `Feedback submitted from ${data.pageUrl}`,
       });
-      const adminIds = await storage.getAdminUserIds();
-      for (const adminId of adminIds) {
-        if (adminId !== user.id) {
-          await storage.createNotification({
-            userId: adminId,
-            type: "feedback_new",
-            title: `Neues Feedback von ${user.name}`,
-            message: data.message
-              ? (data.message.length > 80 ? data.message.slice(0, 80) + "…" : data.message)
-              : "Sprachnachricht gesendet",
-            link: "/feedback",
-            read: false,
-          });
-        }
+      const allUsers = await storage.getAllUsers();
+      const admins = allUsers.filter(u => u.role === "admin" && u.id !== user.id);
+      for (const admin of admins) {
+        await storage.createNotification({
+          userId: admin.id,
+          type: "feedback_new",
+          title: `Neues Feedback von ${user.name}`,
+          message: data.message
+            ? (data.message.length > 80 ? data.message.slice(0, 80) + "…" : data.message)
+            : "Sprachnachricht gesendet",
+          link: "/feedback",
+          read: false,
+        });
+      }
+      const adminEmails = admins.map(a => a.email);
+      if (adminEmails.length) {
+        const msgPreview = data.message || "Sprachnachricht gesendet";
+        sendNotificationEmail(
+          adminEmails,
+          `Neues Feedback von ${user.name}`,
+          `${user.name} hat neues Feedback eingereicht:\n\nSeite: ${data.pageUrl}\nNachricht: ${msgPreview}\n\nÖffne KiteTracker um zu antworten.`
+        );
       }
       res.json(fb);
     } catch (err: any) {
@@ -2754,16 +2782,25 @@ export async function registerRoutes(
     });
     if (updated.userId !== adminUser.id) {
       const statusLabels: Record<string, string> = { open: "Offen", in_progress: "In Bearbeitung", resolved: "Erledigt" };
+      const statusMsg = data.status
+        ? `Dein Feedback wurde auf „${statusLabels[data.status] ?? data.status}" gesetzt.`
+        : "Dein Feedback wurde bearbeitet.";
       await storage.createNotification({
         userId: updated.userId,
         type: "feedback_status",
         title: "Feedback aktualisiert",
-        message: data.status
-          ? `Dein Feedback wurde auf „${statusLabels[data.status] ?? data.status}" gesetzt.`
-          : "Dein Feedback wurde bearbeitet.",
+        message: statusMsg,
         link: "/feedback",
         read: false,
       });
+      const feedbackAuthor = await storage.getUser(updated.userId);
+      if (feedbackAuthor) {
+        sendNotificationEmail(
+          feedbackAuthor.email,
+          "Feedback aktualisiert",
+          `Hallo ${feedbackAuthor.name},\n\n${statusMsg}\n\nÖffne KiteTracker um Details zu sehen.`
+        );
+      }
     }
     res.json(updated);
   });
@@ -2782,30 +2819,46 @@ export async function registerRoutes(
     const allFeedback = await storage.getAllFeedback();
     const fb = allFeedback.find(f => f.id === feedbackId);
     if (fb) {
+      const msgPreview = message.length > 80 ? message.slice(0, 80) + "…" : message;
       if (user.role === "admin") {
         if (fb.userId !== user.id) {
           await storage.createNotification({
             userId: fb.userId,
             type: "feedback_comment",
             title: "Neue Antwort auf dein Feedback",
-            message: message.length > 80 ? message.slice(0, 80) + "…" : message,
+            message: msgPreview,
+            link: "/feedback",
+            read: false,
+          });
+          const author = await storage.getUser(fb.userId);
+          if (author) {
+            sendNotificationEmail(
+              author.email,
+              "Neue Antwort auf dein Feedback",
+              `Hallo ${author.name},\n\n${user.name} hat auf dein Feedback geantwortet:\n\n„${message}"\n\nÖffne KiteTracker um zu antworten.`
+            );
+          }
+        }
+      } else {
+        const allUsers = await storage.getAllUsers();
+        const admins = allUsers.filter(u => u.role === "admin" && u.id !== user.id);
+        for (const admin of admins) {
+          await storage.createNotification({
+            userId: admin.id,
+            type: "feedback_comment",
+            title: `Neue Nachricht von ${user.name}`,
+            message: msgPreview,
             link: "/feedback",
             read: false,
           });
         }
-      } else {
-        const adminIds = await storage.getAdminUserIds();
-        for (const adminId of adminIds) {
-          if (adminId !== user.id) {
-            await storage.createNotification({
-              userId: adminId,
-              type: "feedback_comment",
-              title: `Neue Nachricht von ${user.name}`,
-              message: message.length > 80 ? message.slice(0, 80) + "…" : message,
-              link: "/feedback",
-              read: false,
-            });
-          }
+        const adminEmails = admins.map(a => a.email);
+        if (adminEmails.length) {
+          sendNotificationEmail(
+            adminEmails,
+            `Neue Nachricht von ${user.name}`,
+            `${user.name} hat auf ein Feedback geantwortet:\n\n„${message}"\n\nÖffne KiteTracker um zu antworten.`
+          );
         }
       }
     }

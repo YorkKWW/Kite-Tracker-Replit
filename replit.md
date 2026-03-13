@@ -92,6 +92,7 @@ Bell icon in header with unread badge count. Notifications created automatically
 - **New feedback**: All admins notified when any user submits feedback
 - **Feedback status change**: Feedback author notified when admin updates status
 - **Feedback comment**: Other party notified when a comment is posted (admin→author or author→admins)
+- **E-Mail notifications**: All feedback events (new, status change, comment) also send emails via SMTP when configured (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS). Shared helper `sendNotificationEmail()` in routes.ts.
 - **Dashboard alert**: Orange card on admin dashboard shows open feedback count with link
 - **DB Table**: `notifications` (id, userId, type, title, message, link, read, createdAt)
 - **Routes**: `GET /api/notifications`, `GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read`, `POST /api/notifications/mark-all-read`
