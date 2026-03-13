@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Users, Pencil, Trash2, Shield, ShieldCheck, ShieldAlert, Check, X } from "lucide-react";
 import type { Station } from "@shared/schema";
 
@@ -220,13 +221,21 @@ export default function UsersPage() {
     },
   });
 
+  const [deleteTarget, setDeleteTarget] = useState<SafeUser | null>(null);
+
   const handleDelete = (u: SafeUser) => {
     if (u.id === currentUser?.id) {
       toast({ title: "Cannot delete your own account", variant: "destructive" });
       return;
     }
-    if (!window.confirm(`Delete user "${u.name}" (${u.email})? This cannot be undone.`)) return;
-    deleteMutation.mutate(u.id);
+    setDeleteTarget(u);
+  };
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteMutation.mutate(deleteTarget.id);
+      setDeleteTarget(null);
+    }
   };
 
   const getStationName = (id: number | null) => {
@@ -274,6 +283,9 @@ export default function UsersPage() {
                   <SelectItem value="station_lead">Station Lead</SelectItem>
                 </SelectContent>
               </Select>
+              {!isSuperAdmin && editUser?.role === "admin" && (
+                <p className="text-xs text-muted-foreground">Nur Super Admins können die Admin-Rolle ändern.</p>
+              )}
             </div>
             {role === "admin" && (
               <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
@@ -319,6 +331,23 @@ export default function UsersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>User wirklich löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bist du sicher, dass du <strong>{deleteTarget?.name}</strong> ({deleteTarget?.email}) löschen willst? Diese Aktion kann nicht rückgängig gemacht werden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" data-testid="button-confirm-delete">
+              Ja, löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {isLoading ? (
         <div className="space-y-3">
