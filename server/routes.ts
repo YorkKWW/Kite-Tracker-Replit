@@ -709,6 +709,9 @@ export async function registerRoutes(
       if (!currentUser.isSuperAdmin && (targetRole === "admin" || targetIsSuperAdmin)) {
         return res.status(403).json({ message: "Only Super Admins can create Admin accounts" });
       }
+      if (!currentUser.isSuperAdmin) {
+        delete req.body.canEditEquipment;
+      }
       const hashed = await hashPassword(req.body.password);
       const user = await storage.createUser({ ...req.body, password: hashed });
       const { password, ...safeUser } = user;
@@ -736,6 +739,9 @@ export async function registerRoutes(
     const existingUser = await storage.getUser(parseInt(req.params.id));
     if (existingUser && existingUser.role === "admin" && !currentUser.isSuperAdmin) {
       return res.status(403).json({ message: "Only Super Admins can edit Admin accounts" });
+    }
+    if (!currentUser.isSuperAdmin) {
+      delete req.body.canEditEquipment;
     }
     const data = { ...req.body };
     if (data.password) {
@@ -858,9 +864,21 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/equipment/:id", requireHamburg, async (req, res) => {
+  app.patch("/api/equipment/:id", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const isHamburg = user.role === "admin" || user.role === "manager";
+    if (!isHamburg && !user.canEditEquipment) {
+      return res.status(403).json({ message: "Not authorized to edit equipment" });
+    }
+    let updateData = req.body;
+    if (!isHamburg && user.canEditEquipment) {
+      const ALLOWED_FIELDS = ["serialNumber", "brand", "model", "type", "sku", "typeSpecificFields", "notes"];
+      updateData = Object.fromEntries(
+        Object.entries(req.body).filter(([key]) => ALLOWED_FIELDS.includes(key))
+      );
+    }
     const equipmentId = parseInt(req.params.id);
-    const item = await storage.updateEquipment(equipmentId, req.body);
+    const item = await storage.updateEquipment(equipmentId, updateData);
     if (!item) return res.status(404).json({ message: "Equipment not found" });
     await storage.createActivityLog({
       userId: (req.user as any).id,

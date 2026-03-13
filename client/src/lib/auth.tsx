@@ -14,6 +14,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isHamburg: boolean;
   isStationLead: boolean;
+  canEditEquipment: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -31,7 +32,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    staleTime: Infinity,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
     retry: false,
   });
 
@@ -61,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin: user?.role === "admin",
         isHamburg: user?.role === "admin" || user?.role === "manager",
         isStationLead: user?.role === "station_lead",
+        canEditEquipment: user?.canEditEquipment === true || user?.role === "admin" || user?.role === "manager",
       }}
     >
       {children}

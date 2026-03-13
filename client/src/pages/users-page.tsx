@@ -22,6 +22,7 @@ interface SafeUser {
   role: string;
   assignedStationId: number | null;
   isSuperAdmin?: boolean;
+  canEditEquipment?: boolean;
 }
 
 function getRoleLabel(u: SafeUser) {
@@ -147,6 +148,7 @@ export default function UsersPage() {
   const [role, setRole] = useState("manager");
   const [stationId, setStationId] = useState("");
   const [superAdminFlag, setSuperAdminFlag] = useState(false);
+  const [canEditEquipmentFlag, setCanEditEquipmentFlag] = useState(false);
 
   const openCreate = () => {
     setEditUser(null);
@@ -156,6 +158,7 @@ export default function UsersPage() {
     setRole("manager");
     setStationId("");
     setSuperAdminFlag(false);
+    setCanEditEquipmentFlag(false);
     setOpen(true);
   };
 
@@ -167,6 +170,7 @@ export default function UsersPage() {
     setRole(u.role);
     setStationId(u.assignedStationId?.toString() || "none");
     setSuperAdminFlag(u.isSuperAdmin || false);
+    setCanEditEquipmentFlag(u.canEditEquipment || false);
     setOpen(true);
   };
 
@@ -179,6 +183,7 @@ export default function UsersPage() {
         role,
         assignedStationId: stationId && stationId !== "none" ? parseInt(stationId) : null,
         isSuperAdmin: role === "admin" ? superAdminFlag : false,
+        canEditEquipment: canEditEquipmentFlag,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -198,6 +203,7 @@ export default function UsersPage() {
         role,
         assignedStationId: stationId && stationId !== "none" ? parseInt(stationId) : null,
         isSuperAdmin: role === "admin" ? superAdminFlag : false,
+        canEditEquipment: canEditEquipmentFlag,
       };
       if (password) data.password = password;
       return apiRequest("PATCH", `/api/users/${editUser!.id}`, data);
@@ -304,6 +310,23 @@ export default function UsersPage() {
                 </label>
               </div>
             )}
+            {isSuperAdmin && (
+              <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                <input
+                  type="checkbox"
+                  id="can-edit-equipment-flag"
+                  checked={canEditEquipmentFlag}
+                  onChange={(e) => setCanEditEquipmentFlag(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                  data-testid="checkbox-can-edit-equipment"
+                />
+                <label htmlFor="can-edit-equipment-flag" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                  <Pencil className="h-4 w-4 text-primary" />
+                  Darf Material bearbeiten
+                  <span className="text-xs text-muted-foreground font-normal">(can edit equipment master data)</span>
+                </label>
+              </div>
+            )}
             {(role === "manager" || role === "station_lead") && (
               <div className="space-y-2">
                 <Label>Assigned Location</Label>
@@ -380,6 +403,11 @@ export default function UsersPage() {
                     <p className="text-sm text-muted-foreground">{u.email}</p>
                     {(u.role === "manager" || u.role === "station_lead") && (
                       <p className="text-xs text-muted-foreground">Location: {getStationName(u.assignedStationId)}</p>
+                    )}
+                    {u.canEditEquipment && u.role !== "admin" && u.role !== "manager" && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Pencil className="h-3 w-3" /> Darf Material bearbeiten
+                      </p>
                     )}
                   </div>
                 </div>

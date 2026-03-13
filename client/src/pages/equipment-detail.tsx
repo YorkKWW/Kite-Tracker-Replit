@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -17,16 +17,17 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Star, Wrench, ArrowLeftRight, Camera,
   Upload, Trash2, MapPin, Calendar, Hash, X, ChevronLeft, ChevronRight,
-  FileText, Package, AlertTriangle,
+  FileText, Package, AlertTriangle, Pencil, Loader2,
 } from "lucide-react";
 import type { Equipment, Station, ConditionRating, Repair, Transfer, Photo } from "@shared/schema";
-import { EQUIPMENT_TYPE_LABELS, TYPE_SPECIFIC_FIELDS } from "@shared/schema";
+import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPE_SPECIFIC_FIELDS } from "@shared/schema";
 
 export default function EquipmentDetailPage() {
   const [, params] = useRoute("/equipment/:id");
   const id = params?.id;
-  const { isHamburg, user } = useAuth();
+  const { isHamburg, canEditEquipment, user } = useAuth();
   const { toast } = useToast();
+  const [editOpen, setEditOpen] = useState(false);
 
   const { data: item, isLoading } = useQuery<Equipment>({
     queryKey: ["/api/equipment", id],
@@ -124,11 +125,27 @@ export default function EquipmentDetailPage() {
             )}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <ConditionBadge rating={item.conditionRating} />
-          <StatusBadge status={item.status} />
+        <div className="flex items-center gap-2 shrink-0">
+          {canEditEquipment && (
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} data-testid="button-edit-equipment">
+              <Pencil className="h-4 w-4 mr-1.5" />
+              Bearbeiten
+            </Button>
+          )}
+          <div className="flex flex-col items-end gap-1">
+            <ConditionBadge rating={item.conditionRating} />
+            <StatusBadge status={item.status} />
+          </div>
         </div>
       </div>
+
+      {canEditEquipment && item && (
+        <EditEquipmentDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          equipment={item}
+        />
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <InfoCard icon={<Hash className="h-4 w-4" />} label="Type" value={EQUIPMENT_TYPE_LABELS[item.type] || item.type} />
@@ -312,6 +329,138 @@ export default function EquipmentDetailPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function EditEquipmentDialog({ open, onOpenChange, equipment: eq }: { open: boolean; onOpenChange: (v: boolean) => void; equipment: Equipment }) {
+  const { toast } = useToast();
+  const [serialNumber, setSerialNumber] = useState(eq.serialNumber);
+  const [brand, setBrand] = useState(eq.brand);
+  const [model, setModel] = useState(eq.model);
+  const [type, setType] = useState(eq.type);
+  const [sku, setSku] = useState(eq.sku || "");
+  const [typeSpecific, setTypeSpecific] = useState<Record<string, any>>(eq.typeSpecificFields || {});
+
+  useEffect(() => {
+    if (open) {
+      setSerialNumber(eq.serialNumber);
+      setBrand(eq.brand);
+      setModel(eq.model);
+      setType(eq.type);
+      setSku(eq.sku || "");
+      setTypeSpecific(eq.typeSpecificFields || {});
+    }
+  }, [open, eq.id]);
+
+  const typeFields = TYPE_SPECIFIC_FIELDS[type] || [];
+
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("PATCH", `/api/equipment/${eq.id}`, {
+        serialNumber,
+        brand,
+        model,
+        type,
+        sku: sku || null,
+        typeSpecificFields: typeSpecific,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment", eq.id.toString()] });
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      toast({ title: "Equipment aktualisiert" });
+      onOpenChange(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Fehler beim Speichern", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Equipment bearbeiten</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="space-y-2">
+            <Label>Seriennummer</Label>
+            <Input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} data-testid="input-edit-serial" />
+          </div>
+          <div className="space-y-2">
+            <Label>SKU</Label>
+            <Input value={sku} onChange={(e) => setSku(e.target.value)} data-testid="input-edit-sku" />
+          </div>
+          <div className="space-y-2">
+            <Label>Typ</Label>
+            <Select value={type} onValueChange={(v) => { setType(v); setTypeSpecific({}); }}>
+              <SelectTrigger data-testid="select-edit-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EQUIPMENT_TYPE_OPTIONS.map((key) => (
+                  <SelectItem key={key} value={key}>{EQUIPMENT_TYPE_LABELS[key]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Marke</Label>
+              <Input value={brand} onChange={(e) => setBrand(e.target.value)} data-testid="input-edit-brand" />
+            </div>
+            <div className="space-y-2">
+              <Label>Modell</Label>
+              <Input value={model} onChange={(e) => setModel(e.target.value)} data-testid="input-edit-model" />
+            </div>
+          </div>
+          {typeFields.length > 0 && (
+            <div className="border-t pt-4">
+              <h3 className="font-semibold text-sm mb-3 uppercase tracking-wider text-muted-foreground">
+                {EQUIPMENT_TYPE_LABELS[type]} Details
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                {typeFields.map((field) => (
+                  <div key={field.key} className="space-y-2">
+                    <Label>{field.label}</Label>
+                    {field.type === "select" ? (
+                      <Select
+                        value={typeSpecific[field.key] || ""}
+                        onValueChange={(v) => setTypeSpecific((prev) => ({ ...prev, [field.key]: v }))}
+                      >
+                        <SelectTrigger data-testid={`select-edit-specific-${field.key}`}>
+                          <SelectValue placeholder={`Select ${field.label}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {field.options?.map((opt) => (
+                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        type={field.type}
+                        value={typeSpecific[field.key] || ""}
+                        onChange={(e) => setTypeSpecific((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                        data-testid={`input-edit-specific-${field.key}`}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <Button
+            onClick={() => updateMutation.mutate()}
+            disabled={updateMutation.isPending || !serialNumber || !brand || !model}
+            className="w-full"
+            data-testid="button-save-edit-equipment"
+          >
+            {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Speichern
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

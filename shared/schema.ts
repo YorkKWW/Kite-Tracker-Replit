@@ -70,6 +70,7 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").notNull().default("manager"),
   assignedStationId: integer("assigned_station_id").references(() => stations.id),
   isSuperAdmin: boolean("is_super_admin").notNull().default(false),
+  canEditEquipment: boolean("can_edit_equipment").notNull().default(false),
 });
 
 export const equipment = pgTable("equipment", {
