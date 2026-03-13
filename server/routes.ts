@@ -270,8 +270,8 @@ function parseEleveightInvoice(text: string) {
     const discountedUnitPrice = quantity > 0 ? Math.round((totalPrice / quantity) * 100) / 100 : totalPrice;
 
     if (/delivery\s*cost|versandkosten|shipping|freight/i.test(rawName)) continue;
-    if (discount >= 100) continue;
-    if (/t-shirt|cap\b|beach flag|banner\b|\bflag\b|sticker/i.test(rawName)) continue;
+
+    const isNonEquipment = discount >= 100 || /t-shirt|cap\b|beach flag|banner\b|\bflag\b|sticker/i.test(rawName);
 
     let serials: string[] = [];
     let color = "";
@@ -336,7 +336,7 @@ function parseEleveightInvoice(text: string) {
         serialNumber: serial,
         type: eqType,
         isSpare,
-        skip: isSpare,
+        skip: isSpare || isNonEquipment,
         modelYear,
       });
     }

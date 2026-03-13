@@ -343,6 +343,43 @@ export default function InvoiceImportPage() {
             </CardContent>
           </Card>
 
+          {/* Plausibility check */}
+          {parseResult.totalNet != null && (() => {
+            const itemsTotal = items.reduce((sum, item) => sum + item.quantity * item.unitPriceAfterDiscount, 0);
+            const diff = Math.abs(itemsTotal - parseResult.totalNet!);
+            const isMatch = diff <= 1;
+            return (
+              <div
+                className={`flex items-start gap-2 rounded-lg border px-4 py-3 text-sm ${
+                  isMatch
+                    ? "border-green-300 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-950 dark:text-green-300"
+                    : "border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-700 dark:bg-orange-950 dark:text-orange-300"
+                }`}
+                data-testid="plausibility-check"
+              >
+                {isMatch ? (
+                  <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                )}
+                <div>
+                  {isMatch ? (
+                    <p>Artikelsumme (€{itemsTotal.toFixed(2)}) stimmt mit Rechnungssumme (€{parseResult.totalNet!.toFixed(2)}) überein.</p>
+                  ) : (
+                    <>
+                      <p className="font-medium">
+                        Differenz: €{diff.toFixed(2)} — Artikelsumme: €{itemsTotal.toFixed(2)}, Rechnungssumme: €{parseResult.totalNet!.toFixed(2)}
+                      </p>
+                      <p className="text-xs mt-0.5 opacity-80">
+                        Möglicherweise fehlen Artikel oder es sind Versandkosten enthalten.
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Summary bar */}
           <div className="flex flex-wrap gap-3 text-sm">
             <Badge variant="default" className="gap-1">
