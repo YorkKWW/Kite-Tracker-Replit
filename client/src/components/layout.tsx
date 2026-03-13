@@ -33,7 +33,10 @@ import {
   ClipboardCheck,
   MoreHorizontal,
   Bell,
+  Eye,
+  EyeOff,
 } from "lucide-react";
+import type { ViewMode } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { FeedbackButton } from "@/components/feedback-button";
@@ -48,7 +51,7 @@ type ScanResult =
   | { status: "not_found"; serial: string };
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, logout, isAdmin, isHamburg, isStationLead, isSuperAdmin } = useAuth();
+  const { user, logout, isAdmin, isHamburg, isStationLead, isSuperAdmin, viewMode, setViewMode, isSimulating } = useAuth();
   const [location, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -195,7 +198,22 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {isSimulating && (
+        <div className="sticky top-0 z-[60] bg-amber-500 text-amber-950 text-center py-1 text-xs font-semibold flex items-center justify-center gap-2" data-testid="banner-simulation">
+          <EyeOff className="h-3.5 w-3.5" />
+          Simulierte Ansicht: {viewMode === "admin" ? "Admin" : viewMode === "manager" ? "Center Manager" : "Station Lead"}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-2 text-xs text-amber-950 hover:bg-amber-600"
+            onClick={() => setViewMode(null)}
+            data-testid="button-exit-simulation"
+          >
+            Beenden
+          </Button>
+        </div>
+      )}
+      <header className={cn("sticky z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60", isSimulating ? "top-[28px]" : "top-0")}>
         <div className="flex h-14 items-center justify-between gap-1 px-4">
           <div className="flex items-center gap-2">
             <Wind className="h-6 w-6 text-primary" />
@@ -229,6 +247,23 @@ export default function Layout({ children }: LayoutProps) {
           </nav>
 
           <div className="flex items-center gap-1">
+            {user?.isSuperAdmin && (
+              <Select
+                value={viewMode ?? "super_admin"}
+                onValueChange={(v) => setViewMode(v === "super_admin" ? null : v as ViewMode)}
+              >
+                <SelectTrigger className="h-8 w-auto gap-1 text-xs border-dashed" data-testid="select-view-mode">
+                  <Eye className="h-3.5 w-3.5" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="manager">Center Manager</SelectItem>
+                  <SelectItem value="station_lead">Station Lead</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
             <Button
               variant="ghost"
               size="icon"

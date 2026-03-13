@@ -1,9 +1,11 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "./queryClient";
 import type { User } from "@shared/schema";
 
 type AuthUser = Omit<User, "password">;
+
+export type ViewMode = "super_admin" | "admin" | "manager" | "station_lead";
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -15,11 +17,16 @@ interface AuthContextType {
   isHamburg: boolean;
   isStationLead: boolean;
   canEditEquipment: boolean;
+  viewMode: ViewMode | null;
+  setViewMode: (mode: ViewMode | null) => void;
+  isSimulating: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [viewMode, setViewMode] = useState<ViewMode | null>(null);
+
   const { data: user, isLoading } = useQuery<AuthUser | null>({
     queryKey: ["/api/auth/me"],
     queryFn: async () => {
@@ -46,11 +53,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await apiRequest("POST", "/api/auth/logout");
     } catch {
-      // ignore network errors — still log out client-side
     }
     queryClient.setQueryData(["/api/auth/me"], null);
     queryClient.clear();
   };
+
+  const actualSuperAdmin = user?.role === "admin" && user?.isSuperAdmin === true;
+  const isSimulating = actualSuperAdmin && viewMode !== null && viewMode !== "super_admin";
+
+  let isSuperAdmin = actualSuperAdmin;
+  let isAdmin = user?.role === "admin";
+  let isHamburg = user?.role === "admin" || user?.role === "manager";
+  let isStationLead = user?.role === "station_lead";
+  let canEditEquipment = user?.canEditEquipment === true || user?.role === "admin" || user?.role === "manager";
+
+  if (isSimulating && viewMode) {
+    isSuperAdmin = false;
+    isAdmin = viewMode === "admin";
+    isHamburg = viewMode === "admin" || viewMode === "manager";
+    isStationLead = viewMode === "station_lead";
+    canEditEquipment = viewMode === "station_lead" ? false : viewMode === "admin" || viewMode === "manager";
+  }
 
   return (
     <AuthContext.Provider
@@ -59,11 +82,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         logout,
-        isSuperAdmin: user?.role === "admin" && user?.isSuperAdmin === true,
-        isAdmin: user?.role === "admin",
-        isHamburg: user?.role === "admin" || user?.role === "manager",
-        isStationLead: user?.role === "station_lead",
-        canEditEquipment: user?.canEditEquipment === true || user?.role === "admin" || user?.role === "manager",
+        isSuperAdmin,
+        isAdmin,
+        isHamburg,
+        isStationLead,
+        canEditEquipment,
+        viewMode: actualSuperAdmin ? viewMode : null,
+        setViewMode: actualSuperAdmin ? setViewMode : () => {},
+        isSimulating,
       }}
     >
       {children}
