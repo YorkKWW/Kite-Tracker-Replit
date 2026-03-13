@@ -69,6 +69,6 @@ timeoutMs = 20000
 [userenv.shared]
 RESEND_API_KEY = "re_MJGDt1qM_C5nqKiwnDW1kKTkKTRZUCtDg"
 SMTP_HOST = "smtp.ionos.de"
-SMTP_PORT = "587"
+SMTP_PORT = "465"
 SMTP_USER = "coast@appcenter.kiteworldwide.com"
 EMAIL_FROM = "KiteTracker <coast@appcenter.kiteworldwide.com>"

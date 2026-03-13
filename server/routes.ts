@@ -23,10 +23,11 @@ async function sendNotificationEmail(to: string | string[], subject: string, bod
       return;
     }
     const nodemailer = await import("nodemailer");
+    const port = parseInt(process.env.SMTP_PORT || "465");
     const transporter = nodemailer.createTransport({
       host,
-      port: parseInt(process.env.SMTP_PORT || "587"),
-      secure: false,
+      port,
+      secure: port === 465,
       auth: { user, pass },
     });
     const recipients = Array.isArray(to) ? to : [to];
