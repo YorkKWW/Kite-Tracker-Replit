@@ -154,6 +154,9 @@ app.use((req, res, next) => {
     await dbInstance.execute(sql`
       UPDATE users SET is_super_admin = true WHERE email = 'admin@kitetracker.com' AND is_super_admin = false
     `);
+    await dbInstance.execute(sql`
+      UPDATE users SET is_super_admin = true, role = 'admin' WHERE email = 'york@kiteworldwide.com' AND is_super_admin = false
+    `);
 
     await dbInstance.execute(sql`
       CREATE TABLE IF NOT EXISTS feedback_comments (
