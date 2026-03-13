@@ -15,22 +15,30 @@ import { PDFParse } from "pdf-parse";
 
 async function sendNotificationEmail(to: string | string[], subject: string, body: string) {
   try {
-    if (!process.env.RESEND_API_KEY) {
-      console.log("Skipping email: RESEND_API_KEY not set");
+    const host = process.env.SMTP_HOST;
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    if (!host || !user || !pass) {
+      console.log("Skipping email: SMTP credentials not configured");
       return;
     }
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    const nodemailer = await import("nodemailer");
+    const transporter = nodemailer.createTransport({
+      host,
+      port: parseInt(process.env.SMTP_PORT || "587"),
+      secure: false,
+      auth: { user, pass },
+    });
     const recipients = Array.isArray(to) ? to : [to];
-    const fromAddress = process.env.EMAIL_FROM || "KiteTracker <onboarding@resend.dev>";
+    const fromAddress = process.env.EMAIL_FROM || `KiteTracker <${user}>`;
     console.log(`Sending email to ${recipients.join(", ")} from ${fromAddress}: ${subject}`);
-    const result = await resend.emails.send({
+    const result = await transporter.sendMail({
       from: fromAddress,
-      to: recipients,
+      to: recipients.join(", "),
       subject: `[KiteTracker] ${subject}`,
       text: body,
     });
-    console.log(`Email result:`, JSON.stringify(result));
+    console.log(`Email sent, messageId: ${result.messageId}`);
   } catch (e: any) {
     console.error("Notification email error:", e?.message || e);
   }
