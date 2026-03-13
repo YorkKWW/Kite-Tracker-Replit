@@ -32,7 +32,7 @@ import {
   stations, users, equipment, conditionRatings, repairs, transfers, photos, activityLog,
   inventoryChecks, inventoryCheckItems, suppliers, invoices,
   companySettings, customers, salesInvoices, saleItems, priceLists, priceListItems,
-  damageReports, damageReportPhotos, feedback,
+  damageReports, damageReportPhotos, feedback, feedbackComments, notifications,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -54,6 +54,8 @@ import {
   type DamageReport, type InsertDamageReport,
   type DamageReportPhoto, type InsertDamageReportPhoto,
   type Feedback, type InsertFeedback,
+  type FeedbackComment, type InsertFeedbackComment,
+  type Notification, type InsertNotification,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -169,6 +171,16 @@ export interface IStorage {
   createFeedback(fb: InsertFeedback): Promise<Feedback>;
   updateFeedback(id: number, data: Partial<Feedback>): Promise<Feedback | undefined>;
   getOpenFeedbackCount(): Promise<number>;
+
+  getFeedbackComments(feedbackId: number): Promise<(FeedbackComment & { userName: string })[]>;
+  createFeedbackComment(comment: InsertFeedbackComment): Promise<FeedbackComment>;
+
+  getNotifications(userId: number): Promise<Notification[]>;
+  createNotification(n: InsertNotification): Promise<Notification>;
+  markNotificationRead(id: number, userId: number): Promise<void>;
+  markAllNotificationsRead(userId: number): Promise<void>;
+  getUnreadNotificationCount(userId: number): Promise<number>;
+  getAdminUserIds(): Promise<number[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1104,6 +1116,60 @@ export class DatabaseStorage implements IStorage {
   async getOpenFeedbackCount(): Promise<number> {
     const [result] = await db.select({ count: sql<number>`count(*)::int` }).from(feedback).where(eq(feedback.status, "open"));
     return result?.count ?? 0;
+  }
+
+  async getFeedbackComments(feedbackId: number): Promise<(FeedbackComment & { userName: string })[]> {
+    const rows = await db
+      .select({
+        id: feedbackComments.id,
+        feedbackId: feedbackComments.feedbackId,
+        userId: feedbackComments.userId,
+        message: feedbackComments.message,
+        createdAt: feedbackComments.createdAt,
+        userName: sql<string>`coalesce(${users.name}, 'Unknown')`,
+      })
+      .from(feedbackComments)
+      .leftJoin(users, eq(feedbackComments.userId, users.id))
+      .where(eq(feedbackComments.feedbackId, feedbackId))
+      .orderBy(feedbackComments.createdAt);
+    return rows;
+  }
+
+  async createFeedbackComment(comment: InsertFeedbackComment): Promise<FeedbackComment> {
+    const [created] = await db.insert(feedbackComments).values(comment).returning();
+    return created;
+  }
+
+  async getNotifications(userId: number): Promise<Notification[]> {
+    return db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt))
+      .limit(50);
+  }
+
+  async createNotification(n: InsertNotification): Promise<Notification> {
+    const [created] = await db.insert(notifications).values(n).returning();
+    return created;
+  }
+
+  async markNotificationRead(id: number, userId: number): Promise<void> {
+    await db.update(notifications).set({ read: true }).where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
+  }
+
+  async markAllNotificationsRead(userId: number): Promise<void> {
+    await db.update(notifications).set({ read: true }).where(and(eq(notifications.userId, userId), eq(notifications.read, false)));
+  }
+
+  async getUnreadNotificationCount(userId: number): Promise<number> {
+    const [result] = await db.select({ count: sql<number>`count(*)::int` }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.read, false)));
+    return result?.count ?? 0;
+  }
+
+  async getAdminUserIds(): Promise<number[]> {
+    const rows = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin"));
+    return rows.map(r => r.id);
   }
 }
 

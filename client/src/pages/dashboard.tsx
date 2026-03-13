@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Package, AlertTriangle, ArrowLeftRight, MapPin } from "lucide-react";
+import { Package, AlertTriangle, ArrowLeftRight, MapPin, MessageSquarePlus } from "lucide-react";
 import type { Transfer, Station, Equipment } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 
@@ -41,6 +41,12 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
+  });
+
+  const { data: openFeedbackData } = useQuery<{ count: number }>({
+    queryKey: ["/api/feedback/open-count"],
+    staleTime: 0,
+    enabled: isAdmin,
   });
 
   const { data: stationsList } = useQuery<Station[]>({ queryKey: ["/api/stations"] });
@@ -143,6 +149,24 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {isAdmin && (openFeedbackData?.count ?? 0) > 0 && (
+        <Link href="/feedback">
+          <Card className="border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20 cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-colors">
+            <CardContent className="p-3 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-orange-500/10 shrink-0">
+                <MessageSquarePlus className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold" data-testid="text-feedback-alert">
+                  {openFeedbackData!.count} offene{openFeedbackData!.count === 1 ? "s" : ""} Feedback{openFeedbackData!.count === 1 ? "" : "s"}
+                </p>
+                <p className="text-xs text-muted-foreground">Neue Meldungen von deinem Team</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       {/* Fleet Overview */}
       {stations.length > 0 && (

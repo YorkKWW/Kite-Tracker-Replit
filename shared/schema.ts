@@ -434,6 +434,33 @@ export const insertFeedbackSchema = createInsertSchema(feedback).omit({ id: true
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 export type Feedback = typeof feedback.$inferSelect;
 
+export const feedbackComments = pgTable("feedback_comments", {
+  id: serial("id").primaryKey(),
+  feedbackId: integer("feedback_id").notNull().references(() => feedback.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFeedbackCommentSchema = createInsertSchema(feedbackComments).omit({ id: true, createdAt: true });
+export type InsertFeedbackComment = z.infer<typeof insertFeedbackCommentSchema>;
+export type FeedbackComment = typeof feedbackComments.$inferSelect;
+
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"),
+  read: boolean("read").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),

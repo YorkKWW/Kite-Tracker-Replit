@@ -2701,15 +2701,35 @@ export async function registerRoutes(
         action: "feedback_submitted",
         details: `Feedback submitted from ${data.pageUrl}`,
       });
+      const adminIds = await storage.getAdminUserIds();
+      for (const adminId of adminIds) {
+        if (adminId !== user.id) {
+          await storage.createNotification({
+            userId: adminId,
+            type: "feedback_new",
+            title: `Neues Feedback von ${user.name}`,
+            message: data.message
+              ? (data.message.length > 80 ? data.message.slice(0, 80) + "…" : data.message)
+              : "Sprachnachricht gesendet",
+            link: "/feedback",
+            read: false,
+          });
+        }
+      }
       res.json(fb);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
   });
 
-  app.get("/api/feedback", requireAdmin, async (req, res) => {
-    const items = await storage.getAllFeedback();
-    res.json(items);
+  app.get("/api/feedback", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const all = await storage.getAllFeedback();
+    if (user.role === "admin") {
+      res.json(all);
+    } else {
+      res.json(all.filter(f => f.userId === user.id));
+    }
   });
 
   app.get("/api/feedback/open-count", requireAuth, async (req, res) => {
@@ -2719,6 +2739,7 @@ export async function registerRoutes(
 
   app.patch("/api/feedback/:id", requireAdmin, async (req, res) => {
     const id = parseInt(req.params.id);
+    const adminUser = req.user as any;
     const schema = z.object({
       status: z.enum(["open", "in_progress", "resolved"]).optional(),
       adminNotes: z.string().optional().nullable(),
@@ -2727,11 +2748,92 @@ export async function registerRoutes(
     const updated = await storage.updateFeedback(id, data);
     if (!updated) return res.status(404).json({ message: "Not found" });
     await storage.createActivityLog({
-      userId: (req.user as any).id,
+      userId: adminUser.id,
       action: "feedback_updated",
       details: `Feedback #${id} ${data.status ? `status → ${data.status}` : "updated"}`,
     });
+    if (updated.userId !== adminUser.id) {
+      const statusLabels: Record<string, string> = { open: "Offen", in_progress: "In Bearbeitung", resolved: "Erledigt" };
+      await storage.createNotification({
+        userId: updated.userId,
+        type: "feedback_status",
+        title: "Feedback aktualisiert",
+        message: data.status
+          ? `Dein Feedback wurde auf „${statusLabels[data.status] ?? data.status}" gesetzt.`
+          : "Dein Feedback wurde bearbeitet.",
+        link: "/feedback",
+        read: false,
+      });
+    }
     res.json(updated);
+  });
+
+  app.get("/api/feedback/:id/comments", requireAuth, async (req, res) => {
+    const feedbackId = parseInt(req.params.id);
+    const comments = await storage.getFeedbackComments(feedbackId);
+    res.json(comments);
+  });
+
+  app.post("/api/feedback/:id/comments", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const feedbackId = parseInt(req.params.id);
+    const { message } = z.object({ message: z.string().min(1) }).parse(req.body);
+    const comment = await storage.createFeedbackComment({ feedbackId, userId: user.id, message });
+    const allFeedback = await storage.getAllFeedback();
+    const fb = allFeedback.find(f => f.id === feedbackId);
+    if (fb) {
+      if (user.role === "admin") {
+        if (fb.userId !== user.id) {
+          await storage.createNotification({
+            userId: fb.userId,
+            type: "feedback_comment",
+            title: "Neue Antwort auf dein Feedback",
+            message: message.length > 80 ? message.slice(0, 80) + "…" : message,
+            link: "/feedback",
+            read: false,
+          });
+        }
+      } else {
+        const adminIds = await storage.getAdminUserIds();
+        for (const adminId of adminIds) {
+          if (adminId !== user.id) {
+            await storage.createNotification({
+              userId: adminId,
+              type: "feedback_comment",
+              title: `Neue Nachricht von ${user.name}`,
+              message: message.length > 80 ? message.slice(0, 80) + "…" : message,
+              link: "/feedback",
+              read: false,
+            });
+          }
+        }
+      }
+    }
+    res.json(comment);
+  });
+
+  app.get("/api/notifications", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const items = await storage.getNotifications(user.id);
+    res.json(items);
+  });
+
+  app.get("/api/notifications/unread-count", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const count = await storage.getUnreadNotificationCount(user.id);
+    res.json({ count });
+  });
+
+  app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    await storage.markNotificationRead(parseInt(req.params.id), user.id);
+    res.json({ ok: true });
+  });
+
+  app.post("/api/notifications/mark-all-read", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    await storage.markAllNotificationsRead(user.id);
+    res.json({ ok: true });
   });
 
   app.post("/api/admin/fix-equipment-sizes", requireAdmin, async (req, res) => {

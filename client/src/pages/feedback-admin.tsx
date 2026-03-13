@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -20,8 +21,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Timer,
+  Send,
+  MessageCircle,
 } from "lucide-react";
-import type { Feedback } from "@shared/schema";
+import type { Feedback, FeedbackComment } from "@shared/schema";
 
 type FeedbackWithUser = Feedback & { userName: string; userRole: string };
 
@@ -54,6 +57,71 @@ function getPageLabel(path: string): string {
   return path;
 }
 
+type CommentWithUser = FeedbackComment & { userName: string };
+
+function CommentThread({ feedbackId }: { feedbackId: number }) {
+  const [newComment, setNewComment] = useState("");
+  const { user } = useAuth();
+
+  const { data: comments } = useQuery<CommentWithUser[]>({
+    queryKey: ["/api/feedback", feedbackId, "comments"],
+    queryFn: async () => {
+      const res = await fetch(`/api/feedback/${feedbackId}/comments`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    staleTime: 0,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/feedback/${feedbackId}/comments`, { message: newComment.trim() }),
+    onSuccess: () => {
+      setNewComment("");
+      queryClient.invalidateQueries({ queryKey: ["/api/feedback", feedbackId, "comments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
+
+  return (
+    <div className="border-t pt-3 space-y-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <MessageCircle className="h-3.5 w-3.5" />
+        Kommentare {comments && comments.length > 0 && `(${comments.length})`}
+      </div>
+      {comments?.map((c) => (
+        <div key={c.id} className="bg-muted/50 rounded-md p-2 text-xs" data-testid={`comment-${c.id}`}>
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <span className="font-semibold">{c.userName}</span>
+            <span className="text-muted-foreground">
+              {new Date(c.createdAt).toLocaleDateString("de-DE")} {new Date(c.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          </div>
+          <p className="whitespace-pre-wrap">{c.message}</p>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <Input
+          placeholder="Nachricht schreiben…"
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          className="text-sm h-8"
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && newComment.trim()) { e.preventDefault(); addMutation.mutate(); } }}
+          data-testid={`input-comment-${feedbackId}`}
+        />
+        <Button
+          size="sm"
+          className="h-8 px-2"
+          disabled={!newComment.trim() || addMutation.isPending}
+          onClick={() => addMutation.mutate()}
+          data-testid={`button-send-comment-${feedbackId}`}
+        >
+          {addMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function FeedbackCard({ item }: { item: FeedbackWithUser }) {
   const [editing, setEditing] = useState(false);
   const [notes, setNotes] = useState(item.adminNotes ?? "");
@@ -65,6 +133,7 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
       apiRequest("PATCH", `/api/feedback/${item.id}`, { status, adminNotes: notes || null }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
       toast({ title: "Aktualisiert" });
       setEditing(false);
     },
@@ -190,6 +259,8 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
             </div>
           </div>
         )}
+
+        <CommentThread feedbackId={item.id} />
       </CardContent>
     </Card>
   );
@@ -202,14 +273,7 @@ export default function FeedbackAdminPage() {
   const { data: items, isLoading } = useQuery<FeedbackWithUser[]>({
     queryKey: ["/api/feedback"],
     staleTime: 0,
-    enabled: isAdmin,
   });
-
-  if (!isAdmin) {
-    return (
-      <div className="p-6 text-center text-muted-foreground">Nur für Admins.</div>
-    );
-  }
 
   const filtered = items?.filter((i) => filter === "all" || i.status === filter) ?? [];
   const openCount = items?.filter((i) => i.status === "open").length ?? 0;

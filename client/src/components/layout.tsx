@@ -32,6 +32,7 @@ import {
   MessageSquarePlus,
   ClipboardCheck,
   MoreHorizontal,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -139,6 +140,8 @@ export default function Layout({ children }: LayoutProps) {
 
   const bottomTabs = isStationLead ? stationLeadBottomTabs : defaultBottomTabs;
 
+  const [notifOpen, setNotifOpen] = useState(false);
+
   const { data: openCountData } = useQuery<{ count: number }>({
     queryKey: ["/api/damage-reports/open-count"],
     staleTime: 0,
@@ -146,6 +149,35 @@ export default function Layout({ children }: LayoutProps) {
     enabled: isHamburg || isAdmin,
   });
   const openDamageCount = openCountData?.count ?? 0;
+
+  const { data: unreadNotifData } = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications/unread-count"],
+    staleTime: 0,
+    refetchInterval: 30000,
+  });
+  const unreadCount = unreadNotifData?.count ?? 0;
+
+  const { data: notifItems } = useQuery<{ id: number; type: string; title: string; message: string; link: string | null; read: boolean; createdAt: string }[]>({
+    queryKey: ["/api/notifications"],
+    staleTime: 0,
+    enabled: notifOpen,
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/notifications/mark-all-read"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
+
+  const markReadMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("PATCH", `/api/notifications/${id}/read`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
 
   const isActive = (href: string) => {
     if (href === "/") return location === "/";
@@ -192,6 +224,71 @@ export default function Layout({ children }: LayoutProps) {
             >
               <ScanLine className="h-5 w-5" />
             </Button>
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setNotifOpen(!notifOpen)}
+                data-testid="button-notifications"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-0.5" data-testid="badge-unread-notifications">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </Button>
+              {notifOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-50 w-80 max-h-96 overflow-y-auto rounded-lg border bg-background shadow-lg" data-testid="panel-notifications">
+                    <div className="flex items-center justify-between p-3 border-b">
+                      <span className="font-semibold text-sm">Benachrichtigungen</span>
+                      {unreadCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs h-7"
+                          onClick={() => markAllReadMutation.mutate()}
+                          data-testid="button-mark-all-read"
+                        >
+                          Alle gelesen
+                        </Button>
+                      )}
+                    </div>
+                    {(!notifItems || notifItems.length === 0) && (
+                      <div className="p-6 text-center text-sm text-muted-foreground">Keine Benachrichtigungen</div>
+                    )}
+                    {notifItems?.map((n) => (
+                      <div
+                        key={n.id}
+                        className={cn(
+                          "p-3 border-b last:border-b-0 cursor-pointer hover:bg-muted/50 transition-colors",
+                          !n.read && "bg-primary/5"
+                        )}
+                        onClick={() => {
+                          if (!n.read) markReadMutation.mutate(n.id);
+                          if (n.link) navigate(n.link);
+                          setNotifOpen(false);
+                        }}
+                        data-testid={`notif-item-${n.id}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {!n.read && <span className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0" />}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium leading-tight">{n.title}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              {new Date(n.createdAt).toLocaleDateString("de-DE")} {new Date(n.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <span className="text-sm text-muted-foreground hidden sm:inline" data-testid="text-user-info">
               {user?.name} ({user?.role})
             </span>

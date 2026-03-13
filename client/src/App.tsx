@@ -54,7 +54,7 @@ function AuthenticatedRouter() {
         <Route path="/stations/:id" component={StationDetailPage} />
         <Route path="/inventory-check/:id" component={InventoryCheckPage} />
         {isAdmin && <Route path="/users" component={UsersPage} />}
-        {isAdmin && <Route path="/feedback" component={FeedbackAdminPage} />}
+        <Route path="/feedback" component={FeedbackAdminPage} />
         <Route path="/activity" component={ActivityPage} />
         <Route path="/incidents" component={IncidentsPage} />
         <Route path="/repairs" component={RepairsPage} />

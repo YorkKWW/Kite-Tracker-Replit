@@ -82,12 +82,22 @@ Floating feedback button (bottom-right) visible to all authenticated users. Supp
 - **Text messages**: Optional text field
 - **Screenshots/photos**: Optional image attachment (stored in Object Storage)
 - **Auto page tracking**: Current URL/page automatically captured with each submission
-- **Admin view**: `/feedback` page (admin only) with status management (open/in_progress/resolved), filters, audio playback, admin notes
-- **DB Table**: `feedback` (id, userId, pageUrl, message, audioUrl, screenshotUrl, status, adminNotes, createdAt)
-- **Routes**: `GET /api/feedback` (admin), `POST /api/feedback` (all), `PATCH /api/feedback/:id` (admin), `GET /api/feedback/open-count`, `GET /api/feedback/upload-url`
+- **Admin view**: `/feedback` page — admins see all feedback, non-admins see their own. Status management (open/in_progress/resolved), filters, audio playback, admin notes
+- **Comment thread**: Each feedback item has a comment section for back-and-forth dialogue between submitter and admin
+- **DB Tables**: `feedback` (id, userId, pageUrl, message, audioUrl, screenshotUrl, status, adminNotes, createdAt), `feedback_comments` (id, feedbackId, userId, message, createdAt)
+- **Routes**: `GET /api/feedback` (all — filtered by role), `POST /api/feedback` (all), `PATCH /api/feedback/:id` (admin), `GET /api/feedback/open-count`, `GET /api/feedback/upload-url`, `GET /api/feedback/:id/comments`, `POST /api/feedback/:id/comments`
+
+## In-App Notifications
+Bell icon in header with unread badge count. Notifications created automatically for:
+- **New feedback**: All admins notified when any user submits feedback
+- **Feedback status change**: Feedback author notified when admin updates status
+- **Feedback comment**: Other party notified when a comment is posted (admin→author or author→admins)
+- **Dashboard alert**: Orange card on admin dashboard shows open feedback count with link
+- **DB Table**: `notifications` (id, userId, type, title, message, link, read, createdAt)
+- **Routes**: `GET /api/notifications`, `GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read`, `POST /api/notifications/mark-all-read`
 
 ## Database Tables
-stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices, feedback
+stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices, feedback, feedback_comments, notifications
 
 ## Equipment Types
 kite, board, foil, wing, bar_lines, wetsuit, harness, helmet_safety

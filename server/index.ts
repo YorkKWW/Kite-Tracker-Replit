@@ -154,6 +154,31 @@ app.use((req, res, next) => {
     await dbInstance.execute(sql`
       UPDATE users SET is_super_admin = true WHERE email = 'admin@kitetracker.com' AND is_super_admin = false
     `);
+
+    await dbInstance.execute(sql`
+      CREATE TABLE IF NOT EXISTS feedback_comments (
+        id SERIAL PRIMARY KEY,
+        feedback_id INTEGER NOT NULL REFERENCES feedback(id),
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        message TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await dbInstance.execute(sql`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        link TEXT,
+        read BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await dbInstance.execute(sql`CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)`);
+    await dbInstance.execute(sql`CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, read)`);
+    await dbInstance.execute(sql`CREATE INDEX IF NOT EXISTS idx_feedback_comments_feedback_id ON feedback_comments(feedback_id)`);
   } catch (e) {
     console.error("Equipment size migration error:", e);
   }

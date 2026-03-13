@@ -103,7 +103,7 @@ export default function SettingsPage() {
     ...(isAdmin ? [{ href: "/stations", label: "Locations", icon: MapPin, description: "Manage stations & locations" }] : []),
     ...(isAdmin ? [{ href: "/users", label: "Users", icon: Users, description: "Manage user accounts & roles" }] : []),
     { href: "/activity", label: "Activity Log", icon: FileText, description: "View system activity & audit trail" },
-    ...(isAdmin ? [{ href: "/feedback", label: "Feedback & Bug Reports", icon: MessageSquarePlus, description: "Review user feedback", badge: feedbackCountData?.count }] : []),
+    { href: "/feedback", label: "Feedback & Bug Reports", icon: MessageSquarePlus, description: isAdmin ? "Review user feedback" : "Dein Feedback anzeigen", badge: isAdmin ? feedbackCountData?.count : undefined },
   ];
 
   return (
