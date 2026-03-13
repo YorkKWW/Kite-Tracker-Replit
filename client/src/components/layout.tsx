@@ -48,7 +48,7 @@ type ScanResult =
   | { status: "not_found"; serial: string };
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, logout, isAdmin, isHamburg, isStationLead } = useAuth();
+  const { user, logout, isAdmin, isHamburg, isStationLead, isSuperAdmin } = useAuth();
   const [location, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -136,6 +136,7 @@ export default function Layout({ children }: LayoutProps) {
     { href: "/equipment", label: "Equipment", icon: Package },
     { href: "/sales", label: "Sales", icon: ShoppingCart },
     { href: "/incidents", label: "Incidents", icon: AlertTriangle },
+    ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
   ];
 
   const bottomTabs = isStationLead ? stationLeadBottomTabs : defaultBottomTabs;
@@ -156,6 +157,14 @@ export default function Layout({ children }: LayoutProps) {
     refetchInterval: 30000,
   });
   const unreadCount = unreadNotifData?.count ?? 0;
+
+  const { data: feedbackCountData } = useQuery<{ count: number }>({
+    queryKey: ["/api/feedback/open-count"],
+    staleTime: 0,
+    refetchInterval: 60000,
+    enabled: !!isSuperAdmin,
+  });
+  const openFeedbackCount = feedbackCountData?.count ?? 0;
 
   const { data: notifItems } = useQuery<{ id: number; type: string; title: string; message: string; link: string | null; read: boolean; createdAt: string }[]>({
     queryKey: ["/api/notifications"],
@@ -466,6 +475,11 @@ export default function Layout({ children }: LayoutProps) {
                     {openDamageCount > 9 ? "9+" : openDamageCount}
                   </span>
                 )}
+                {item.href === "/feedback" && openFeedbackCount > 0 && (
+                  <span className="ml-auto h-5 min-w-[20px] rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                    {openFeedbackCount > 9 ? "9+" : openFeedbackCount}
+                  </span>
+                )}
               </Button>
             </Link>
           ))}
@@ -487,6 +501,11 @@ export default function Layout({ children }: LayoutProps) {
                 {item.href === "/incidents" && openDamageCount > 0 && (
                   <span className="absolute top-1 right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
                     {openDamageCount > 9 ? "9+" : openDamageCount}
+                  </span>
+                )}
+                {item.href === "/feedback" && openFeedbackCount > 0 && (
+                  <span className="absolute top-1 right-1 h-4 w-4 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {openFeedbackCount > 9 ? "9+" : openFeedbackCount}
                   </span>
                 )}
                 <span className="text-[10px] font-medium">{item.label}</span>
