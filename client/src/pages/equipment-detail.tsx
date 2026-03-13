@@ -186,7 +186,7 @@ export default function EquipmentDetailPage() {
                 <p className="text-xs text-muted-foreground">Retail Price (MSRP)</p>
                 <p className="font-semibold" data-testid="text-retail-price">
                   {retailPrice?.retailPrice
-                    ? `€${parseFloat(retailPrice.retailPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                    ? `€${parseFloat(retailPrice.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}`
                     : "N/A"}
                 </p>
               </div>
@@ -197,9 +197,9 @@ export default function EquipmentDetailPage() {
                   Price source: {retailPrice.supplier} · {retailPrice.productName}
                   {(retailPrice.validFrom || retailPrice.validTo) && (
                     <span className="block mt-0.5">
-                      Valid: {retailPrice.validFrom ? new Date(retailPrice.validFrom).toLocaleDateString("en-US") : "—"}
+                      Valid: {retailPrice.validFrom ? new Date(retailPrice.validFrom).toLocaleDateString("de-DE") : "—"}
                       {" → "}
-                      {retailPrice.validTo ? new Date(retailPrice.validTo).toLocaleDateString("en-US") : "—"}
+                      {retailPrice.validTo ? new Date(retailPrice.validTo).toLocaleDateString("de-DE") : "—"}
                     </span>
                   )}
                 </p>
@@ -211,9 +211,9 @@ export default function EquipmentDetailPage() {
                   Purchase based on: {purchasePriceList.supplier} price list
                   {(purchasePriceList.validFrom || purchasePriceList.validTo) && (
                     <span className="block mt-0.5">
-                      Valid: {purchasePriceList.validFrom ? new Date(purchasePriceList.validFrom).toLocaleDateString("en-US") : "—"}
+                      Valid: {purchasePriceList.validFrom ? new Date(purchasePriceList.validFrom).toLocaleDateString("de-DE") : "—"}
                       {" → "}
-                      {purchasePriceList.validTo ? new Date(purchasePriceList.validTo).toLocaleDateString("en-US") : "—"}
+                      {purchasePriceList.validTo ? new Date(purchasePriceList.validTo).toLocaleDateString("de-DE") : "—"}
                     </span>
                   )}
                 </p>
@@ -1010,7 +1010,7 @@ function formatRelativeTime(ts: string | null) {
   if (diffHrs < 24) return `${diffHrs}h ago`;
   const diffDays = Math.floor(diffHrs / 24);
   if (diffDays < 30) return `${diffDays}d ago`;
-  return d.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 type ActivityEntry = { id: number; userId: number; action: string; equipmentId: number | null; details: string | null; timestamp: string | null; userName: string };
@@ -1066,7 +1066,7 @@ function EquipmentDamageSection({ equipmentId, stationId }: { equipmentId: numbe
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>{r.reporterName}</span>
               <span>·</span>
-              <span>{r.reportedAt ? new Date(r.reportedAt).toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" }) : "–"}</span>
+              <span>{r.reportedAt ? new Date(r.reportedAt).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "–"}</span>
             </div>
             {r.photos.length > 0 && (
               <div className="flex gap-2 mt-2 overflow-x-auto pb-1">

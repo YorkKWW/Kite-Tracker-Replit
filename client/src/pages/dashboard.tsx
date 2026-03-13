@@ -217,7 +217,7 @@ export default function DashboardPage() {
                   <StatPill value={st.boards} color="amber" />
                   {isAdmin && (
                     <span className="w-[62px] text-right text-sm font-medium text-muted-foreground tabular-nums" data-testid={`text-value-${st.stationId}`}>
-                      {st.totalValue > 0 ? `€${Math.round(st.totalValue).toLocaleString("en-US")}` : "—"}
+                      {st.totalValue > 0 ? `€${Math.round(st.totalValue).toLocaleString("de-DE")}` : "—"}
                     </span>
                   )}
                 </div>
@@ -243,7 +243,7 @@ export default function DashboardPage() {
                   {isAdmin && (
                     <span className="w-[62px] text-right text-sm font-medium text-muted-foreground tabular-nums">
                       {stats.inTransferBreakdown.totalValue > 0
-                        ? `€${Math.round(stats.inTransferBreakdown.totalValue).toLocaleString("en-US")}`
+                        ? `€${Math.round(stats.inTransferBreakdown.totalValue).toLocaleString("de-DE")}`
                         : "—"}
                     </span>
                   )}
@@ -260,7 +260,7 @@ export default function DashboardPage() {
                 <StatPill value={totalBoards} color="amber" bold />
                 {isAdmin && (
                   <span className="w-[62px] text-right text-sm font-bold tabular-nums" data-testid="text-total-value">
-                    {totalValue > 0 ? `€${Math.round(totalValue).toLocaleString("en-US")}` : "—"}
+                    {totalValue > 0 ? `€${Math.round(totalValue).toLocaleString("de-DE")}` : "—"}
                   </span>
                 )}
               </div>
@@ -292,7 +292,7 @@ export default function DashboardPage() {
                   {getEquipmentLabel(t.equipmentId)} · {getStationName(t.fromStationId)} → {getStationName(t.toStationId)}
                 </span>
                 <span className="text-xs text-muted-foreground shrink-0 mt-0.5">
-                  {t.initiatedAt ? new Date(t.initiatedAt).toLocaleDateString("en-US") : ""}
+                  {t.initiatedAt ? new Date(t.initiatedAt).toLocaleDateString("de-DE") : ""}
                 </span>
               </div>
             ))}

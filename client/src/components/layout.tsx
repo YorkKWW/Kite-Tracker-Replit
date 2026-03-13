@@ -331,7 +331,7 @@ export default function Layout({ children }: LayoutProps) {
                             <p className="text-sm font-medium leading-tight">{n.title}</p>
                             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
                             <p className="text-[10px] text-muted-foreground mt-1">
-                              {new Date(n.createdAt).toLocaleDateString("en-US")} {new Date(n.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                              {new Date(n.createdAt).toLocaleDateString("de-DE")} {new Date(n.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
                             </p>
                           </div>
                         </div>

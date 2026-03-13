@@ -597,7 +597,7 @@ export default function StationDetailPage() {
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {ic.totalItems} items · {new Date(ic.startedAt!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {ic.totalItems} items · {new Date(ic.startedAt!).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
                 </CardContent>
