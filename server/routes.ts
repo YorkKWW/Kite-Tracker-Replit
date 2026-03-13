@@ -15,19 +15,18 @@ import { PDFParse } from "pdf-parse";
 
 async function sendNotificationEmail(to: string | string[], subject: string, body: string) {
   try {
-    const nodemailer = await import("nodemailer").catch(() => null);
-    if (!nodemailer || !process.env.SMTP_USER || !process.env.SMTP_PASS) return;
-    const transporter = nodemailer.default.createTransport({
-      host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: parseInt(process.env.SMTP_PORT || "587"),
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
-    await transporter.sendMail({
-      from: process.env.SMTP_USER || "noreply@kitetracker.com",
-      to: Array.isArray(to) ? to.join(", ") : to,
+    if (!process.env.RESEND_API_KEY) return;
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const recipients = Array.isArray(to) ? to : [to];
+    const fromAddress = process.env.EMAIL_FROM || "KiteTracker <onboarding@resend.dev>";
+    await resend.emails.send({
+      from: fromAddress,
+      to: recipients,
       subject: `[KiteTracker] ${subject}`,
       text: body,
     });
+    console.log(`Notification email sent to ${recipients.join(", ")}: ${subject}`);
   } catch (e) {
     console.error("Notification email error:", e);
   }
@@ -2370,72 +2369,57 @@ export async function registerRoutes(
     const stationName = stationsList.find(s => s.id === data.stationId)?.name || (data.stationId ? `Station #${data.stationId}` : "Unknown");
 
     try {
-      const nodemailer = await import("nodemailer").catch(() => null);
-      if (nodemailer) {
-        const admins = await storage.getAllUsers();
-        const adminEmails = admins.filter(u => u.role === "admin").map(u => u.email);
-        if (adminEmails.length) {
-          const transporter = nodemailer.default.createTransport({
-            host: process.env.SMTP_HOST || "smtp.gmail.com",
-            port: parseInt(process.env.SMTP_PORT || "587"),
-            auth: {
-              user: process.env.SMTP_USER,
-              pass: process.env.SMTP_PASS,
-            },
-          });
-          const usageLabel = data.usageType === "rental" ? "Rental" : data.usageType === "lesson" ? "Lesson (liability on us)" : "Other";
-
-          await transporter.sendMail({
-            from: process.env.SMTP_USER || "noreply@kitetracker.com",
-            to: adminEmails.join(", "),
-            subject: `[KiteTracker] Damage Report: ${eqLabel}`,
-            text: [
-              `A damage report has been filed by ${user.name}.`,
+      const admins = await storage.getAllUsers();
+      const adminEmails = admins.filter(u => u.role === "admin").map(u => u.email);
+      if (adminEmails.length) {
+        const usageLabel = data.usageType === "rental" ? "Rental" : data.usageType === "lesson" ? "Lesson (liability on us)" : "Other";
+        sendNotificationEmail(
+          adminEmails,
+          `Damage Report: ${eqLabel}`,
+          [
+            `A damage report has been filed by ${user.name}.`,
+            ``,
+            `Equipment: ${eqLabel}`,
+            `Location: ${stationName}`,
+            ``,
+            `What happened: ${data.howItHappened}`,
+            ``,
+            `Customer: ${data.customerName || "–"}`,
+            `Booking ref: ${data.bookingReference || "–"}`,
+            `Usage type: ${usageLabel}`,
+            `Customer insured: ${data.customerInsured ? "Yes" : "No"}`,
+            ``,
+            `Assessment: ${data.totalLoss ? "TOTAL LOSS" : data.repairable ? "Repairable" : "Not repairable"}`,
+            `Can repair on-site: ${data.canRepairOnSite ? "Yes" : "No"}`,
+            `Needs spare parts: ${data.needsSpareParts ? "Yes" : "No"}`,
+            data.needsSpareParts ? `Parts needed: ${data.sparePartsNeeded || "–"}` : "",
+            ``,
+            `View in KiteTracker: /incidents`,
+          ].filter(Boolean).join("\n"),
+        );
+        if (data.needsSpareParts) {
+          sendNotificationEmail(
+            adminEmails,
+            `⚙️ SPARE PARTS NEEDED: ${eqLabel} — ${stationName}`,
+            [
+              `SPARE PARTS ORDER REQUIRED`,
               ``,
-              `Equipment: ${eqLabel}`,
+              `Reported by: ${user.name}`,
               `Location: ${stationName}`,
+              `Equipment: ${eqLabel}`,
               ``,
-              `What happened: ${data.howItHappened}`,
+              `Parts needed:`,
+              `  ${data.sparePartsNeeded || "–"}`,
               ``,
-              `Customer: ${data.customerName || "–"}`,
-              `Booking ref: ${data.bookingReference || "–"}`,
-              `Usage type: ${usageLabel}`,
-              `Customer insured: ${data.customerInsured ? "Yes" : "No"}`,
+              `Context:`,
+              `  What happened: ${data.howItHappened}`,
+              `  Customer: ${data.customerName || "–"}`,
+              `  Booking ref: ${data.bookingReference || "–"}`,
               ``,
-              `Assessment: ${data.totalLoss ? "TOTAL LOSS" : data.repairable ? "Repairable" : "Not repairable"}`,
-              `Can repair on-site: ${data.canRepairOnSite ? "Yes" : "No"}`,
-              `Needs spare parts: ${data.needsSpareParts ? "Yes" : "No"}`,
-              data.needsSpareParts ? `Parts needed: ${data.sparePartsNeeded || "–"}` : "",
-              ``,
+              `Please order the parts and update the damage report in KiteTracker.`,
               `View in KiteTracker: /incidents`,
-            ].filter(Boolean).join("\n"),
-          }).catch(() => null);
-
-          if (data.needsSpareParts) {
-            await transporter.sendMail({
-              from: process.env.SMTP_USER || "noreply@kitetracker.com",
-              to: adminEmails.join(", "),
-              subject: `[KiteTracker] ⚙️ SPARE PARTS NEEDED: ${eqLabel} — ${stationName}`,
-              text: [
-                `SPARE PARTS ORDER REQUIRED`,
-                ``,
-                `Reported by: ${user.name}`,
-                `Location: ${stationName}`,
-                `Equipment: ${eqLabel}`,
-                ``,
-                `Parts needed:`,
-                `  ${data.sparePartsNeeded || "–"}`,
-                ``,
-                `Context:`,
-                `  What happened: ${data.howItHappened}`,
-                `  Customer: ${data.customerName || "–"}`,
-                `  Booking ref: ${data.bookingReference || "–"}`,
-                ``,
-                `Please order the parts and update the damage report in KiteTracker.`,
-                `View in KiteTracker: /incidents`,
-              ].join("\n"),
-            }).catch(() => null);
-          }
+            ].join("\n"),
+          );
         }
       }
     } catch (_) {}

@@ -182,6 +182,20 @@ app.use((req, res, next) => {
     await dbInstance.execute(sql`CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)`);
     await dbInstance.execute(sql`CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, read)`);
     await dbInstance.execute(sql`CREATE INDEX IF NOT EXISTS idx_feedback_comments_feedback_id ON feedback_comments(feedback_id)`);
+
+    await dbInstance.execute(sql`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS can_edit_equipment boolean NOT NULL DEFAULT false
+    `);
+
+    await dbInstance.execute(sql`
+      CREATE TABLE IF NOT EXISTS feedback_attachments (
+        id SERIAL PRIMARY KEY,
+        feedback_id INTEGER NOT NULL REFERENCES feedback(id),
+        url TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'image',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
   } catch (e) {
     console.error("Equipment size migration error:", e);
   }
