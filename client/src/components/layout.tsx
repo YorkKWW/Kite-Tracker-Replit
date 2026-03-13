@@ -35,6 +35,7 @@ import {
   Bell,
   Eye,
   EyeOff,
+  Shirt as ShirtIcon,
 } from "lucide-react";
 import type { ViewMode } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -90,8 +91,8 @@ export default function Layout({ children }: LayoutProps) {
       apiRequest("POST", "/api/equipment", {
         serialNumber: scanResult?.status === "not_found" ? scanResult.serial : "",
         type: quickType,
-        brand: quickBrand || "Unbekannt",
-        model: "Unbekannt",
+        brand: quickBrand || "Unknown",
+        model: "Unknown",
         currentStationId: 7,
         status: "active",
         conditionRating: 3,
@@ -100,18 +101,19 @@ export default function Layout({ children }: LayoutProps) {
     onSuccess: async (res) => {
       const newItem = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
-      toast({ title: "Schnellerfassung", description: `${quickBrand || "Unbekannt"} ${EQUIPMENT_TYPE_LABELS[quickType] || quickType} als "${scanResult?.status === 'not_found' ? scanResult.serial : ''}" angelegt. Zur Nachbearbeitung unter "Incoming".` });
+      toast({ title: "Quick Entry", description: `${quickBrand || "Unknown"} ${EQUIPMENT_TYPE_LABELS[quickType] || quickType} created as "${scanResult?.status === 'not_found' ? scanResult.serial : ''}". Available for editing under "Incoming".` });
       setScanResult(null);
       navigate(`/equipment/${newItem.id}`);
     },
     onError: () => {
-      toast({ title: "Fehler", description: "Equipment konnte nicht angelegt werden.", variant: "destructive" });
+      toast({ title: "Error", description: "Equipment could not be created.", variant: "destructive" });
     },
   });
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/equipment", label: "Equipment", icon: Package },
+    { href: "/accessories", label: "Accessories", icon: ShirtIcon },
     { href: "/transfers", label: "Transfers", icon: ArrowLeftRight },
     { href: "/sales", label: "Sales", icon: ShoppingCart },
     { href: "/incidents", label: "Incidents", icon: AlertTriangle },
@@ -128,10 +130,11 @@ export default function Layout({ children }: LayoutProps) {
 
   const stationLeadBottomTabs = [
     { href: "/equipment", label: "Equipment", icon: Package },
+    { href: "/accessories", label: "Accessories", icon: ShirtIcon },
     { href: "/incidents", label: "Incidents", icon: AlertTriangle },
     { href: "/repairs", label: "Repairs", icon: Wrench },
     ...(user?.assignedStationId
-      ? [{ href: `/stations/${user.assignedStationId}`, label: "Inventur", icon: ClipboardCheck }]
+      ? [{ href: `/stations/${user.assignedStationId}`, label: "Inventory", icon: ClipboardCheck }]
       : []),
   ];
 
@@ -201,7 +204,7 @@ export default function Layout({ children }: LayoutProps) {
       {isSimulating && (
         <div className="sticky top-0 z-[60] bg-amber-500 text-amber-950 text-center py-1 text-xs font-semibold flex items-center justify-center gap-2" data-testid="banner-simulation">
           <EyeOff className="h-3.5 w-3.5" />
-          Simulierte Ansicht: {viewMode === "admin" ? "Admin" : viewMode === "manager" ? "Center Manager" : "Station Lead"}
+          Simulated View: {viewMode === "admin" ? "Admin" : viewMode === "manager" ? "Center Manager" : "Station Lead"}
           <Button
             variant="ghost"
             size="sm"
@@ -209,7 +212,7 @@ export default function Layout({ children }: LayoutProps) {
             onClick={() => setViewMode(null)}
             data-testid="button-exit-simulation"
           >
-            Beenden
+            Exit
           </Button>
         </div>
       )}
@@ -292,7 +295,7 @@ export default function Layout({ children }: LayoutProps) {
                   <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
                   <div className="absolute right-0 top-full mt-1 z-50 w-80 max-h-96 overflow-y-auto rounded-lg border bg-background shadow-lg" data-testid="panel-notifications">
                     <div className="flex items-center justify-between p-3 border-b">
-                      <span className="font-semibold text-sm">Benachrichtigungen</span>
+                      <span className="font-semibold text-sm">Notifications</span>
                       {unreadCount > 0 && (
                         <Button
                           variant="ghost"
@@ -301,12 +304,12 @@ export default function Layout({ children }: LayoutProps) {
                           onClick={() => markAllReadMutation.mutate()}
                           data-testid="button-mark-all-read"
                         >
-                          Alle gelesen
+                          Mark all read
                         </Button>
                       )}
                     </div>
                     {(!notifItems || notifItems.length === 0) && (
-                      <div className="p-6 text-center text-sm text-muted-foreground">Keine Benachrichtigungen</div>
+                      <div className="p-6 text-center text-sm text-muted-foreground">No notifications</div>
                     )}
                     {notifItems?.map((n) => (
                       <div
@@ -328,7 +331,7 @@ export default function Layout({ children }: LayoutProps) {
                             <p className="text-sm font-medium leading-tight">{n.title}</p>
                             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
                             <p className="text-[10px] text-muted-foreground mt-1">
-                              {new Date(n.createdAt).toLocaleDateString("de-DE")} {new Date(n.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+                              {new Date(n.createdAt).toLocaleDateString("en-US")} {new Date(n.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                             </p>
                           </div>
                         </div>
@@ -373,7 +376,7 @@ export default function Layout({ children }: LayoutProps) {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-base">
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  Equipment gefunden
+                  Equipment Found
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-3">
@@ -391,7 +394,7 @@ export default function Layout({ children }: LayoutProps) {
                     }}
                     data-testid="button-view-found"
                   >
-                    Details anzeigen
+                    View Details
                   </Button>
                   <Button
                     variant="outline"
@@ -401,7 +404,7 @@ export default function Layout({ children }: LayoutProps) {
                     }}
                     data-testid="button-scan-again"
                   >
-                    Weiter scannen
+                    Continue Scanning
                   </Button>
                 </div>
               </div>
@@ -413,22 +416,22 @@ export default function Layout({ children }: LayoutProps) {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-base">
                   <HelpCircle className="h-5 w-5 text-amber-500" />
-                  Nicht im Bestand
+                  Not in Inventory
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3">
                   <p className="text-sm text-amber-800 dark:text-amber-300">
-                    Die Seriennummer <span className="font-mono font-medium">{scanResult.serial}</span> ist nicht im System.
+                    The serial number <span className="font-mono font-medium">{scanResult.serial}</span> is not in the system.
                   </p>
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-sm font-medium">Schnellerfassung</p>
-                  <p className="text-xs text-muted-foreground">Das Equipment wird unter &quot;Incoming&quot; geparkt und kann später im Büro vervollständigt werden.</p>
+                  <p className="text-sm font-medium">Quick Entry</p>
+                  <p className="text-xs text-muted-foreground">The equipment will be parked under &quot;Incoming&quot; and can be completed later in the office.</p>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">Typ</Label>
+                    <Label className="text-xs">Type</Label>
                     <Select value={quickType} onValueChange={setQuickType}>
                       <SelectTrigger data-testid="select-quick-type">
                         <SelectValue />
@@ -442,9 +445,9 @@ export default function Layout({ children }: LayoutProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">Hersteller</Label>
+                    <Label className="text-xs">Manufacturer</Label>
                     <Input
-                      placeholder="z.B. Core, Duotone, North..."
+                      placeholder="e.g. Core, Duotone, North..."
                       value={quickBrand}
                       onChange={(e) => setQuickBrand(e.target.value)}
                       data-testid="input-quick-brand"
@@ -459,7 +462,7 @@ export default function Layout({ children }: LayoutProps) {
                     disabled={quickAddMutation.isPending}
                     data-testid="button-quick-add"
                   >
-                    {quickAddMutation.isPending ? "Wird angelegt..." : "Schnell anlegen"}
+                    {quickAddMutation.isPending ? "Creating..." : "Quick Add"}
                   </Button>
                   <Button
                     variant="outline"
@@ -469,7 +472,7 @@ export default function Layout({ children }: LayoutProps) {
                     }}
                     data-testid="button-full-add"
                   >
-                    Voll erfassen
+                    Full Entry
                   </Button>
                 </div>
                 <Button
@@ -481,7 +484,7 @@ export default function Layout({ children }: LayoutProps) {
                   }}
                   data-testid="button-scan-again-notfound"
                 >
-                  Weiter scannen
+                  Continue Scanning
                 </Button>
               </div>
             </>
@@ -561,7 +564,7 @@ export default function Layout({ children }: LayoutProps) {
             data-testid="link-bottom-nav-more"
           >
             <MoreHorizontal className="h-5 w-5" />
-            <span className="text-[10px] font-medium">Mehr</span>
+            <span className="text-[10px] font-medium">More</span>
           </button>
         </div>
       </nav>

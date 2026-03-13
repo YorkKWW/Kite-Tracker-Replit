@@ -364,14 +364,14 @@ export default function InvoiceImportPage() {
                 )}
                 <div>
                   {isMatch ? (
-                    <p>Artikelsumme (€{itemsTotal.toFixed(2)}) stimmt mit Rechnungssumme (€{parseResult.totalNet!.toFixed(2)}) überein.</p>
+                    <p>Item total (€{itemsTotal.toFixed(2)}) matches invoice total (€{parseResult.totalNet!.toFixed(2)}).</p>
                   ) : (
                     <>
                       <p className="font-medium">
-                        Differenz: €{diff.toFixed(2)} — Artikelsumme: €{itemsTotal.toFixed(2)}, Rechnungssumme: €{parseResult.totalNet!.toFixed(2)}
+                        Difference: €{diff.toFixed(2)} — Item total: €{itemsTotal.toFixed(2)}, Invoice total: €{parseResult.totalNet!.toFixed(2)}
                       </p>
                       <p className="text-xs mt-0.5 opacity-80">
-                        Möglicherweise fehlen Artikel oder es sind Versandkosten enthalten.
+                        Items may be missing or shipping costs may be included.
                       </p>
                     </>
                   )}
@@ -647,13 +647,13 @@ function InvoiceRow({ invoice, isExpanded, onToggle }: {
   const fmtDate = (d: string | null | undefined) => {
     if (!d) return "—";
     const p = new Date(d);
-    return isNaN(p.getTime()) ? d : p.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+    return isNaN(p.getTime()) ? d : p.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
   };
 
   const fmtPrice = (v: string | null | undefined) => {
     if (!v) return "—";
     const n = parseFloat(v);
-    return isNaN(n) ? "—" : `€${n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return isNaN(n) ? "—" : `€${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   return (

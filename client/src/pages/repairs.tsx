@@ -50,7 +50,7 @@ function formatIncidentNumber(id: number, reportedAt: string | null): string {
 
 function fmt(date: string | null): string {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return new Date(date).toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 const USAGE_LABELS: Record<string, string> = {

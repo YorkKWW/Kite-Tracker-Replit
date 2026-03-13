@@ -102,7 +102,7 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
         if (!code || code.length < 4) return;
 
         if (isProductUpc(code)) {
-          setLastDetected("EAN erkannt — bitte den UNTEREN Barcode (S/N) scannen");
+          setLastDetected("EAN detected — please scan the LOWER barcode (S/N)");
           return;
         }
 
@@ -115,7 +115,7 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
           onScan(code);
           onClose();
         } else {
-          setLastDetected(`Erkannt: ${code} — bestätige...`);
+          setLastDetected(`Detected: ${code} — confirming...`);
         }
       });
     } catch (err: any) {
@@ -123,11 +123,11 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
       setScanning(false);
       const msg = (err?.message || err?.name || String(err)).toLowerCase();
       if (msg.includes("notallowed") || msg.includes("permission") || msg.includes("denied")) {
-        setError("Kamerazugriff verweigert. Bitte in den iPhone-Einstellungen → Safari → Kamera erlauben.");
+        setError("Camera access denied. Please allow camera access in iPhone Settings → Safari → Camera.");
       } else if (msg.includes("notfound") || msg.includes("overconstrained") || msg.includes("notreadable")) {
-        setError("Keine Kamera gefunden.");
+        setError("No camera found.");
       } else {
-        setError(`Kamera-Fehler: ${err?.message || String(err)}`);
+        setError(`Camera error: ${err?.message || String(err)}`);
       }
     }
   }, [onScan, onClose, stopScanner]);
@@ -171,7 +171,7 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
             Scan Serial Number
           </DialogTitle>
           <p id="scanner-desc" className="text-xs text-muted-foreground leading-snug mt-0.5">
-            Den <strong>unteren Barcode</strong> auf dem Etikett scannen (S/N).
+            Scan the <strong>lower barcode</strong> on the label (S/N).
           </p>
         </DialogHeader>
 
@@ -207,7 +207,7 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
                     <div className="absolute inset-x-1 top-1/2 -translate-y-1/2 h-px bg-primary/60 animate-pulse" />
                   </div>
                   <span className="text-[10px] text-white/70 bg-black/50 px-2 py-0.5 rounded">
-                    S/N Barcode zentrieren
+                    Center S/N barcode
                   </span>
                 </div>
               )}
@@ -222,13 +222,13 @@ export function BarcodeScanner({ open, onClose, onScan }: BarcodeScannerProps) {
 
           <div className="flex items-center gap-2">
             <div className="flex-1 h-px bg-border" />
-            <span className="text-[11px] text-muted-foreground">oder manuell eingeben</span>
+            <span className="text-[11px] text-muted-foreground">or enter manually</span>
             <div className="flex-1 h-px bg-border" />
           </div>
 
           <div className="flex gap-2">
             <Input
-              placeholder="Seriennummer (z.B. KXR708BBA2032579)"
+              placeholder="Serial number (e.g. KXR708BBA2032579)"
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === "Enter" && handleManualSubmit()}

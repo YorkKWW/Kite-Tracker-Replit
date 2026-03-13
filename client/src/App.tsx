@@ -10,6 +10,7 @@ import DashboardPage from "@/pages/dashboard";
 import EquipmentListPage from "@/pages/equipment-list";
 import EquipmentDetailPage from "@/pages/equipment-detail";
 import EquipmentFormPage from "@/pages/equipment-form";
+import AccessoriesPage from "@/pages/accessories";
 import TransfersPage from "@/pages/transfers";
 import StationsPage from "@/pages/stations";
 import StationDetailPage from "@/pages/station-detail";
@@ -49,6 +50,7 @@ function AuthenticatedRouter() {
         <Route path="/equipment" component={EquipmentListPage} />
         {isHamburg && <Route path="/equipment/new" component={EquipmentFormPage} />}
         <Route path="/equipment/:id" component={EquipmentDetailPage} />
+        <Route path="/accessories" component={AccessoriesPage} />
         <Route path="/transfers" component={TransfersPage} />
         {isAdmin && <Route path="/stations" component={StationsPage} />}
         <Route path="/stations/:id" component={StationDetailPage} />

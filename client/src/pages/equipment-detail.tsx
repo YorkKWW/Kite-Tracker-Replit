@@ -129,7 +129,7 @@ export default function EquipmentDetailPage() {
           {canEditEquipment && (
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} data-testid="button-edit-equipment">
               <Pencil className="h-4 w-4 mr-1.5" />
-              Bearbeiten
+              Edit
             </Button>
           )}
           <div className="flex flex-col items-end gap-1">
@@ -183,10 +183,10 @@ export default function EquipmentDetailPage() {
                 </p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Retail Price (UVP)</p>
+                <p className="text-xs text-muted-foreground">Retail Price (MSRP)</p>
                 <p className="font-semibold" data-testid="text-retail-price">
                   {retailPrice?.retailPrice
-                    ? `€${parseFloat(retailPrice.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}`
+                    ? `€${parseFloat(retailPrice.retailPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
                     : "N/A"}
                 </p>
               </div>
@@ -197,9 +197,9 @@ export default function EquipmentDetailPage() {
                   Price source: {retailPrice.supplier} · {retailPrice.productName}
                   {(retailPrice.validFrom || retailPrice.validTo) && (
                     <span className="block mt-0.5">
-                      Valid: {retailPrice.validFrom ? new Date(retailPrice.validFrom).toLocaleDateString("de-DE") : "—"}
+                      Valid: {retailPrice.validFrom ? new Date(retailPrice.validFrom).toLocaleDateString("en-US") : "—"}
                       {" → "}
-                      {retailPrice.validTo ? new Date(retailPrice.validTo).toLocaleDateString("de-DE") : "—"}
+                      {retailPrice.validTo ? new Date(retailPrice.validTo).toLocaleDateString("en-US") : "—"}
                     </span>
                   )}
                 </p>
@@ -211,9 +211,9 @@ export default function EquipmentDetailPage() {
                   Purchase based on: {purchasePriceList.supplier} price list
                   {(purchasePriceList.validFrom || purchasePriceList.validTo) && (
                     <span className="block mt-0.5">
-                      Valid: {purchasePriceList.validFrom ? new Date(purchasePriceList.validFrom).toLocaleDateString("de-DE") : "—"}
+                      Valid: {purchasePriceList.validFrom ? new Date(purchasePriceList.validFrom).toLocaleDateString("en-US") : "—"}
                       {" → "}
-                      {purchasePriceList.validTo ? new Date(purchasePriceList.validTo).toLocaleDateString("de-DE") : "—"}
+                      {purchasePriceList.validTo ? new Date(purchasePriceList.validTo).toLocaleDateString("en-US") : "—"}
                     </span>
                   )}
                 </p>
@@ -367,11 +367,11 @@ function EditEquipmentDialog({ open, onOpenChange, equipment: eq }: { open: bool
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment", eq.id.toString()] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
-      toast({ title: "Equipment aktualisiert" });
+      toast({ title: "Equipment updated" });
       onOpenChange(false);
     },
     onError: (err: Error) => {
-      toast({ title: "Fehler beim Speichern", description: err.message, variant: "destructive" });
+      toast({ title: "Error saving", description: err.message, variant: "destructive" });
     },
   });
 
@@ -379,11 +379,11 @@ function EditEquipmentDialog({ open, onOpenChange, equipment: eq }: { open: bool
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Equipment bearbeiten</DialogTitle>
+          <DialogTitle>Edit Equipment</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <div className="space-y-2">
-            <Label>Seriennummer</Label>
+            <Label>Serial Number</Label>
             <Input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} data-testid="input-edit-serial" />
           </div>
           <div className="space-y-2">
@@ -391,7 +391,7 @@ function EditEquipmentDialog({ open, onOpenChange, equipment: eq }: { open: bool
             <Input value={sku} onChange={(e) => setSku(e.target.value)} data-testid="input-edit-sku" />
           </div>
           <div className="space-y-2">
-            <Label>Typ</Label>
+            <Label>Type</Label>
             <Select value={type} onValueChange={(v) => { setType(v); setTypeSpecific({}); }}>
               <SelectTrigger data-testid="select-edit-type">
                 <SelectValue />
@@ -405,11 +405,11 @@ function EditEquipmentDialog({ open, onOpenChange, equipment: eq }: { open: bool
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Marke</Label>
+              <Label>Brand</Label>
               <Input value={brand} onChange={(e) => setBrand(e.target.value)} data-testid="input-edit-brand" />
             </div>
             <div className="space-y-2">
-              <Label>Modell</Label>
+              <Label>Model</Label>
               <Input value={model} onChange={(e) => setModel(e.target.value)} data-testid="input-edit-model" />
             </div>
           </div>
@@ -456,7 +456,7 @@ function EditEquipmentDialog({ open, onOpenChange, equipment: eq }: { open: bool
             data-testid="button-save-edit-equipment"
           >
             {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Speichern
+            Save
           </Button>
         </div>
       </DialogContent>
@@ -1010,7 +1010,7 @@ function formatRelativeTime(ts: string | null) {
   if (diffHrs < 24) return `${diffHrs}h ago`;
   const diffDays = Math.floor(diffHrs / 24);
   if (diffDays < 30) return `${diffDays}d ago`;
-  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return d.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 type ActivityEntry = { id: number; userId: number; action: string; equipmentId: number | null; details: string | null; timestamp: string | null; userName: string };
@@ -1066,7 +1066,7 @@ function EquipmentDamageSection({ equipmentId, stationId }: { equipmentId: numbe
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>{r.reporterName}</span>
               <span>·</span>
-              <span>{r.reportedAt ? new Date(r.reportedAt).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "–"}</span>
+              <span>{r.reportedAt ? new Date(r.reportedAt).toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" }) : "–"}</span>
             </div>
             {r.photos.length > 0 && (
               <div className="flex gap-2 mt-2 overflow-x-auto pb-1">

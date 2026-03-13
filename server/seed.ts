@@ -1,8 +1,8 @@
 import { storage } from "./storage";
 import { hashPassword } from "./auth";
 import { db } from "./db";
-import { users, stations, equipment } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, stations, equipment, accessoryCategories, accessoryInventory } from "@shared/schema";
+import { eq, inArray } from "drizzle-orm";
 
 const DEFAULT_SUPPLIERS = [
   { name: "Duotone", color: "#8b5cf6" },
@@ -27,8 +27,93 @@ async function seedSuppliers() {
   console.log(`Inserted ${missing.length} suppliers: ${missing.map(s => s.name).join(", ")}`);
 }
 
+const DEFAULT_ACCESSORY_CATEGORIES = [
+  { name: "Impact Vest", hasSizes: true, isDefault: true, sortOrder: 10 },
+  { name: "Helmet", hasSizes: true, isDefault: true, sortOrder: 20 },
+  { name: "Wetsuit", hasSizes: true, isDefault: true, sortOrder: 30 },
+  { name: "Waist Harness", hasSizes: true, isDefault: true, sortOrder: 40 },
+  { name: "Seat Harness", hasSizes: true, isDefault: true, sortOrder: 41 },
+  { name: "Pump", hasSizes: false, isDefault: true, sortOrder: 50 },
+];
+
+async function seedAccessoryCategories() {
+  const existing = await storage.getAllAccessoryCategories();
+  const existingNames = new Set(existing.map(c => c.name));
+  const missing = DEFAULT_ACCESSORY_CATEGORIES.filter(c => !existingNames.has(c.name));
+  if (missing.length === 0) return;
+  console.log(`Adding ${missing.length} accessory categories...`);
+  for (const cat of missing) {
+    await storage.createAccessoryCategory(cat);
+  }
+  console.log(`Inserted accessory categories: ${missing.map(c => c.name).join(", ")}`);
+}
+
+async function migrateEquipmentToAccessories() {
+  const { sql: rawSql } = await import("drizzle-orm");
+  const eqItems = await db.select().from(equipment).where(
+    rawSql`${equipment.type} IN ('wetsuit', 'harness', 'helmet_safety')`
+  );
+  if (eqItems.length === 0) return;
+
+  console.log(`Migrating ${eqItems.length} equipment items to accessories...`);
+
+  const categories = await storage.getAllAccessoryCategories();
+  const catByName = (name: string) => categories.find(c => c.name === name)?.id;
+
+  function resolveCategory(item: typeof eqItems[0]): number | undefined {
+    const fields = (item.typeSpecificFields || {}) as Record<string, any>;
+    if (item.type === "wetsuit") return catByName("Wetsuit");
+    if (item.type === "harness") {
+      const harnessType = (fields.harnessType || "").toLowerCase();
+      if (harnessType === "seat") return catByName("Seat Harness");
+      return catByName("Waist Harness");
+    }
+    if (item.type === "helmet_safety") {
+      const gearType = (fields.gearType || "").toLowerCase();
+      if (gearType === "impact vest" || gearType === "vest") return catByName("Impact Vest");
+      return catByName("Helmet");
+    }
+    return undefined;
+  }
+
+  const grouped: Record<string, number> = {};
+  for (const item of eqItems) {
+    const catId = resolveCategory(item);
+    if (!catId || !item.currentStationId) continue;
+    const fields = (item.typeSpecificFields || {}) as Record<string, any>;
+    const size = fields.size || "Einheitsgröße";
+    const key = `${catId}:${item.currentStationId}:${size}`;
+    grouped[key] = (grouped[key] || 0) + 1;
+  }
+
+  for (const [key, count] of Object.entries(grouped)) {
+    const [catId, stationId, size] = key.split(":");
+    const existing = await storage.getAccessoryInventory(parseInt(stationId));
+    const current = existing.find(i => i.categoryId === parseInt(catId) && i.size === size);
+    const newQty = (current?.quantity || 0) + count;
+    await storage.updateAccessoryInventory(parseInt(catId), parseInt(stationId), size, newQty);
+  }
+
+  const eqIds = eqItems.map(e => e.id);
+  await db.execute(rawSql`DELETE FROM photos WHERE equipment_id = ANY(${eqIds})`);
+  await db.execute(rawSql`DELETE FROM condition_ratings WHERE equipment_id = ANY(${eqIds})`);
+  await db.execute(rawSql`DELETE FROM repairs WHERE equipment_id = ANY(${eqIds})`);
+  await db.execute(rawSql`DELETE FROM transfers WHERE equipment_id = ANY(${eqIds})`);
+  await db.execute(rawSql`DELETE FROM activity_log WHERE equipment_id = ANY(${eqIds})`);
+  await db.execute(rawSql`DELETE FROM sale_items WHERE equipment_id = ANY(${eqIds})`);
+  await db.execute(rawSql`DELETE FROM inventory_check_items WHERE equipment_id = ANY(${eqIds})`);
+  await db.execute(rawSql`UPDATE sales_invoices SET damage_report_id = NULL WHERE damage_report_id IN (SELECT id FROM damage_reports WHERE equipment_id = ANY(${eqIds}))`);
+  await db.execute(rawSql`DELETE FROM damage_report_photos WHERE damage_report_id IN (SELECT id FROM damage_reports WHERE equipment_id = ANY(${eqIds}))`);
+  await db.execute(rawSql`DELETE FROM damage_reports WHERE equipment_id = ANY(${eqIds})`);
+  await db.delete(equipment).where(inArray(equipment.id, eqIds));
+
+  console.log(`Migrated ${eqItems.length} items into accessory inventory and removed from equipment.`);
+}
+
 export async function seedDatabase() {
   await seedSuppliers();
+  await seedAccessoryCategories();
+  await migrateEquipmentToAccessories();
 
   const existingUsers = await storage.getAllUsers();
   if (existingUsers.length > 0) {
@@ -208,85 +293,6 @@ export async function seedDatabase() {
       typeSpecificFields: { lineLength: 24, compatibleSizes: "7-14m" },
     },
     {
-      serialNumber: "MY-WS-2024-011",
-      type: "wetsuit" as const,
-      brand: "Mystic",
-      model: "Star Fullsuit 5/3",
-      yearOfPurchase: 2024,
-      currentStationId: dakhla.id,
-      status: "active" as const,
-      conditionRating: 4,
-      purchasePrice: "249.00",
-      currentValue: "200.00",
-      typeSpecificFields: { thickness: 5, size: "L", wetsuitType: "Full" },
-    },
-    {
-      serialNumber: "IO-WS-2023-012",
-      type: "wetsuit" as const,
-      brand: "ION",
-      model: "Element 4/3",
-      yearOfPurchase: 2023,
-      currentStationId: tatajuba.id,
-      status: "active" as const,
-      conditionRating: 3,
-      purchasePrice: "199.00",
-      currentValue: "100.00",
-      typeSpecificFields: { thickness: 4, size: "M", wetsuitType: "Full" },
-    },
-    {
-      serialNumber: "MY-H-2024-013",
-      type: "harness" as const,
-      brand: "Mystic",
-      model: "Majestic X",
-      yearOfPurchase: 2024,
-      currentStationId: dakhla.id,
-      status: "active" as const,
-      conditionRating: 5,
-      purchasePrice: "299.00",
-      currentValue: "270.00",
-      typeSpecificFields: { size: "L", harnessType: "Waist" },
-    },
-    {
-      serialNumber: "MN-H-2023-014",
-      type: "harness" as const,
-      brand: "Manera",
-      model: "Exo",
-      yearOfPurchase: 2023,
-      currentStationId: dakhla.id,
-      status: "active" as const,
-      conditionRating: 3,
-      purchasePrice: "249.00",
-      currentValue: "130.00",
-      typeSpecificFields: { size: "M", harnessType: "Seat" },
-    },
-    {
-      serialNumber: "MY-HS-2024-015",
-      type: "helmet_safety" as const,
-      brand: "Mystic",
-      model: "MK8 X Helmet",
-      yearOfPurchase: 2024,
-      currentStationId: dakhla.id,
-      status: "active" as const,
-      conditionRating: 5,
-      purchasePrice: "89.00",
-      currentValue: "80.00",
-      typeSpecificFields: { size: "L", gearType: "Helmet" },
-    },
-    {
-      serialNumber: "IO-HS-2023-016",
-      type: "helmet_safety" as const,
-      brand: "ION",
-      model: "Collision Vest",
-      yearOfPurchase: 2023,
-      currentStationId: tatajuba.id,
-      status: "retired" as const,
-      conditionRating: 1,
-      purchasePrice: "79.00",
-      currentValue: "0.00",
-      salePrice: "15.00",
-      typeSpecificFields: { size: "M", gearType: "Impact Vest" },
-    },
-    {
       serialNumber: "CR-K-2023-017",
       type: "kite" as const,
       brand: "Core",
@@ -327,7 +333,6 @@ export async function seedDatabase() {
 
   await storage.createRepair({ equipmentId: createdEquipment[6].id, description: "Delamination repair on rail", cost: "120.00", status: "pending", loggedBy: admin.id });
   await storage.createRepair({ equipmentId: createdEquipment[3].id, description: "Bladder replacement", cost: "85.00", status: "completed", loggedBy: admin.id });
-  await storage.createRepair({ equipmentId: createdEquipment[15].id, description: "Zipper replacement", cost: "35.00", status: "completed", loggedBy: admin.id });
 
   const transfer1 = await storage.createTransfer({
     equipmentId: createdEquipment[1].id,

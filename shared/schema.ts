@@ -10,6 +10,7 @@ import {
   serial,
   pgEnum,
   boolean,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -480,6 +481,69 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+export const accessoryCategories = pgTable("accessory_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  hasSizes: boolean("has_sizes").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(100),
+});
+
+export const accessoryInventory = pgTable("accessory_inventory", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull().references(() => accessoryCategories.id),
+  stationId: integer("station_id").notNull().references(() => stations.id),
+  size: text("size").notNull().default("Einheitsgröße"),
+  quantity: integer("quantity").notNull().default(0),
+}, (t) => [
+  uniqueIndex("accessory_inventory_unique").on(t.categoryId, t.stationId, t.size),
+]);
+
+export const accessoryTransfers = pgTable("accessory_transfers", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull().references(() => accessoryCategories.id),
+  size: text("size").notNull().default("Einheitsgröße"),
+  quantity: integer("quantity").notNull().default(1),
+  fromStationId: integer("from_station_id").notNull().references(() => stations.id),
+  toStationId: integer("to_station_id").notNull().references(() => stations.id),
+  transferredBy: integer("transferred_by").references(() => users.id),
+  transferredAt: timestamp("transferred_at").defaultNow(),
+});
+
+export const accessoryLossReports = pgTable("accessory_loss_reports", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull().references(() => accessoryCategories.id),
+  stationId: integer("station_id").notNull().references(() => stations.id),
+  size: text("size").notNull().default("Einheitsgröße"),
+  quantity: integer("quantity").notNull().default(1),
+  reason: text("reason").notNull(),
+  reportedBy: integer("reported_by").notNull().references(() => users.id),
+  reportedAt: timestamp("reported_at").defaultNow(),
+  status: text("status").notNull().default("pending"),
+  resolvedBy: integer("resolved_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  adminNote: text("admin_note"),
+});
+
+export const insertAccessoryCategorySchema = createInsertSchema(accessoryCategories).omit({ id: true });
+export const insertAccessoryInventorySchema = createInsertSchema(accessoryInventory).omit({ id: true });
+export const insertAccessoryTransferSchema = createInsertSchema(accessoryTransfers).omit({ id: true, transferredAt: true });
+export const insertAccessoryLossReportSchema = createInsertSchema(accessoryLossReports).omit({ id: true, reportedAt: true, status: true, resolvedBy: true, resolvedAt: true, adminNote: true });
+
+export type InsertAccessoryCategory = z.infer<typeof insertAccessoryCategorySchema>;
+export type AccessoryCategory = typeof accessoryCategories.$inferSelect;
+
+export type InsertAccessoryInventory = z.infer<typeof insertAccessoryInventorySchema>;
+export type AccessoryInventory = typeof accessoryInventory.$inferSelect;
+
+export type InsertAccessoryTransfer = z.infer<typeof insertAccessoryTransferSchema>;
+export type AccessoryTransfer = typeof accessoryTransfers.$inferSelect;
+
+export type InsertAccessoryLossReport = z.infer<typeof insertAccessoryLossReportSchema>;
+export type AccessoryLossReport = typeof accessoryLossReports.$inferSelect;
+
+export const ACCESSORY_SIZES = ["XS", "S", "M", "L", "XL"] as const;
+
 export const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   kite: "Kites",
   board: "Kiteboards",
@@ -487,9 +551,6 @@ export const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   foilboard: "Wing Foil Boards",
   foil: "Foils",
   bar_lines: "Bars",
-  wetsuit: "Wetsuits",
-  harness: "Harnesses",
-  helmet_safety: "Helmets",
 };
 
 export const EQUIPMENT_TYPE_OPTIONS = [
@@ -498,12 +559,9 @@ export const EQUIPMENT_TYPE_OPTIONS = [
   "wing",
   "foilboard",
   "bar_lines",
-  "wetsuit",
-  "harness",
-  "helmet_safety",
 ] as const;
 
-export const TYPES_WITHOUT_SERIAL = ["helmet_safety", "harness", "wetsuit"] as const;
+export const TYPES_WITHOUT_SERIAL: readonly string[] = [];
 
 export const EQUIPMENT_STATUS_LABELS: Record<string, string> = {
   active: "Active",
@@ -537,18 +595,5 @@ export const TYPE_SPECIFIC_FIELDS: Record<string, { key: string; label: string; 
   bar_lines: [
     { key: "lineLength", label: "Line Length (m)", type: "number" },
     { key: "compatibleSizes", label: "Compatible Kite Sizes", type: "text" },
-  ],
-  wetsuit: [
-    { key: "thickness", label: "Thickness (mm)", type: "number" },
-    { key: "size", label: "Size", type: "select", options: ["XS", "S", "M", "L", "XL", "XXL"] },
-    { key: "wetsuitType", label: "Type", type: "select", options: ["Full", "Shorty", "Top"] },
-  ],
-  harness: [
-    { key: "size", label: "Size", type: "select", options: ["XS", "S", "M", "L", "XL", "XXL"] },
-    { key: "harnessType", label: "Type", type: "select", options: ["Waist", "Seat"] },
-  ],
-  helmet_safety: [
-    { key: "size", label: "Size", type: "text" },
-    { key: "gearType", label: "Type", type: "select", options: ["Helmet", "Impact Vest", "Other"] },
   ],
 };

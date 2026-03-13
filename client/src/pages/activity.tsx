@@ -98,6 +98,11 @@ const ACTION_LABELS: Record<string, string> = {
   photo_deleted: "Photo Deleted",
   settings_updated: "Settings Updated",
   customer_created: "Customer Created",
+  accessory_quantity_changed: "Accessory Stock Changed",
+  accessory_transferred: "Accessory Transferred",
+  accessory_loss_reported: "Loss/Damage Reported",
+  accessory_loss_approved: "Loss Confirmed",
+  accessory_loss_rejected: "Loss Rejected",
   customer_updated: "Customer Updated",
   price_list_created: "Price List Uploaded",
   price_list_updated: "Price List Updated",
@@ -122,8 +127,8 @@ function formatTime(ts: string | null) {
   if (diffMins < 60) return `${diffMins}m ago`;
   const diffHrs = Math.floor(diffMins / 60);
   if (diffHrs < 24) return `${diffHrs}h ago`;
-  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) +
-    " " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+    " " + d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 }
 
 export default function ActivityPage() {

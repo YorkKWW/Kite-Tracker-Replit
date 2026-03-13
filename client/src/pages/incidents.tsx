@@ -53,8 +53,8 @@ type DamageReport = {
 
 function formatDate(ts: string | null) {
   if (!ts) return "–";
-  return new Date(ts).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) +
-    " " + new Date(ts).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return new Date(ts).toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+    " " + new Date(ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -817,7 +817,7 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
                         id="dr-parts"
                         className="mt-1 border-orange-300 focus:border-orange-400"
                         rows={3}
-                        placeholder="z.B. Bladder 9m², Leading Edge Valve, Strut Tip…"
+                        placeholder="e.g. Bladder 9m², Leading Edge Valve, Strut Tip…"
                         value={form.sparePartsNeeded}
                         onChange={e => set("sparePartsNeeded", e.target.value)}
                         data-testid="textarea-spare-parts"
@@ -838,7 +838,7 @@ function DamageReportForm({ equipmentId, stationId, onSuccess, onCancel }: {
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       {priceInfo?.retailPrice && (
                         <div className="rounded-md bg-background border px-2.5 py-1.5">
-                          <p className="text-muted-foreground">UVP (Retail-Price)</p>
+                          <p className="text-muted-foreground">MSRP (Retail Price)</p>
                           <p className="font-semibold text-sm mt-0.5">€ {parseFloat(priceInfo.retailPrice).toFixed(2)}</p>
                         </div>
                       )}

@@ -20,7 +20,7 @@ type ParsedItem = { sku: string; productName: string; retailPrice: string; deale
 
 const TYPE_LABELS: Record<string, string> = {
   kite: "Kite", board: "Board", foilboard: "Foilboard", foil: "Foil",
-  wing: "Wing", bar_lines: "Bar", wetsuit: "Wetsuit", harness: "Harness", helmet_safety: "Helmet",
+  wing: "Wing", bar_lines: "Bar",
 };
 const TYPE_COLORS: Record<string, string> = {
   kite: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -29,9 +29,6 @@ const TYPE_COLORS: Record<string, string> = {
   foil: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
   wing: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
   bar_lines: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-  wetsuit: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
-  harness: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  helmet_safety: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
 function TypeBadge({ type }: { type: string | null | undefined }) {
   if (!type) return <span className="text-muted-foreground text-[10px]">—</span>;
@@ -259,13 +256,13 @@ export default function PriceListsPage() {
                     {active ? (
                       <div className="text-right">
                         <span className="text-xs text-muted-foreground block">
-                          {active.itemCount} items · {active.uploadedAt ? new Date(active.uploadedAt).toLocaleDateString("de-DE") : ""}
+                          {active.itemCount} items · {active.uploadedAt ? new Date(active.uploadedAt).toLocaleDateString("en-US") : ""}
                         </span>
                         {(active.validFrom || active.validTo) && (
                           <span className="text-[10px] text-muted-foreground block">
-                            {active.validFrom ? new Date(active.validFrom).toLocaleDateString("de-DE") : "—"}
+                            {active.validFrom ? new Date(active.validFrom).toLocaleDateString("en-US") : "—"}
                             {" → "}
-                            {active.validTo ? new Date(active.validTo).toLocaleDateString("de-DE") : "—"}
+                            {active.validTo ? new Date(active.validTo).toLocaleDateString("en-US") : "—"}
                           </span>
                         )}
                       </div>
@@ -403,7 +400,7 @@ export default function PriceListsPage() {
                         <th className="px-2 py-1.5 text-left font-medium">SKU / UPC</th>
                         <th className="px-2 py-1.5 text-left font-medium">Product Name</th>
                         <th className="px-2 py-1.5 text-right font-medium">Dealer (net)</th>
-                        <th className="px-2 py-1.5 text-right font-medium">UVP (brutto)</th>
+                        <th className="px-2 py-1.5 text-right font-medium">MSRP (gross)</th>
                         {oldItems.length > 0 && <th className="px-2 py-1.5 text-right font-medium">Change</th>}
                       </tr>
                     </thead>
@@ -429,9 +426,9 @@ export default function PriceListsPage() {
                             <td className="px-2 py-1 font-mono text-[10px]">{item.sku}</td>
                             <td className="px-2 py-1">{item.productName}</td>
                             <td className="px-2 py-1 text-right text-muted-foreground">
-                              {item.dealerPrice ? `€${parseFloat(item.dealerPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}` : "—"}
+                              {item.dealerPrice ? `€${parseFloat(item.dealerPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
                             </td>
-                            <td className="px-2 py-1 text-right font-medium">€{newRetail.toLocaleString("de-DE", { minimumFractionDigits: 2 })}</td>
+                            <td className="px-2 py-1 text-right font-medium">€{newRetail.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
                             {oldItems.length > 0 && (
                               <td className="px-2 py-1 text-right whitespace-nowrap">
                                 {isNew ? (
@@ -440,7 +437,7 @@ export default function PriceListsPage() {
                                   <span className="text-muted-foreground text-[10px]">—</span>
                                 ) : (
                                   <span className={`text-[10px] font-medium ${priceDiff > 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                                    {priceDiff > 0 ? "+" : ""}{priceDiff.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} € ({pctChange > 0 ? "+" : ""}{pctChange.toFixed(1)}%)
+                                    {priceDiff > 0 ? "+" : ""}{priceDiff.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} € ({pctChange > 0 ? "+" : ""}{pctChange.toFixed(1)}%)
                                   </span>
                                 )}
                               </td>
@@ -465,9 +462,9 @@ export default function PriceListsPage() {
                               <td className="px-2 py-1 font-mono text-[10px]">{item.sku}</td>
                               <td className="px-2 py-1 line-through">{item.productName}</td>
                               <td className="px-2 py-1 text-right text-muted-foreground line-through">
-                                {item.dealerPrice ? `€${parseFloat(item.dealerPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}` : "—"}
+                                {item.dealerPrice ? `€${parseFloat(item.dealerPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
                               </td>
-                              <td className="px-2 py-1 text-right line-through">€{parseFloat(item.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}</td>
+                              <td className="px-2 py-1 text-right line-through">€{parseFloat(item.retailPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
                               {oldItems.length > 0 && (
                                 <td className="px-2 py-1 text-right">
                                   <span className="text-amber-600 dark:text-amber-400 font-medium text-[10px]">REMOVED</span>
@@ -522,7 +519,7 @@ export default function PriceListsPage() {
                     </Badge>
                     <span className="font-medium text-sm truncate">{pl.supplier}{pl.name ? ` — ${pl.name}` : ""}</span>
                     <span className="text-xs text-muted-foreground shrink-0">
-                      {pl.itemCount} items · {pl.uploadedAt ? new Date(pl.uploadedAt).toLocaleDateString("de-DE") : ""}
+                      {pl.itemCount} items · {pl.uploadedAt ? new Date(pl.uploadedAt).toLocaleDateString("en-US") : ""}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -572,9 +569,9 @@ export default function PriceListsPage() {
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Calendar className="h-3 w-3" />
                     <span>
-                      {pl.validFrom ? new Date(pl.validFrom).toLocaleDateString("de-DE") : "—"}
+                      {pl.validFrom ? new Date(pl.validFrom).toLocaleDateString("en-US") : "—"}
                       {" → "}
-                      {pl.validTo ? new Date(pl.validTo).toLocaleDateString("de-DE") : "—"}
+                      {pl.validTo ? new Date(pl.validTo).toLocaleDateString("en-US") : "—"}
                     </span>
                   </div>
                 )}
@@ -639,7 +636,7 @@ export default function PriceListsPage() {
                             <th className="px-2 py-1.5 text-left font-medium">SKU / UPC</th>
                             <th className="px-2 py-1.5 text-left font-medium">Product Name</th>
                             <th className="px-2 py-1.5 text-right font-medium">Dealer (net)</th>
-                            <th className="px-2 py-1.5 text-right font-medium">UVP (brutto)</th>
+                            <th className="px-2 py-1.5 text-right font-medium">MSRP (gross)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -649,9 +646,9 @@ export default function PriceListsPage() {
                               <td className="px-2 py-1 font-mono text-[10px]">{item.sku}</td>
                               <td className="px-2 py-1">{item.productName}</td>
                               <td className="px-2 py-1 text-right text-muted-foreground">
-                                {item.dealerPrice ? `€${parseFloat(item.dealerPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}` : "—"}
+                                {item.dealerPrice ? `€${parseFloat(item.dealerPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
                               </td>
-                              <td className="px-2 py-1 text-right font-medium">€{parseFloat(item.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}</td>
+                              <td className="px-2 py-1 text-right font-medium">€{parseFloat(item.retailPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
                             </tr>
                           ))}
                         </tbody>

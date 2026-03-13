@@ -23,9 +23,6 @@ const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
   foilboard:     { label: "WF", cls: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" },
   wing:          { label: "W",  cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" },
   bar_lines:     { label: "BR", cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400" },
-  wetsuit:       { label: "WS", cls: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300" },
-  harness:       { label: "HA", cls: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
-  helmet_safety: { label: "HE", cls: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" },
   foil:          { label: "FO", cls: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
 };
 
@@ -321,9 +318,6 @@ export default function EquipmentListPage() {
               { label: "WF", cls: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300", name: "Foilboard",       key: "foilboard" },
               { label: "W",  cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300", name: "Wing",         key: "wing" },
               { label: "BR", cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",        name: "Bar & Lines",     key: "bar_lines" },
-              { label: "WS", cls: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300",         name: "Wetsuit",         key: "wetsuit" },
-              { label: "HA", cls: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300", name: "Harness",         key: "harness" },
-              { label: "HE", cls: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",         name: "Helmet / Safety", key: "helmet_safety" },
               { label: "FO", cls: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",            name: "Foil",            key: "foil" },
             ].map(({ label, cls, name, key }) => {
               const active = typeFilter === key;
@@ -570,9 +564,6 @@ function getSizeBadge(item: Equipment): string | null {
     case "board":
     case "foilboard":
       return f.size != null && f.size !== "" ? `${f.size}cm` : null;
-    case "harness":
-    case "wetsuit":
-      return f.size ? String(f.size) : null;
     default:
       return null;
   }
@@ -586,9 +577,6 @@ function getSizeValue(item: Equipment): number | string {
     case "board":
     case "foilboard":
       return f.size != null && f.size !== "" ? Number(f.size) : 0;
-    case "harness":
-    case "wetsuit":
-      return f.size ? String(f.size) : "";
     default:
       return 0;
   }

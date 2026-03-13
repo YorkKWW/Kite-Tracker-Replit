@@ -76,10 +76,6 @@ function getItemSize(item: Equipment): string | null {
       return f.lineLength != null ? `${f.lineLength} m` : null;
     case "foil":
       return f.mastLength != null ? `${f.mastLength} cm` : null;
-    case "wetsuit":
-    case "harness":
-    case "helmet_safety":
-      return f.size ?? null;
     default:
       return f.size ?? null;
   }
@@ -378,7 +374,7 @@ export default function StationDetailPage() {
   const barsLines  = allEquipment.filter((e) => e.type === "bar_lines");
   const foils      = allEquipment.filter((e) => e.type === "foil");
   const other      = allEquipment.filter((e) =>
-    ["wetsuit", "harness", "helmet_safety"].includes(e.type)
+    !["kite", "wing", "board", "foilboard", "bar_lines", "foil"].includes(e.type)
   );
 
   const avgCond    = avgCondition(allEquipment);

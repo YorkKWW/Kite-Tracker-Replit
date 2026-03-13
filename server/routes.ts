@@ -165,7 +165,10 @@ function parseDuotoneInvoice(text: string) {
     const colorRaw = descParts.slice(2).join(":").trim();
     const color = colorRaw.replace(/^[A-Z0-9]+:/, "").trim();
 
-    const { type, isSpare } = detectEquipmentType(name, sku);
+    const detected = detectEquipmentType(name, sku);
+    const type = detected?.type ?? "kite";
+    const isSpare = detected?.isSpare ?? false;
+    const isAccessory = detected === null;
 
     items.push({
       sku,
@@ -178,14 +181,14 @@ function parseDuotoneInvoice(text: string) {
       serialNumber: "",
       type,
       isSpare,
-      skip: isSpare,
+      skip: isSpare || isAccessory,
     });
   }
 
   return { invoiceNumber, invoiceDate, deliveryDate, orderNumber, totalNet, totalGross, items };
 }
 
-function detectEquipmentType(name: string, sku: string): { type: string; isSpare: boolean } {
+function detectEquipmentType(name: string, sku: string): { type: string; isSpare: boolean } | null {
   const text = `${name} ${sku}`.toLowerCase();
   const textNoIncl = text.replace(/\(incl\..*?\)/gi, "");
 
@@ -213,14 +216,14 @@ function detectEquipmentType(name: string, sku: string): { type: string; isSpare
   if (/\bwing\b/i.test(text)) {
     return { type: "wing", isSpare: false };
   }
-  if (/harness|seat harness/i.test(text)) {
-    return { type: "harness", isSpare: false };
+  if (/harness|seat harness|trapez/i.test(text)) {
+    return null;
   }
-  if (/wetsuit|neoprene/i.test(text)) {
-    return { type: "wetsuit", isSpare: false };
+  if (/wetsuit|neoprene|neopren/i.test(text)) {
+    return null;
   }
-  if (/helmet|impact vest|safety/i.test(text)) {
-    return { type: "helmet_safety", isSpare: false };
+  if (/helmet|impact vest|safety vest/i.test(text)) {
+    return null;
   }
   return { type: "kite", isSpare: false };
 }
@@ -319,7 +322,10 @@ function parseEleveightInvoice(text: string) {
       }
     }
 
-    const { type: eqType, isSpare } = detectEquipmentType(rawName, sku);
+    const detected2 = detectEquipmentType(rawName, sku);
+    const eqType = detected2?.type ?? "kite";
+    const isSpare = detected2?.isSpare ?? false;
+    const isAccessory = detected2 === null;
 
     let size = "";
     if (eqType === "board") {
@@ -348,7 +354,7 @@ function parseEleveightInvoice(text: string) {
         serialNumber: serial,
         type: eqType,
         isSpare,
-        skip: isSpare || isNonEquipment,
+        skip: isSpare || isNonEquipment || isAccessory,
         modelYear,
       });
     }
@@ -429,7 +435,10 @@ function parseCoreOldInvoice(text: string) {
         const total     = parseGermanNumber(priceMatch[4]);
         const unitPrice = quantity > 0 ? Math.round((total / quantity) * 100) / 100 : total;
 
-        const { type, isSpare } = detectEquipmentType(rawName, sku);
+        const detected3 = detectEquipmentType(rawName, sku);
+        const type = detected3?.type ?? "kite";
+        const isSpare = detected3?.isSpare ?? false;
+        const isAccessoryItem = detected3 === null;
         const dimMatch = rawName.match(/(\d{2,3})\s*x\s*\d{2,3}/);
         const decimalMatch = rawName.match(/\s(\d+\.\d+)(?:\s|$)/);
         const fallbackMatch = rawName.match(/\s(\d+\.?\d*)(?:\s|$)/);
@@ -455,7 +464,7 @@ function parseCoreOldInvoice(text: string) {
             serialNumber: serial,
             type,
             isSpare,
-            skip: isSpare,
+            skip: isSpare || isAccessoryItem,
           });
         }
         i = j; // advance outer loop past this item block
@@ -564,7 +573,10 @@ function parsePdfInvoice(text: string) {
     const color = colorMatch?.[1]?.trim() || "";
     const name = rawName.replace(/\s*\([^)]*\)\s*/, "").trim();
 
-    const { type, isSpare } = detectEquipmentType(name, sku);
+    const detected4 = detectEquipmentType(name, sku);
+    const type = detected4?.type ?? "kite";
+    const isSpare = detected4?.isSpare ?? false;
+    const isAccessoryLine = detected4 === null;
 
     for (const serial of serials) {
       items.push({
@@ -578,7 +590,7 @@ function parsePdfInvoice(text: string) {
         serialNumber: serial,
         type,
         isSpare,
-        skip: isSpare,
+        skip: isSpare || isAccessoryLine,
       });
     }
 
@@ -1805,7 +1817,7 @@ export async function registerRoutes(
       if (!sale) return res.status(404).json({ message: "Not found" });
       const settings = await storage.getCompanySettings();
 
-      const doc = new PDFDocument({ size: "A4", margin: 50, info: { Title: `Rechnung ${sale.invoiceNumber}` } });
+      const doc = new PDFDocument({ size: "A4", margin: 50, info: { Title: `Invoice ${sale.invoiceNumber}` } });
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${sale.invoiceNumber}.pdf"`);
@@ -1833,7 +1845,7 @@ export async function registerRoutes(
       let y = margin + 55;
 
       // ── Recipient address block ──────────────────────────
-      doc.fontSize(7).font("Helvetica").fillColor(grey).text("Rechnung an:", margin, y);
+      doc.fontSize(7).font("Helvetica").fillColor(grey).text("Invoice to:", margin, y);
       y += 12;
       doc.fontSize(10).font("Helvetica-Bold").fillColor(black);
       if (sale.customer.companyName) {
@@ -1843,16 +1855,16 @@ export async function registerRoutes(
       doc.font("Helvetica").fontSize(9).fillColor(black);
       sale.customer.address.split("\n").forEach((line) => { doc.text(line, margin, y); y += 13; });
       if (sale.customer.email) { doc.text(sale.customer.email, margin, y); y += 13; }
-      if (sale.customer.taxId) { doc.text(`St-Nr.: ${sale.customer.taxId}`, margin, y); y += 13; }
+      if (sale.customer.taxId) { doc.text(`Tax ID: ${sale.customer.taxId}`, margin, y); y += 13; }
 
       // ── Invoice meta (right side) ─────────────────────────
       const metaX = pageW - margin - 200;
       const metaY = margin + 55;
       const metaData = [
-        ["Rechnungsnummer:", sale.invoiceNumber],
-        ["Rechnungsdatum:", sale.invoiceDate],
-        ...(sale.deliveryDate ? [["Lieferdatum:", sale.deliveryDate]] : []),
-        ["Zahlungsbedingungen:", sale.paymentTerms],
+        ["Invoice No.:", sale.invoiceNumber],
+        ["Invoice Date:", sale.invoiceDate],
+        ...(sale.deliveryDate ? [["Delivery Date:", sale.deliveryDate]] : []),
+        ["Payment Terms:", sale.paymentTerms],
       ] as [string, string][];
       let my = metaY;
       for (const [label, val] of metaData) {
@@ -1863,8 +1875,8 @@ export async function registerRoutes(
 
       y = Math.max(y, my) + 20;
 
-      // ── "RECHNUNG" heading ────────────────────────────────
-      doc.fontSize(16).font("Helvetica-Bold").fillColor(navy).text("RECHNUNG", margin, y);
+      // ── "INVOICE" heading ────────────────────────────────
+      doc.fontSize(16).font("Helvetica-Bold").fillColor(navy).text("INVOICE", margin, y);
       y += 30;
 
       // ── Table header ──────────────────────────────────────
@@ -1880,12 +1892,12 @@ export async function registerRoutes(
       doc.rect(margin, y, contentW, 18).fill(navy);
       doc.fontSize(8).font("Helvetica-Bold").fillColor("#ffffff");
       doc.text("Pos.", colPos, y + 5, { width: 25 });
-      doc.text("Beschreibung", colDesc, y + 5, { width: 185 });
-      doc.text("Seriennr.", colSerial, y + 5, { width: 85 });
+      doc.text("Description", colDesc, y + 5, { width: 185 });
+      doc.text("Serial No.", colSerial, y + 5, { width: 85 });
       doc.text("SKU", colSku, y + 5, { width: 70 });
-      doc.text("Menge", colQty, y + 5, { width: 40 });
-      doc.text("Einzelpreis", colPrice, y + 5, { width: 55, align: "right" });
-      doc.text("Gesamt", colTotal, y + 5, { width: tableRight - colTotal, align: "right" });
+      doc.text("Qty", colQty, y + 5, { width: 40 });
+      doc.text("Unit Price", colPrice, y + 5, { width: 55, align: "right" });
+      doc.text("Total", colTotal, y + 5, { width: tableRight - colTotal, align: "right" });
       y += 20;
 
       // ── Table rows ────────────────────────────────────────
@@ -1912,9 +1924,9 @@ export async function registerRoutes(
       const totX = margin + contentW * 0.55;
       const totValX = tableRight - 80;
       const vatRateNum = parseFloat(sale.vatRate);
-      const vatLabel = vatRateNum === 0 ? `MwSt. 0%` : `MwSt. ${vatRateNum}%`;
+      const vatLabel = vatRateNum === 0 ? `VAT 0%` : `VAT ${vatRateNum}%`;
       const totals: [string, string][] = [
-        ["Nettobetrag:", `${parseFloat(sale.totalNet).toFixed(2)} €`],
+        ["Net Total:", `${parseFloat(sale.totalNet).toFixed(2)} €`],
         [vatLabel, `${parseFloat(sale.totalVat).toFixed(2)} €`],
       ];
       for (const [lbl, val] of totals) {
@@ -1925,38 +1937,38 @@ export async function registerRoutes(
       // Grand total
       doc.rect(totX - 5, y - 2, tableRight - totX + 5, 20).fill(navy);
       doc.fontSize(10).font("Helvetica-Bold").fillColor("#ffffff");
-      doc.text("Gesamtbetrag:", totX, y + 4, { width: totValX - totX - 5, align: "right" });
+      doc.text("Grand Total:", totX, y + 4, { width: totValX - totX - 5, align: "right" });
       doc.text(`${parseFloat(sale.totalGross).toFixed(2)} €`, totValX, y + 4, { width: 80, align: "right" });
       y += 30;
 
       // VAT note if applicable
       if (sale.vatNote) {
-        doc.fontSize(8).font("Helvetica-Oblique").fillColor(grey).text(`Hinweis: ${sale.vatNote}`, margin, y, { width: contentW });
+        doc.fontSize(8).font("Helvetica-Oblique").fillColor(grey).text(`Note: ${sale.vatNote}`, margin, y, { width: contentW });
         y += 20;
       }
 
       // ── Payment section ────────────────────────────────────
       y += 10;
-      doc.fontSize(10).font("Helvetica-Bold").fillColor(navy).text("Zahlungsinformationen", margin, y);
+      doc.fontSize(10).font("Helvetica-Bold").fillColor(navy).text("Payment Information", margin, y);
       y += 16;
       doc.fontSize(9).font("Helvetica").fillColor(black);
       if (sale.paymentMethod === "bank_transfer") {
         doc.text(`Bank: ${settings.bankName}`, margin, y); y += 13;
         doc.text(`IBAN: ${settings.iban}`, margin, y); y += 13;
         doc.text(`BIC: ${settings.bic}`, margin, y); y += 13;
-        doc.text(`Kontoinhaber: ${settings.accountHolder}`, margin, y); y += 13;
-        doc.text(`Verwendungszweck: ${sale.invoiceNumber}`, margin, y); y += 13;
+        doc.text(`Account Holder: ${settings.accountHolder}`, margin, y); y += 13;
+        doc.text(`Reference: ${sale.invoiceNumber}`, margin, y); y += 13;
       } else if (sale.paymentMethod === "cash") {
-        doc.text("Bezahlung: Bar erhalten", margin, y); y += 13;
+        doc.text("Payment: Cash received", margin, y); y += 13;
       } else if (sale.paymentMethod === "paypal") {
-        doc.text(`Bezahlung per PayPal${settings.paypalEmail ? ` (${settings.paypalEmail})` : ""}`, margin, y); y += 13;
+        doc.text(`Payment via PayPal${settings.paypalEmail ? ` (${settings.paypalEmail})` : ""}`, margin, y); y += 13;
       } else if (sale.paymentMethod === "credit_card") {
-        doc.text("Bezahlung per Kreditkarte", margin, y); y += 13;
+        doc.text("Payment via Credit Card", margin, y); y += 13;
       }
 
       if (sale.notes) {
         y += 10;
-        doc.fontSize(9).font("Helvetica-Bold").fillColor(black).text("Anmerkungen:", margin, y); y += 13;
+        doc.fontSize(9).font("Helvetica-Bold").fillColor(black).text("Notes:", margin, y); y += 13;
         doc.font("Helvetica").fillColor(grey).text(sale.notes, margin, y, { width: contentW }); y += 20;
       }
 
@@ -1964,9 +1976,9 @@ export async function registerRoutes(
       const footerY = pageH - 80;
       doc.moveTo(margin, footerY).lineTo(pageW - margin, footerY).strokeColor(grey).lineWidth(0.5).stroke();
       doc.fontSize(7).font("Helvetica").fillColor(grey);
-      const footerLine1 = `${settings.companyName} | ${settings.address} | Geschäftsführer: ${settings.managingDirector}`;
-      const footerLine2 = `Registergericht: ${settings.registry} | St-Nr.: ${settings.taxId} | USt-IdNr.: ${settings.vatId}`;
-      const footerLine3 = `Tel.: ${settings.phone} | Web: ${settings.website} | ${settings.bankName} | IBAN: ${settings.iban} | BIC: ${settings.bic}`;
+      const footerLine1 = `${settings.companyName} | ${settings.address} | Managing Director: ${settings.managingDirector}`;
+      const footerLine2 = `Registry: ${settings.registry} | Tax ID: ${settings.taxId} | VAT ID: ${settings.vatId}`;
+      const footerLine3 = `Phone: ${settings.phone} | Web: ${settings.website} | ${settings.bankName} | IBAN: ${settings.iban} | BIC: ${settings.bic}`;
       doc.text(footerLine1, margin, footerY + 8, { width: contentW, align: "center" });
       doc.text(footerLine2, margin, footerY + 20, { width: contentW, align: "center" });
       doc.text(footerLine3, margin, footerY + 32, { width: contentW, align: "center" });
@@ -1998,14 +2010,9 @@ export async function registerRoutes(
     // Bars & control systems — check first (e.g. "Sensor 4 Bar")
     if (/\bbar\b|sensor\b|navigator\b|trust bar|depower bar|control bar|control system|chicken loop/.test(n)) return "bar_lines";
 
-    // Harnesses
-    if (/harness|trapez/.test(n)) return "harness";
-
-    // Wetsuits
-    if (/wetsuit|neoprene|neopren|fullsuit|shorty|steamer/.test(n)) return "wetsuit";
-
-    // Helmets / safety
-    if (/helmet|impact vest|impact protection|buoyancy/.test(n)) return "helmet_safety";
+    if (/harness|trapez/.test(n)) return null;
+    if (/wetsuit|neoprene|neopren|fullsuit|shorty|steamer/.test(n)) return null;
+    if (/helmet|impact vest|impact protection|buoyancy/.test(n)) return null;
 
     // Foilboards (wingfoil boards) — before generic "foil" check
     if (/wingfoilboard|wing foil board|foilboard/.test(n)) return "foilboard";
@@ -2532,10 +2539,10 @@ export async function registerRoutes(
       const totalVat = Math.round(totalNet * vatRateNum) / 100;
       const totalGross = totalNet + totalVat;
 
-      const vatNote = vatRateNum === 0 ? "Gemäß §19 UStG wird keine Umsatzsteuer berechnet." : undefined;
+      const vatNote = vatRateNum === 0 ? "No VAT charged pursuant to §19 UStG (small business regulation)." : undefined;
 
       const notesParts: string[] = [];
-      if (body.customerType === "kww" && body.bookingNumber) notesParts.push(`KiteWorldWide Buchung: ${body.bookingNumber}`);
+      if (body.customerType === "kww" && body.bookingNumber) notesParts.push(`KiteWorldWide Booking: ${body.bookingNumber}`);
       if (body.notes) notesParts.push(body.notes);
       notesParts.push(`Damage Report #${reportId} | Equipment: ${eqLabel}`);
 
@@ -2786,7 +2793,7 @@ export async function registerRoutes(
       const data = schema.parse(req.body);
       const hasAttachments = (data.attachmentUrls && data.attachmentUrls.length > 0) || data.screenshotUrl;
       if (!data.message && !data.audioUrl && !hasAttachments) {
-        return res.status(400).json({ message: "Bitte Nachricht, Sprachnachricht oder Screenshot/Foto angeben." });
+        return res.status(400).json({ message: "Please provide a message, voice note, or screenshot/photo." });
       }
       const fb = await storage.createFeedback({
         userId: user.id,
@@ -2815,21 +2822,21 @@ export async function registerRoutes(
         await storage.createNotification({
           userId: sa.id,
           type: "feedback_new",
-          title: `${ticketLabel}: Neues Feedback von ${user.name}`,
+          title: `${ticketLabel}: New feedback from ${user.name}`,
           message: data.message
             ? (data.message.length > 80 ? data.message.slice(0, 80) + "…" : data.message)
-            : "Sprachnachricht gesendet",
+            : "Voice message sent",
           link: "/feedback",
           read: false,
         });
       }
       const superAdminEmails = superAdmins.map(a => a.email);
       if (superAdminEmails.length) {
-        const msgPreview = data.message || "Sprachnachricht gesendet";
+        const msgPreview = data.message || "Voice message sent";
         sendNotificationEmail(
           superAdminEmails,
-          `${ticketLabel}: Neues Feedback von ${user.name}`,
-          `${user.name} hat neues Feedback eingereicht (${ticketLabel}):\n\nSeite: ${data.pageUrl}\nNachricht: ${msgPreview}\n\nÖffne KiteTracker um zu antworten.`
+          `${ticketLabel}: New feedback from ${user.name}`,
+          `${user.name} submitted new feedback (${ticketLabel}):\n\nPage: ${data.pageUrl}\nMessage: ${msgPreview}\n\nOpen KiteTracker to respond.`
         );
       }
       res.json(fb);
@@ -2870,14 +2877,14 @@ export async function registerRoutes(
     });
     if (updated.userId !== adminUser.id) {
       const ticketLabel = updated.ticketNumber || `FB-${updated.id}`;
-      const statusLabels: Record<string, string> = { open: "Offen", in_progress: "In Bearbeitung", resolved: "Erledigt" };
+      const statusLabels: Record<string, string> = { open: "Open", in_progress: "In Progress", resolved: "Resolved" };
       const statusMsg = data.status
-        ? `${ticketLabel}: Status → „${statusLabels[data.status] ?? data.status}"`
-        : `${ticketLabel}: Feedback wurde bearbeitet.`;
+        ? `${ticketLabel}: Status → "${statusLabels[data.status] ?? data.status}"`
+        : `${ticketLabel}: Feedback has been updated.`;
       await storage.createNotification({
         userId: updated.userId,
         type: "feedback_status",
-        title: `${ticketLabel}: Feedback aktualisiert`,
+        title: `${ticketLabel}: Feedback updated`,
         message: statusMsg,
         link: "/feedback",
         read: false,
@@ -2886,8 +2893,8 @@ export async function registerRoutes(
       if (feedbackAuthor) {
         sendNotificationEmail(
           feedbackAuthor.email,
-          `${ticketLabel}: Feedback aktualisiert`,
-          `Hallo ${feedbackAuthor.name},\n\n${statusMsg}\n\nÖffne KiteTracker um Details zu sehen.`
+          `${ticketLabel}: Feedback updated`,
+          `Hi ${feedbackAuthor.name},\n\n${statusMsg}\n\nOpen KiteTracker to see details.`
         );
       }
     }
@@ -2915,7 +2922,7 @@ export async function registerRoutes(
           await storage.createNotification({
             userId: fb.userId,
             type: "feedback_comment",
-            title: `${ticketLabel}: Neue Antwort auf dein Feedback`,
+            title: `${ticketLabel}: New reply to your feedback`,
             message: msgPreview,
             link: "/feedback",
             read: false,
@@ -2924,8 +2931,8 @@ export async function registerRoutes(
           if (author) {
             sendNotificationEmail(
               author.email,
-              `${ticketLabel}: Neue Antwort auf dein Feedback`,
-              `Hallo ${author.name},\n\n${user.name} hat auf dein Feedback geantwortet (${ticketLabel}):\n\n„${message}"\n\nÖffne KiteTracker um zu antworten.`
+              `${ticketLabel}: New reply to your feedback`,
+              `Hi ${author.name},\n\n${user.name} replied to your feedback (${ticketLabel}):\n\n"${message}"\n\nOpen KiteTracker to respond.`
             );
           }
         }
@@ -2936,7 +2943,7 @@ export async function registerRoutes(
           await storage.createNotification({
             userId: admin.id,
             type: "feedback_comment",
-            title: `${ticketLabel}: Neue Nachricht von ${user.name}`,
+            title: `${ticketLabel}: New message from ${user.name}`,
             message: msgPreview,
             link: "/feedback",
             read: false,
@@ -2946,8 +2953,8 @@ export async function registerRoutes(
         if (adminEmails.length) {
           sendNotificationEmail(
             adminEmails,
-            `${ticketLabel}: Neue Nachricht von ${user.name}`,
-            `${user.name} hat auf Feedback ${ticketLabel} geantwortet:\n\n„${message}"\n\nÖffne KiteTracker um zu antworten.`
+            `${ticketLabel}: New message from ${user.name}`,
+            `${user.name} replied to feedback ${ticketLabel}:\n\n"${message}"\n\nOpen KiteTracker to respond.`
           );
         }
       }
@@ -2977,6 +2984,177 @@ export async function registerRoutes(
     const user = req.user as any;
     await storage.markAllNotificationsRead(user.id);
     res.json({ ok: true });
+  });
+
+  app.get("/api/accessory-categories", requireAuth, async (_req, res) => {
+    const cats = await storage.getAllAccessoryCategories();
+    res.json(cats);
+  });
+
+  app.post("/api/accessory-categories", requireAdmin, async (req, res) => {
+    const schema = z.object({ name: z.string().min(1), hasSizes: z.boolean().optional().default(true) });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+    try {
+      const cat = await storage.createAccessoryCategory({ name: parsed.data.name, hasSizes: parsed.data.hasSizes, isDefault: false });
+      res.json(cat);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.delete("/api/accessory-categories/:id", requireAdmin, async (req, res) => {
+    await storage.deleteAccessoryCategory(parseInt(req.params.id));
+    res.json({ ok: true });
+  });
+
+  app.get("/api/accessory-inventory", requireAuth, async (req, res) => {
+    const stationId = req.query.stationId ? parseInt(req.query.stationId as string) : undefined;
+    const inventory = await storage.getAccessoryInventory(stationId);
+    res.json(inventory);
+  });
+
+  app.patch("/api/accessory-inventory", requireAdmin, async (req, res) => {
+    const user = req.user as any;
+    const schema = z.object({
+      categoryId: z.number().int().positive(),
+      stationId: z.number().int().positive(),
+      size: z.string().min(1).default("Einheitsgröße"),
+      quantity: z.number().int().min(0),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+    const { categoryId, stationId, size, quantity } = parsed.data;
+    const oldInventory = await storage.getAccessoryInventory(stationId);
+    const oldQty = oldInventory.find(i => i.categoryId === categoryId && i.size === size)?.quantity ?? 0;
+    const inv = await storage.updateAccessoryInventory(categoryId, stationId, size, quantity);
+    if (oldQty !== quantity) {
+      const cats = await storage.getAllAccessoryCategories();
+      const catName = cats.find(c => c.id === categoryId)?.name ?? "?";
+      const stations = await storage.getAllStations();
+      const stationName = stations.find(s => s.id === stationId)?.name ?? "?";
+      const delta = quantity - oldQty;
+      const sizeLabel = size === "Einheitsgröße" ? "" : ` (${size})`;
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "accessory_quantity_changed",
+        details: `${catName}${sizeLabel} @ ${stationName}: ${oldQty} → ${quantity} (${delta > 0 ? "+" : ""}${delta})`,
+      });
+    }
+    res.json(inv);
+  });
+
+  app.get("/api/accessory-transfers", requireAuth, async (_req, res) => {
+    const transfers = await storage.getAllAccessoryTransfers();
+    res.json(transfers);
+  });
+
+  app.post("/api/accessory-transfers", requireAdmin, async (req, res) => {
+    const user = req.user as any;
+    const schema = z.object({
+      categoryId: z.number().int().positive(),
+      size: z.string().min(1).default("Einheitsgröße"),
+      quantity: z.number().int().positive(),
+      fromStationId: z.number().int().positive(),
+      toStationId: z.number().int().positive(),
+    }).refine(d => d.fromStationId !== d.toStationId, { message: "Source and destination must differ" });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+    try {
+      const transfer = await storage.createAccessoryTransfer({
+        categoryId: parsed.data.categoryId,
+        size: parsed.data.size,
+        quantity: parsed.data.quantity,
+        fromStationId: parsed.data.fromStationId,
+        toStationId: parsed.data.toStationId,
+        transferredBy: user.id,
+      });
+      const cats = await storage.getAllAccessoryCategories();
+      const catName = cats.find(c => c.id === parsed.data.categoryId)?.name ?? "?";
+      const stations = await storage.getAllStations();
+      const fromName = stations.find(s => s.id === parsed.data.fromStationId)?.name ?? "?";
+      const toName = stations.find(s => s.id === parsed.data.toStationId)?.name ?? "?";
+      const sizeLabel = parsed.data.size === "Einheitsgröße" ? "" : ` (${parsed.data.size})`;
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "accessory_transferred",
+        details: `${catName}${sizeLabel} ×${parsed.data.quantity}: ${fromName} → ${toName}`,
+      });
+      res.json(transfer);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/accessory-loss-reports", requireAuth, async (req, res) => {
+    const status = req.query.status as string | undefined;
+    const reports = await storage.getAccessoryLossReports(status);
+    res.json(reports);
+  });
+
+  app.post("/api/accessory-loss-reports", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const schema = z.object({
+      categoryId: z.number().int().positive(),
+      stationId: z.number().int().positive(),
+      size: z.string().min(1).default("Einheitsgröße"),
+      quantity: z.number().int().positive(),
+      reason: z.string().min(1),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+    try {
+      const report = await storage.createAccessoryLossReport({
+        ...parsed.data,
+        reportedBy: user.id,
+      });
+      const cats = await storage.getAllAccessoryCategories();
+      const catName = cats.find(c => c.id === parsed.data.categoryId)?.name ?? "?";
+      const allStations = await storage.getAllStations();
+      const stationName = allStations.find(s => s.id === parsed.data.stationId)?.name ?? "?";
+      const sizeLabel = parsed.data.size === "Einheitsgröße" ? "" : ` (${parsed.data.size})`;
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "accessory_loss_reported",
+        details: `${catName}${sizeLabel} ×${parsed.data.quantity} @ ${stationName}: ${parsed.data.reason}`,
+      });
+      res.json(report);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/accessory-loss-reports/:id", requireAdmin, async (req, res) => {
+    const user = req.user as any;
+    const schema = z.object({
+      approved: z.boolean(),
+      adminNote: z.string().nullable().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+    try {
+      const report = await storage.resolveAccessoryLossReport(
+        parseInt(req.params.id),
+        user.id,
+        parsed.data.adminNote ?? null,
+        parsed.data.approved,
+      );
+      res.json(report);
+      storage.getAllAccessoryCategories().then(async cats => {
+        const catName = cats.find(c => c.id === report.categoryId)?.name ?? "?";
+        const allStations = await storage.getAllStations();
+        const stationName = allStations.find(s => s.id === report.stationId)?.name ?? "?";
+        const sizeLabel = report.size === "Einheitsgröße" ? "" : ` (${report.size})`;
+        const action = parsed.data.approved ? "accessory_loss_approved" : "accessory_loss_rejected";
+        await storage.createActivityLog({
+          userId: user.id,
+          action,
+          details: `${catName}${sizeLabel} ×${report.quantity} @ ${stationName}${parsed.data.adminNote ? ` – ${parsed.data.adminNote}` : ""}`,
+        });
+      }).catch(() => {});
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
   });
 
   app.post("/api/admin/fix-equipment-sizes", requireAdmin, async (req, res) => {

@@ -72,6 +72,7 @@ client/src/
     inventory-check.tsx - Inventory check workflow (checklist, scanner, progress)
     invoice-import.tsx - 4-step PDF invoice import wizard (admin only)
     users-page.tsx    - User management (admin)
+    accessories.tsx   - Accessories (Zubehör) quantity management per station
     activity.tsx      - Activity log (admin)
     settings.tsx      - Settings + CSV import
 ```
@@ -98,11 +99,22 @@ Bell icon in header with unread badge count. Notifications created automatically
 - **Routes**: `GET /api/notifications`, `GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read`, `POST /api/notifications/mark-all-read`
 
 ## Database Tables
-stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices, feedback, feedback_comments, notifications
+stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices, feedback, feedback_comments, notifications, accessory_categories, accessory_inventory, accessory_transfers
 
 ## Equipment Types
-kite, board, foil, wing, bar_lines, wetsuit, harness, helmet_safety
+kite, board, foil, wing, bar_lines
 Each uses a JSONB column `type_specific_fields` for type-specific attributes.
+
+## Accessories (Zubehör)
+Quantity-based inventory managed per station (not individual items like equipment).
+- **Categories**: Weste, Helm, Neopren, Sitztrapez, Hüfttrapez, Pumpe (defaults), custom categories can be added
+- **Sizes**: XS, S, M, L, XL for sized categories; "Einheitsgröße" for one-size items (e.g. Pumpe)
+- **Transfers**: Move quantities between stations with stock validation (transactional)
+- **DB Tables**: `accessory_categories`, `accessory_inventory` (unique per category+station+size), `accessory_transfers`
+- **Routes**: `GET/POST/DELETE /api/accessory-categories`, `GET/PATCH /api/accessory-inventory`, `GET/POST /api/accessory-transfers`
+- **Auth**: Category CRUD requires admin; inventory/transfer accessible to all authenticated users
+- **UI**: `/accessories` page with station-grouped tables, +/- quantity buttons, transfer dialog, category management
+- **Migration**: wetsuit, harness, helmet_safety removed from equipment types; these are now managed as accessories
 
 ## Sample Accounts
 - admin@kitetracker.com / admin123 (Admin)

@@ -39,32 +39,32 @@ function getRoleBadgeVariant(u: SafeUser): "default" | "secondary" | "outline" {
 }
 
 const PERMISSIONS = [
-  { label: "Equipment anzeigen", superAdmin: true, admin: true, manager: true, stationLead: true },
-  { label: "Equipment anlegen & bearbeiten", superAdmin: true, admin: true, manager: true, stationLead: false },
-  { label: "Equipment endgültig löschen", superAdmin: true, admin: false, manager: false, stationLead: false },
-  { label: "Einkaufspreise & Werte sehen", superAdmin: true, admin: true, manager: false, stationLead: false },
-  { label: "Rechnungen importieren", superAdmin: true, admin: true, manager: true, stationLead: false },
-  { label: "Rechnungen löschen", superAdmin: true, admin: false, manager: false, stationLead: false },
-  { label: "Transfers starten, bestätigen & stornieren", superAdmin: true, admin: true, manager: true, stationLead: true },
-  { label: "Verkäufe erstellen, bestätigen & abschließen", superAdmin: true, admin: true, manager: false, stationLead: true },
-  { label: "Preislisten verwalten", superAdmin: true, admin: true, manager: false, stationLead: false },
-  { label: "Preislisten einsehen", superAdmin: true, admin: true, manager: true, stationLead: false },
-  { label: "Stationen anlegen & bearbeiten", superAdmin: true, admin: true, manager: false, stationLead: false },
-  { label: "Stationen löschen", superAdmin: true, admin: false, manager: false, stationLead: false },
-  { label: "Manager & Station Leads anlegen & bearbeiten", superAdmin: true, admin: true, manager: false, stationLead: false },
-  { label: "Admins anlegen & bearbeiten", superAdmin: true, admin: false, manager: false, stationLead: false },
-  { label: "Benutzer löschen", superAdmin: true, admin: false, manager: false, stationLead: false },
-  { label: "Benutzer anzeigen", superAdmin: true, admin: true, manager: false, stationLead: false },
-  { label: "Damage Reports erstellen", superAdmin: true, admin: true, manager: true, stationLead: true },
-  { label: "Damage Reports Status ändern", superAdmin: true, admin: true, manager: true, stationLead: false },
-  { label: "Reparaturen verwalten", superAdmin: true, admin: true, manager: true, stationLead: true },
-  { label: "Inventur durchführen", superAdmin: true, admin: true, manager: true, stationLead: true },
-  { label: "Activity Log einsehen", superAdmin: true, admin: true, manager: true, stationLead: true },
-  { label: "Feedback / Bug Reports senden", superAdmin: true, admin: true, manager: true, stationLead: true },
-  { label: "Feedback verwalten", superAdmin: true, admin: true, manager: false, stationLead: false },
-  { label: "Firmeneinstellungen ändern", superAdmin: true, admin: true, manager: false, stationLead: false },
-  { label: "Barcode Scanner nutzen", superAdmin: true, admin: true, manager: true, stationLead: true },
-  { label: "Fotos hochladen & löschen", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "View equipment", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Create & edit equipment", superAdmin: true, admin: true, manager: true, stationLead: false },
+  { label: "Permanently delete equipment", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "View purchase prices & values", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Import invoices", superAdmin: true, admin: true, manager: true, stationLead: false },
+  { label: "Delete invoices", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "Start, confirm & cancel transfers", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Create, confirm & complete sales", superAdmin: true, admin: true, manager: false, stationLead: true },
+  { label: "Manage price lists", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "View price lists", superAdmin: true, admin: true, manager: true, stationLead: false },
+  { label: "Create & edit locations", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Delete locations", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "Create & edit managers & station leads", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Create & edit admins", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "Delete users", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "View users", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Create damage reports", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Change damage report status", superAdmin: true, admin: true, manager: true, stationLead: false },
+  { label: "Manage repairs", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Perform inventory checks", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "View activity log", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Send feedback / bug reports", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Manage feedback", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Change company settings", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Use barcode scanner", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Upload & delete photos", superAdmin: true, admin: true, manager: true, stationLead: true },
 ];
 
 function PermissionsTable() {
@@ -74,14 +74,14 @@ function PermissionsTable() {
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            Rechte-Übersicht
+            Permissions Overview
           </h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
-                <th className="text-left p-3 font-medium min-w-[200px]">Berechtigung</th>
+                <th className="text-left p-3 font-medium min-w-[200px]">Permission</th>
                 <th className="text-center p-3 font-medium w-24">
                   <div className="flex flex-col items-center gap-1">
                     <ShieldAlert className="h-4 w-4 text-primary" />
@@ -290,7 +290,7 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
               {!isSuperAdmin && editUser?.role === "admin" && (
-                <p className="text-xs text-muted-foreground">Nur Super Admins können die Admin-Rolle ändern.</p>
+                <p className="text-xs text-muted-foreground">Only Super Admins can change the Admin role.</p>
               )}
             </div>
             {role === "admin" && (
@@ -322,7 +322,7 @@ export default function UsersPage() {
                 />
                 <label htmlFor="can-edit-equipment-flag" className="text-sm font-medium cursor-pointer flex items-center gap-2">
                   <Pencil className="h-4 w-4 text-primary" />
-                  Darf Material bearbeiten
+                  Can edit equipment
                   <span className="text-xs text-muted-foreground font-normal">(can edit equipment master data)</span>
                 </label>
               </div>
@@ -358,15 +358,15 @@ export default function UsersPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>User wirklich löschen?</AlertDialogTitle>
+            <AlertDialogTitle>Really delete user?</AlertDialogTitle>
             <AlertDialogDescription>
-              Bist du sicher, dass du <strong>{deleteTarget?.name}</strong> ({deleteTarget?.email}) löschen willst? Diese Aktion kann nicht rückgängig gemacht werden.
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong> ({deleteTarget?.email})? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" data-testid="button-confirm-delete">
-              Ja, löschen
+              Yes, delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -406,7 +406,7 @@ export default function UsersPage() {
                     )}
                     {u.canEditEquipment && u.role !== "admin" && u.role !== "manager" && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Pencil className="h-3 w-3" /> Darf Material bearbeiten
+                        <Pencil className="h-3 w-3" /> Can edit equipment
                       </p>
                     )}
                   </div>

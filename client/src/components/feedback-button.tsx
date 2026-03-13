@@ -10,25 +10,25 @@ import { MessageSquarePlus, Mic, Square, Send, Camera, Loader2, X } from "lucide
 
 const PAGE_LABELS: Record<string, string> = {
   "/": "Dashboard",
-  "/equipment": "Equipment Liste",
+  "/equipment": "Equipment List",
   "/transfers": "Transfers",
   "/sales": "Sales",
   "/incidents": "Incidents",
   "/repairs": "Repairs",
-  "/price-lists": "Preislisten",
-  "/invoice-import": "Rechnungsimport",
-  "/stations": "Standorte",
-  "/users": "Benutzer",
-  "/activity": "Aktivitäten",
-  "/settings": "Einstellungen",
+  "/price-lists": "Price Lists",
+  "/invoice-import": "Invoice Import",
+  "/stations": "Stations",
+  "/users": "Users",
+  "/activity": "Activity",
+  "/settings": "Settings",
   "/feedback": "Feedback",
 };
 
 function getPageLabel(path: string): string {
   if (PAGE_LABELS[path]) return PAGE_LABELS[path];
   if (path.startsWith("/equipment/")) return "Equipment Detail";
-  if (path.startsWith("/inventory-check")) return "Inventur";
-  if (path.startsWith("/stations/")) return "Standort Detail";
+  if (path.startsWith("/inventory-check")) return "Inventory Check";
+  if (path.startsWith("/stations/")) return "Station Detail";
   return path;
 }
 
@@ -44,7 +44,7 @@ function getPreferredMimeType(): string {
 
 async function getUploadUrl(): Promise<{ uploadURL: string; objectPath: string }> {
   const res = await fetch("/api/feedback/upload-url", { credentials: "include" });
-  if (!res.ok) throw new Error("Upload URL konnte nicht geholt werden");
+  if (!res.ok) throw new Error("Could not get upload URL");
   return res.json();
 }
 
@@ -54,7 +54,7 @@ async function uploadBlob(blob: Blob, uploadURL: string): Promise<void> {
     body: blob,
     headers: { "Content-Type": blob.type },
   });
-  if (!res.ok) throw new Error("Upload fehlgeschlagen");
+  if (!res.ok) throw new Error("Upload failed");
 }
 
 interface AttachmentItem {
@@ -117,7 +117,7 @@ export function FeedbackButton() {
 
   const startRecording = async () => {
     if (!supportsMediaRecorder) {
-      toast({ title: "Nicht unterstützt", description: "Dein Browser unterstützt keine Sprachaufnahme. Bitte nutze die Texteingabe.", variant: "destructive" });
+      toast({ title: "Not supported", description: "Your browser does not support audio recording. Please use text input.", variant: "destructive" });
       return;
     }
     try {
@@ -153,7 +153,7 @@ export function FeedbackButton() {
         setRecordingDuration((d) => d + 1);
       }, 1000);
     } catch {
-      toast({ title: "Mikrofon nicht verfügbar", description: "Bitte Mikrofon-Zugriff erlauben.", variant: "destructive" });
+      toast({ title: "Microphone not available", description: "Please allow microphone access.", variant: "destructive" });
     }
   };
 
@@ -226,12 +226,12 @@ export function FeedbackButton() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
-      toast({ title: "Danke für dein Feedback!", description: "Wir schauen uns das an." });
+      toast({ title: "Thanks for your feedback!", description: "We'll look into it." });
       reset();
       setOpen(false);
     },
     onError: () => {
-      toast({ title: "Fehler", description: "Feedback konnte nicht gesendet werden.", variant: "destructive" });
+      toast({ title: "Error", description: "Feedback could not be sent.", variant: "destructive" });
     },
   });
 
@@ -245,7 +245,7 @@ export function FeedbackButton() {
         onClick={() => setOpen(true)}
         className="fixed bottom-20 right-4 md:bottom-6 z-50 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
         data-testid="button-feedback"
-        aria-label="Feedback geben"
+        aria-label="Give feedback"
       >
         <MessageSquarePlus className="h-5 w-5" />
       </button>
@@ -262,11 +262,11 @@ export function FeedbackButton() {
       >
         <DialogContent className="max-w-sm" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
-            <DialogTitle className="text-base">Fehler melden / Verbesserung vorschlagen</DialogTitle>
+            <DialogTitle className="text-base">Report bug / Suggest improvement</DialogTitle>
           </DialogHeader>
 
           <div className="text-xs text-muted-foreground bg-muted rounded-md px-3 py-2">
-            Seite: <span className="font-medium">{getPageLabel(location)}</span>
+            Page: <span className="font-medium">{getPageLabel(location)}</span>
             <span className="ml-1 font-mono text-[10px] opacity-60">({location})</span>
           </div>
 
@@ -284,7 +284,7 @@ export function FeedbackButton() {
                     data-testid="button-start-recording"
                   >
                     <Mic className="h-4 w-4 text-red-500" />
-                    {supportsMediaRecorder ? "Sprachnachricht" : "Aufnahme nicht verfügbar"}
+                    {supportsMediaRecorder ? "Voice message" : "Recording not available"}
                   </Button>
                 )}
 
@@ -298,7 +298,7 @@ export function FeedbackButton() {
                     data-testid="button-stop-recording"
                   >
                     <Square className="h-3 w-3" />
-                    Aufnahme stoppen ({formatDuration(recordingDuration)})
+                    Stop recording ({formatDuration(recordingDuration)})
                   </Button>
                 )}
 
@@ -322,7 +322,7 @@ export function FeedbackButton() {
 
             <div className="relative">
               <Textarea
-                placeholder="Oder kurz beschreiben, was nicht funktioniert..."
+                placeholder="Briefly describe what's not working..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={3}
@@ -330,7 +330,7 @@ export function FeedbackButton() {
                 data-testid="input-feedback-message"
               />
               <span className="absolute bottom-1 right-2 text-[10px] text-muted-foreground">
-                {message.length > 0 ? `${message.length} Zeichen` : "optional wenn Sprachnachricht"}
+                {message.length > 0 ? `${message.length} chars` : "optional if voice message"}
               </span>
             </div>
 
@@ -344,7 +344,7 @@ export function FeedbackButton() {
                 data-testid="button-add-screenshot"
               >
                 <Camera className="h-4 w-4" />
-                Screenshot / Foto anhängen{attachments.length > 0 ? ` (${attachments.length})` : ""}
+                Attach screenshot / photo{attachments.length > 0 ? ` (${attachments.length})` : ""}
               </Button>
 
               {attachments.length > 0 && (
@@ -353,7 +353,7 @@ export function FeedbackButton() {
                     <div key={index} className="relative inline-block">
                       <img
                         src={att.preview}
-                        alt={`Anhang ${index + 1}`}
+                        alt={`Attachment ${index + 1}`}
                         className="h-20 rounded-md border object-cover"
                         data-testid={`img-screenshot-preview-${index}`}
                       />
@@ -389,12 +389,12 @@ export function FeedbackButton() {
               {uploading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Wird gesendet...
+                  Sending...
                 </>
               ) : (
                 <>
                   <Send className="h-4 w-4" />
-                  Feedback absenden
+                  Submit feedback
                 </>
               )}
             </Button>

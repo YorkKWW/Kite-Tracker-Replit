@@ -29,9 +29,9 @@ import type { Feedback, FeedbackAttachment, FeedbackComment } from "@shared/sche
 type FeedbackWithUser = Feedback & { userName: string; userRole: string; attachments: FeedbackAttachment[] };
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof AlertCircle }> = {
-  open: { label: "Offen", variant: "destructive", icon: AlertCircle },
-  in_progress: { label: "In Bearbeitung", variant: "default", icon: Timer },
-  resolved: { label: "Erledigt", variant: "secondary", icon: CheckCircle2 },
+  open: { label: "Open", variant: "destructive", icon: AlertCircle },
+  in_progress: { label: "In Progress", variant: "default", icon: Timer },
+  resolved: { label: "Resolved", variant: "secondary", icon: CheckCircle2 },
 };
 
 const PAGE_LABELS: Record<string, string> = {
@@ -41,19 +41,19 @@ const PAGE_LABELS: Record<string, string> = {
   "/sales": "Sales",
   "/incidents": "Incidents",
   "/repairs": "Repairs",
-  "/price-lists": "Preislisten",
-  "/invoice-import": "Rechnungsimport",
-  "/stations": "Standorte",
-  "/users": "Benutzer",
-  "/activity": "Aktivitäten",
-  "/settings": "Einstellungen",
+  "/price-lists": "Price Lists",
+  "/invoice-import": "Invoice Import",
+  "/stations": "Locations",
+  "/users": "Users",
+  "/activity": "Activity",
+  "/settings": "Settings",
 };
 
 function getPageLabel(path: string): string {
   if (PAGE_LABELS[path]) return PAGE_LABELS[path];
   if (path.startsWith("/equipment/")) return "Equipment Detail";
-  if (path.startsWith("/inventory-check")) return "Inventur";
-  if (path.startsWith("/stations/")) return "Standort Detail";
+  if (path.startsWith("/inventory-check")) return "Inventory Check";
+  if (path.startsWith("/stations/")) return "Location Detail";
   return path;
 }
 
@@ -86,14 +86,14 @@ function CommentThread({ feedbackId }: { feedbackId: number }) {
     <div className="border-t pt-3 space-y-2">
       <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         <MessageCircle className="h-3.5 w-3.5" />
-        Kommentare {comments && comments.length > 0 && `(${comments.length})`}
+        Comments {comments && comments.length > 0 && `(${comments.length})`}
       </div>
       {comments?.map((c) => (
         <div key={c.id} className="bg-muted/50 rounded-md p-2 text-xs" data-testid={`comment-${c.id}`}>
           <div className="flex items-center gap-1.5 mb-0.5">
             <span className="font-semibold">{c.userName}</span>
             <span className="text-muted-foreground">
-              {new Date(c.createdAt).toLocaleDateString("de-DE")} {new Date(c.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+              {new Date(c.createdAt).toLocaleDateString("en-US")} {new Date(c.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
             </span>
           </div>
           <p className="whitespace-pre-wrap">{c.message}</p>
@@ -101,7 +101,7 @@ function CommentThread({ feedbackId }: { feedbackId: number }) {
       ))}
       <div className="flex gap-2">
         <Input
-          placeholder="Nachricht schreiben…"
+          placeholder="Write a message…"
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           className="text-sm h-8"
@@ -134,7 +134,7 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
-      toast({ title: "Aktualisiert" });
+      toast({ title: "Updated" });
       setEditing(false);
     },
   });
@@ -164,7 +164,7 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            {date.toLocaleDateString("de-DE")} {date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+            {date.toLocaleDateString("en-US")} {date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
           </span>
           <span className="flex items-center gap-1">
             <MapPin className="h-3 w-3" />
@@ -200,7 +200,7 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
                 <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer">
                   <img
                     src={att.url}
-                    alt={`Anhang ${idx + 1}`}
+                    alt={`Attachment ${idx + 1}`}
                     className="max-h-40 rounded-md border object-contain cursor-pointer hover:opacity-80"
                     data-testid={`img-feedback-attachment-${item.id}-${idx}`}
                   />
@@ -222,7 +222,7 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
 
         {item.adminNotes && !editing && (
           <div className="bg-muted rounded-md p-2 text-xs">
-            <span className="font-medium">Admin-Notiz:</span> {item.adminNotes}
+            <span className="font-medium">Admin note:</span> {item.adminNotes}
           </div>
         )}
 
@@ -237,7 +237,7 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
             }}
             data-testid={`button-edit-feedback-${item.id}`}
           >
-            Bearbeiten
+            Edit
           </Button>
         ) : (
           <div className="space-y-2 border-t pt-2">
@@ -247,14 +247,14 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="open">Offen</SelectItem>
-                  <SelectItem value="in_progress">In Bearbeitung</SelectItem>
-                  <SelectItem value="resolved">Erledigt</SelectItem>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="resolved">Resolved</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <Textarea
-              placeholder="Admin-Notiz..."
+              placeholder="Admin note..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
@@ -268,10 +268,10 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
                 disabled={updateMutation.isPending}
                 data-testid={`button-save-feedback-${item.id}`}
               >
-                {updateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Speichern"}
+                {updateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-                Abbrechen
+                Cancel
               </Button>
             </div>
           </div>
@@ -302,17 +302,17 @@ export default function FeedbackAdminPage() {
           <MessageSquarePlus className="h-5 w-5 text-primary" />
           <h1 className="text-lg font-bold" data-testid="text-feedback-title">Feedback & Bug Reports</h1>
           {openCount > 0 && (
-            <Badge variant="destructive" className="text-xs">{openCount} offen</Badge>
+            <Badge variant="destructive" className="text-xs">{openCount} open</Badge>
           )}
         </div>
       </div>
 
       <div className="flex gap-2">
         {[
-          { val: "all", label: "Alle" },
-          { val: "open", label: "Offen" },
-          { val: "in_progress", label: "In Bearbeitung" },
-          { val: "resolved", label: "Erledigt" },
+          { val: "all", label: "All" },
+          { val: "open", label: "Open" },
+          { val: "in_progress", label: "In Progress" },
+          { val: "resolved", label: "Resolved" },
         ].map((f) => (
           <Button
             key={f.val}
@@ -334,7 +334,7 @@ export default function FeedbackAdminPage() {
 
       {!isLoading && filtered.length === 0 && (
         <div className="text-center py-12 text-muted-foreground text-sm">
-          Keine Einträge gefunden.
+          No entries found.
         </div>
       )}
 

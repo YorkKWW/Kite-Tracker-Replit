@@ -36,10 +36,10 @@ const VAT_OPTIONS = [
 ];
 
 const PAY_OPTIONS = [
-  { value: "bank_transfer", label: "Bank Transfer (Überweisung)" },
-  { value: "cash", label: "Cash (Bar)" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "cash", label: "Cash" },
   { value: "paypal", label: "PayPal" },
-  { value: "credit_card", label: "Credit Card (Kreditkarte)" },
+  { value: "credit_card", label: "Credit Card" },
 ];
 
 export default function SaleCreatePage() {
@@ -298,7 +298,7 @@ export default function SaleCreatePage() {
                   <Textarea
                     value={newCust.address}
                     onChange={(e) => setNewCust((p) => ({ ...p, address: e.target.value }))}
-                    placeholder={"Musterstraße 1\n12345 Berlin\nGermany"}
+                    placeholder={"123 Main Street\n12345 Berlin\nGermany"}
                     rows={3}
                     data-testid="input-new-customer-address"
                   />
@@ -374,11 +374,11 @@ export default function SaleCreatePage() {
                         <div data-testid={`text-uvp-${idx}`}>
                           {item.uvp.dealerPrice && (
                             <p className="text-[10px] text-blue-600 dark:text-blue-400 leading-tight">
-                              Dealer (net): €{parseFloat(item.uvp.dealerPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })} · {item.uvp.supplier}
+                              Dealer (net): €{parseFloat(item.uvp.dealerPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })} · {item.uvp.supplier}
                             </p>
                           )}
                           <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400 leading-tight">
-                            UVP: €{parseFloat(item.uvp.retailPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })} <span className="font-normal text-muted-foreground">(brutto incl. VAT)</span>
+                            MSRP: €{parseFloat(item.uvp.retailPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })} <span className="font-normal text-muted-foreground">(gross incl. VAT)</span>
                           </p>
                         </div>
                       ) : (

@@ -33,6 +33,7 @@ import {
   inventoryChecks, inventoryCheckItems, suppliers, invoices,
   companySettings, customers, salesInvoices, saleItems, priceLists, priceListItems,
   damageReports, damageReportPhotos, feedback, feedbackAttachments, feedbackComments, notifications,
+  accessoryCategories, accessoryInventory, accessoryTransfers, accessoryLossReports,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -57,6 +58,10 @@ import {
   type FeedbackAttachment, type InsertFeedbackAttachment,
   type FeedbackComment, type InsertFeedbackComment,
   type Notification, type InsertNotification,
+  type AccessoryCategory, type InsertAccessoryCategory,
+  type AccessoryInventory, type InsertAccessoryInventory,
+  type AccessoryTransfer, type InsertAccessoryTransfer,
+  type AccessoryLossReport, type InsertAccessoryLossReport,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -184,6 +189,20 @@ export interface IStorage {
   markAllNotificationsRead(userId: number): Promise<void>;
   getUnreadNotificationCount(userId: number): Promise<number>;
   getAdminUserIds(): Promise<number[]>;
+
+  getAllAccessoryCategories(): Promise<AccessoryCategory[]>;
+  createAccessoryCategory(cat: InsertAccessoryCategory): Promise<AccessoryCategory>;
+  deleteAccessoryCategory(id: number): Promise<void>;
+
+  getAccessoryInventory(stationId?: number): Promise<AccessoryInventory[]>;
+  updateAccessoryInventory(categoryId: number, stationId: number, size: string, quantity: number): Promise<AccessoryInventory>;
+
+  getAllAccessoryTransfers(): Promise<(AccessoryTransfer & { categoryName: string; fromStationName: string; toStationName: string; transferredByName: string | null })[]>;
+  createAccessoryTransfer(transfer: InsertAccessoryTransfer): Promise<AccessoryTransfer>;
+
+  getAccessoryLossReports(status?: string): Promise<any[]>;
+  createAccessoryLossReport(report: InsertAccessoryLossReport): Promise<AccessoryLossReport>;
+  resolveAccessoryLossReport(id: number, resolvedBy: number, adminNote: string | null, approved: boolean): Promise<AccessoryLossReport>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1200,6 +1219,171 @@ export class DatabaseStorage implements IStorage {
   async getAdminUserIds(): Promise<number[]> {
     const rows = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin"));
     return rows.map(r => r.id);
+  }
+
+  async getAllAccessoryCategories(): Promise<AccessoryCategory[]> {
+    return db.select().from(accessoryCategories).orderBy(accessoryCategories.sortOrder, accessoryCategories.name);
+  }
+
+  async createAccessoryCategory(cat: InsertAccessoryCategory): Promise<AccessoryCategory> {
+    const [created] = await db.insert(accessoryCategories).values(cat).returning();
+    return created;
+  }
+
+  async deleteAccessoryCategory(id: number): Promise<void> {
+    await db.delete(accessoryInventory).where(eq(accessoryInventory.categoryId, id));
+    await db.delete(accessoryTransfers).where(eq(accessoryTransfers.categoryId, id));
+    await db.delete(accessoryCategories).where(eq(accessoryCategories.id, id));
+  }
+
+  async getAccessoryInventory(stationId?: number): Promise<AccessoryInventory[]> {
+    if (stationId) {
+      return db.select().from(accessoryInventory).where(eq(accessoryInventory.stationId, stationId));
+    }
+    return db.select().from(accessoryInventory);
+  }
+
+  async updateAccessoryInventory(categoryId: number, stationId: number, size: string, quantity: number): Promise<AccessoryInventory> {
+    const [result] = await db.insert(accessoryInventory)
+      .values({ categoryId, stationId, size, quantity })
+      .onConflictDoUpdate({
+        target: [accessoryInventory.categoryId, accessoryInventory.stationId, accessoryInventory.size],
+        set: { quantity },
+      })
+      .returning();
+    return result;
+  }
+
+  async getAllAccessoryTransfers(): Promise<(AccessoryTransfer & { categoryName: string; fromStationName: string; toStationName: string; transferredByName: string | null })[]> {
+    const rows = await db.select().from(accessoryTransfers).orderBy(desc(accessoryTransfers.transferredAt));
+    if (!rows.length) return [];
+
+    const catIds = [...new Set(rows.map(r => r.categoryId))];
+    const stationIds = [...new Set(rows.flatMap(r => [r.fromStationId, r.toStationId]))];
+    const userIds = [...new Set(rows.map(r => r.transferredBy).filter(Boolean))] as number[];
+
+    const [cats, sts, usrs] = await Promise.all([
+      db.select().from(accessoryCategories).where(inArray(accessoryCategories.id, catIds)),
+      db.select().from(stations).where(inArray(stations.id, stationIds)),
+      userIds.length ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, userIds)) : Promise.resolve([]),
+    ]);
+
+    const catMap = Object.fromEntries(cats.map(c => [c.id, c.name]));
+    const stMap = Object.fromEntries(sts.map(s => [s.id, s.name]));
+    const uMap = Object.fromEntries(usrs.map(u => [u.id, u.name]));
+
+    return rows.map(r => ({
+      ...r,
+      categoryName: catMap[r.categoryId] ?? "Unknown",
+      fromStationName: stMap[r.fromStationId] ?? "Unknown",
+      toStationName: stMap[r.toStationId] ?? "Unknown",
+      transferredByName: r.transferredBy ? (uMap[r.transferredBy] ?? null) : null,
+    }));
+  }
+
+  async createAccessoryTransfer(transfer: InsertAccessoryTransfer): Promise<AccessoryTransfer> {
+    const size = transfer.size ?? "Einheitsgröße";
+    const transferQty = transfer.quantity ?? 1;
+
+    return await db.transaction(async (tx) => {
+      const fromInv = await tx.select().from(accessoryInventory).where(
+        and(
+          eq(accessoryInventory.categoryId, transfer.categoryId),
+          eq(accessoryInventory.stationId, transfer.fromStationId),
+          eq(accessoryInventory.size, size),
+        )
+      );
+      const currentQty = fromInv[0]?.quantity ?? 0;
+      if (currentQty < transferQty) {
+        throw new Error("Not enough stock at source station");
+      }
+
+      if (fromInv[0]) {
+        await tx.update(accessoryInventory).set({ quantity: currentQty - transferQty }).where(eq(accessoryInventory.id, fromInv[0].id));
+      }
+
+      const toInv = await tx.select().from(accessoryInventory).where(
+        and(
+          eq(accessoryInventory.categoryId, transfer.categoryId),
+          eq(accessoryInventory.stationId, transfer.toStationId),
+          eq(accessoryInventory.size, size),
+        )
+      );
+      const toQty = toInv[0]?.quantity ?? 0;
+      if (toInv[0]) {
+        await tx.update(accessoryInventory).set({ quantity: toQty + transferQty }).where(eq(accessoryInventory.id, toInv[0].id));
+      } else {
+        await tx.insert(accessoryInventory).values({ categoryId: transfer.categoryId, stationId: transfer.toStationId, size, quantity: transferQty });
+      }
+
+      const [created] = await tx.insert(accessoryTransfers).values(transfer).returning();
+      return created;
+    });
+  }
+
+  async getAccessoryLossReports(status?: string): Promise<any[]> {
+    const rows = status
+      ? await db.select().from(accessoryLossReports).where(eq(accessoryLossReports.status, status)).orderBy(desc(accessoryLossReports.reportedAt))
+      : await db.select().from(accessoryLossReports).orderBy(desc(accessoryLossReports.reportedAt));
+    if (!rows.length) return [];
+
+    const catIds = [...new Set(rows.map(r => r.categoryId))];
+    const stationIds = [...new Set(rows.map(r => r.stationId))];
+    const userIds = [...new Set([...rows.map(r => r.reportedBy), ...rows.map(r => r.resolvedBy).filter(Boolean)])] as number[];
+
+    const [cats, sts, usrs] = await Promise.all([
+      db.select().from(accessoryCategories).where(inArray(accessoryCategories.id, catIds)),
+      db.select().from(stations).where(inArray(stations.id, stationIds)),
+      userIds.length ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, userIds)) : Promise.resolve([]),
+    ]);
+
+    const catMap = Object.fromEntries(cats.map(c => [c.id, c.name]));
+    const stMap = Object.fromEntries(sts.map(s => [s.id, s.name]));
+    const uMap = Object.fromEntries(usrs.map(u => [u.id, u.name]));
+
+    return rows.map(r => ({
+      ...r,
+      categoryName: catMap[r.categoryId] ?? "?",
+      stationName: stMap[r.stationId] ?? "?",
+      reportedByName: uMap[r.reportedBy] ?? "?",
+      resolvedByName: r.resolvedBy ? (uMap[r.resolvedBy] ?? null) : null,
+    }));
+  }
+
+  async createAccessoryLossReport(report: InsertAccessoryLossReport): Promise<AccessoryLossReport> {
+    const [created] = await db.insert(accessoryLossReports).values(report).returning();
+    return created;
+  }
+
+  async resolveAccessoryLossReport(id: number, resolvedBy: number, adminNote: string | null, approved: boolean): Promise<AccessoryLossReport> {
+    return await db.transaction(async (tx) => {
+      const [updated] = await tx.update(accessoryLossReports)
+        .set({
+          status: approved ? "approved" : "rejected",
+          resolvedBy,
+          resolvedAt: new Date(),
+          adminNote,
+        })
+        .where(and(eq(accessoryLossReports.id, id), eq(accessoryLossReports.status, "pending")))
+        .returning();
+      if (!updated) throw new Error("Report not found or already resolved");
+
+      if (approved) {
+        const inv = await tx.select().from(accessoryInventory).where(
+          and(
+            eq(accessoryInventory.categoryId, updated.categoryId),
+            eq(accessoryInventory.stationId, updated.stationId),
+            eq(accessoryInventory.size, updated.size),
+          )
+        );
+        if (inv[0]) {
+          const newQty = Math.max(0, inv[0].quantity - updated.quantity);
+          await tx.update(accessoryInventory).set({ quantity: newQty }).where(eq(accessoryInventory.id, inv[0].id));
+        }
+      }
+
+      return updated;
+    });
   }
 }
 
