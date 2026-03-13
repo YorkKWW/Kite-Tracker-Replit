@@ -504,7 +504,7 @@ function parsePdfInvoice(text: string) {
   //   Line N: "qty \t unitPrice \t discount% total €"
   const skuLineRe = /^\[([A-Z0-9]+)\]\s+(.+)$/;
   const qtyLineRe = /^(\d+)\s+[\d.,]+\s+\d+%\s+([\d.,]+)\s*€?$/;
-  const serialLineRe = /^([A-Z0-9]{6,}(?:,\s*[A-Z0-9]{6,})*)$/;
+  const serialLineRe = /^([A-Z0-9]{6,}(?:,\s*[A-Z0-9]{6,})*),?\s*$/;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -513,10 +513,10 @@ function parsePdfInvoice(text: string) {
 
     const [, sku, rawName] = skuMatch;
 
-    // Find qty line within the next 4 lines
+    // Find qty line within the next 10 lines (serial numbers may span multiple lines)
     let qtyLine: string | null = null;
     let qtyLineIdx = -1;
-    for (let j = i + 1; j <= Math.min(i + 4, lines.length - 1); j++) {
+    for (let j = i + 1; j <= Math.min(i + 10, lines.length - 1); j++) {
       if (lines[j].match(qtyLineRe)) {
         qtyLine = lines[j];
         qtyLineIdx = j;
@@ -534,13 +534,13 @@ function parsePdfInvoice(text: string) {
     }
     const unitPriceAfterDiscount = quantity > 0 ? total / quantity : total;
 
-    // Look for serial line between SKU line and qty line
+    // Look for serial lines between SKU line and qty line (may span multiple lines)
     let serials: string[] = [];
     for (let j = i + 1; j < qtyLineIdx; j++) {
       const serialMatch = lines[j].match(serialLineRe);
       if (serialMatch) {
-        serials = serialMatch[1].split(",").map((s: string) => s.trim()).filter(Boolean);
-        break;
+        const found = serialMatch[1].split(",").map((s: string) => s.trim()).filter(Boolean);
+        serials.push(...found);
       }
     }
 
