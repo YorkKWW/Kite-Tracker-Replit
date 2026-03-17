@@ -192,6 +192,8 @@ export default function QuickInventoryPage() {
   const equipTotalItems = data.openEquipCheck?.totalItems ?? 0;
   const equipProgress = equipTotalItems > 0 ? Math.round((equipCheckedCount / equipTotalItems) * 100) : 0;
 
+  const totalAccItems = data.accessoryInventory.length;
+
   const openCheckItems = data.openCheckItems ?? [];
   const openCheckEquipment = data.openCheckEquipment ?? [];
 
@@ -344,15 +346,39 @@ export default function QuickInventoryPage() {
         </CardHeader>
         <CardContent>
           {!countRows ? (
-            <Button
-              className="w-full"
-              variant="outline"
-              onClick={initCountRows}
-              data-testid="button-start-acc-count"
-            >
-              <ClipboardCheck className="h-4 w-4 mr-2" />
-              Start Accessory Count
-            </Button>
+            <div className="space-y-3">
+              <button
+                className="w-full text-left"
+                onClick={initCountRows}
+                data-testid="button-toggle-acc-count"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    {totalAccItems > 0 ? "Ready to count" : "No accessories configured"}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" data-testid="badge-acc-progress">
+                      0/{totalAccItems} counted
+                    </Badge>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+                <div className="w-full bg-secondary rounded-full h-2 mt-2">
+                  <div className="bg-primary rounded-full h-2" style={{ width: "0%" }} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 text-center">0%</p>
+              </button>
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={initCountRows}
+                disabled={totalAccItems === 0}
+                data-testid="button-start-acc-count"
+              >
+                <ClipboardCheck className="h-4 w-4 mr-2" />
+                Start Accessory Count
+              </Button>
+            </div>
           ) : (
             <div className="space-y-4">
               {countRows.length === 0 ? (
