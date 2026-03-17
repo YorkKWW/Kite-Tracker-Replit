@@ -1156,7 +1156,7 @@ export class DatabaseStorage implements IStorage {
     return rows.map(r => ({
       ...r,
       userName: r.userName ?? "Unknown",
-      userRole: r.userRole ?? "center_manager",
+      userRole: r.userRole ?? "station_lead",
       attachments: attachmentsByFeedback.get(r.id) || [],
     }));
   }

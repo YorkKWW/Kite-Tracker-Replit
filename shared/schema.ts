@@ -15,7 +15,7 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const userRoleEnum = pgEnum("user_role", ["admin", "manager", "center_manager"]);
+export const userRoleEnum = pgEnum("user_role", ["admin", "manager", "station_lead"]);
 
 export const equipmentTypeEnum = pgEnum("equipment_type", [
   "kite",
@@ -416,7 +416,7 @@ export type DamageReport = typeof damageReports.$inferSelect;
 export type InsertDamageReportPhoto = z.infer<typeof insertDamageReportPhotoSchema>;
 export type DamageReportPhoto = typeof damageReportPhotos.$inferSelect;
 
-// Feedback / bug reports from center managers
+// Feedback / bug reports from station leads
 export const feedbackStatusEnum = pgEnum("feedback_status", ["open", "in_progress", "resolved"]);
 
 export const feedback = pgTable("feedback", {

@@ -5,7 +5,7 @@ import type { User } from "@shared/schema";
 
 type AuthUser = Omit<User, "password">;
 
-export type ViewMode = "super_admin" | "admin" | "manager" | "center_manager";
+export type ViewMode = "super_admin" | "admin" | "manager" | "station_lead";
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -15,7 +15,7 @@ interface AuthContextType {
   isSuperAdmin: boolean;
   isAdmin: boolean;
   isHamburg: boolean;
-  isCenterManager: boolean;
+  isStationLead: boolean;
   canEditEquipment: boolean;
   viewMode: ViewMode | null;
   setViewMode: (mode: ViewMode | null) => void;
@@ -64,15 +64,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   let isSuperAdmin = actualSuperAdmin;
   let isAdmin = user?.role === "admin";
   let isHamburg = user?.role === "admin" || user?.role === "manager";
-  let isCenterManager = user?.role === "center_manager";
+  let isStationLead = user?.role === "station_lead";
   let canEditEquipment = user?.canEditEquipment === true || user?.role === "admin" || user?.role === "manager";
 
   if (isSimulating && viewMode) {
     isSuperAdmin = false;
     isAdmin = viewMode === "admin";
     isHamburg = viewMode === "admin" || viewMode === "manager";
-    isCenterManager = viewMode === "center_manager";
-    canEditEquipment = viewMode === "center_manager" ? false : viewMode === "admin" || viewMode === "manager";
+    isStationLead = viewMode === "station_lead";
+    canEditEquipment = viewMode === "station_lead" ? false : viewMode === "admin" || viewMode === "manager";
   }
 
   return (
@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperAdmin,
         isAdmin,
         isHamburg,
-        isCenterManager,
+        isStationLead,
         canEditEquipment,
         viewMode: actualSuperAdmin ? viewMode : null,
         setViewMode: actualSuperAdmin ? setViewMode : () => {},
@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
 }

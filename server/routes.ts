@@ -808,7 +808,7 @@ export async function registerRoutes(
     const item = await storage.getEquipmentByCode(serial);
     if (!item) return res.status(404).json({ message: "Equipment not found" });
     const user = req.user as any;
-    if (user.role === "center_manager" && item.currentStationId !== user.assignedStationId) {
+    if (user.role === "station_lead" && item.currentStationId !== user.assignedStationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     res.json(item);
@@ -823,7 +823,7 @@ export async function registerRoutes(
   app.get("/api/equipment", requireAuth, async (req, res) => {
     const user = req.user as any;
     const filters: any = {};
-    if (user.role === "center_manager") {
+    if (user.role === "station_lead") {
       filters.stationId = user.assignedStationId;
     } else if (req.query.stationId === "unassigned") {
       filters.unassigned = true;
@@ -837,7 +837,7 @@ export async function registerRoutes(
 
     let items = await storage.getAllEquipment(filters);
 
-    if (user.role === "center_manager") {
+    if (user.role === "station_lead") {
       items = items.map(({ purchasePrice, salePrice, ...rest }) => rest as any);
     }
 
@@ -851,11 +851,11 @@ export async function registerRoutes(
     if (!item) return res.status(404).json({ message: "Equipment not found" });
 
     const user = req.user as any;
-    if (user.role === "center_manager" && item.currentStationId !== user.assignedStationId) {
+    if (user.role === "station_lead" && item.currentStationId !== user.assignedStationId) {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    if (user.role === "center_manager") {
+    if (user.role === "station_lead") {
       const { purchasePrice, salePrice, ...safe } = item;
       return res.json(safe);
     }
@@ -974,7 +974,7 @@ export async function registerRoutes(
     }
     let repairsList = await storage.getRepairs(equipmentId);
     const user = req.user as any;
-    if (user.role === "center_manager") {
+    if (user.role === "station_lead") {
       repairsList = repairsList.map(({ cost, ...rest }) => rest as any);
     }
     res.json(repairsList);
@@ -1005,7 +1005,7 @@ export async function registerRoutes(
   app.patch("/api/repairs/:id", requireAuth, async (req, res) => {
     const user = req.user as any;
     const data = { ...req.body };
-    if (user.role === "center_manager") {
+    if (user.role === "station_lead") {
       delete data.cost;
     }
     const repair = await storage.updateRepair(parseInt(req.params.id), data);
@@ -1022,7 +1022,7 @@ export async function registerRoutes(
 
   app.get("/api/repairs/active", requireAuth, async (req, res) => {
     const user = req.user as any;
-    const stationId = user.role === "center_manager" ? user.assignedStationId : undefined;
+    const stationId = user.role === "station_lead" ? user.assignedStationId : undefined;
     const items = await storage.getActiveRepairsWithDetails(stationId);
     res.json(items);
   });
@@ -1068,7 +1068,7 @@ export async function registerRoutes(
   app.get("/api/transfers", requireAuth, async (req, res) => {
     const user = req.user as any;
     const filters: any = {};
-    if (user.role === "center_manager") {
+    if (user.role === "station_lead") {
       filters.stationId = user.assignedStationId;
     } else if (req.query.stationId) {
       filters.stationId = parseInt(req.query.stationId as string);
@@ -1184,7 +1184,7 @@ export async function registerRoutes(
 
     const isAdmin = user.role === "admin";
     const isReceivingManager =
-      (user.role === "manager" || user.role === "center_manager") &&
+      (user.role === "manager" || user.role === "station_lead") &&
       user.assignedStationId === existing.toStationId;
     if (!isAdmin && !isReceivingManager) {
       return res.status(403).json({ message: "Only the receiving station manager or admin can confirm receipt" });
@@ -1300,7 +1300,7 @@ export async function registerRoutes(
   app.post("/api/stations/:id/inventory-checks", requireAuth, async (req, res) => {
     const user = req.user as any;
     const stationId = parseInt(req.params.id);
-    if (user.role === "center_manager" && user.assignedStationId !== stationId) {
+    if (user.role === "station_lead" && user.assignedStationId !== stationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     const equipmentList = await storage.getAllEquipment({ stationId });
@@ -1326,7 +1326,7 @@ export async function registerRoutes(
   app.get("/api/stations/:id/inventory-checks", requireAuth, async (req, res) => {
     const user = req.user as any;
     const stationId = parseInt(req.params.id);
-    if (user.role === "center_manager" && user.assignedStationId !== stationId) {
+    if (user.role === "station_lead" && user.assignedStationId !== stationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     const checks = await storage.getInventoryChecks(stationId);
@@ -1337,7 +1337,7 @@ export async function registerRoutes(
     const user = req.user as any;
     const check = await storage.getInventoryCheck(parseInt(req.params.id));
     if (!check) return res.status(404).json({ message: "Not found" });
-    if (user.role === "center_manager" && user.assignedStationId !== check.stationId) {
+    if (user.role === "station_lead" && user.assignedStationId !== check.stationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     const items = await storage.getInventoryCheckItems(check.id);
@@ -1350,7 +1350,7 @@ export async function registerRoutes(
     const user = req.user as any;
     const check = await storage.getInventoryCheck(parseInt(req.params.id));
     if (!check) return res.status(404).json({ message: "Not found" });
-    if (user.role === "center_manager" && user.assignedStationId !== check.stationId) {
+    if (user.role === "station_lead" && user.assignedStationId !== check.stationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     const updated = await storage.completeInventoryCheck(check.id);
@@ -1370,7 +1370,7 @@ export async function registerRoutes(
     const equipmentId = parseInt(req.params.equipmentId);
     const check = await storage.getInventoryCheck(checkId);
     if (!check) return res.status(404).json({ message: "Not found" });
-    if (user.role === "center_manager" && user.assignedStationId !== check.stationId) {
+    if (user.role === "station_lead" && user.assignedStationId !== check.stationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     const item = await storage.upsertInventoryCheckItem({
@@ -1399,7 +1399,7 @@ export async function registerRoutes(
     const equipmentId = req.query.equipmentId ? parseInt(req.query.equipmentId as string) : undefined;
     const dateFrom = req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined;
     const dateTo = req.query.dateTo ? new Date(req.query.dateTo as string) : undefined;
-    const stationId = user.role === "center_manager"
+    const stationId = user.role === "station_lead"
       ? user.assignedStationId
       : req.query.stationId ? parseInt(req.query.stationId as string) : undefined;
     const logs = await storage.getActivityLog({ limit, userId, action, stationId, equipmentId, dateFrom, dateTo });
@@ -1417,7 +1417,7 @@ export async function registerRoutes(
 
   app.get("/api/dashboard", requireAuth, async (req, res) => {
     const user = req.user as any;
-    const stationId = user.role === "center_manager" ? user.assignedStationId : undefined;
+    const stationId = user.role === "station_lead" ? user.assignedStationId : undefined;
     const stats = await storage.getDashboardStats(stationId);
     res.json(stats);
   });
@@ -2367,7 +2367,7 @@ export async function registerRoutes(
   app.get("/api/damage-reports", requireAuth, async (req, res) => {
     const user = req.user as any;
     const reports = await storage.getAllDamageReports();
-    if (user.role === "center_manager") {
+    if (user.role === "station_lead") {
       return res.json(reports.filter(r => r.stationId === user.stationId));
     }
     res.json(reports);
@@ -2377,7 +2377,7 @@ export async function registerRoutes(
     const report = await storage.getDamageReport(parseInt(req.params.id));
     if (!report) return res.status(404).json({ message: "Not found" });
     const user = req.user as any;
-    if (user.role === "center_manager" && report.stationId !== user.stationId) {
+    if (user.role === "station_lead" && report.stationId !== user.stationId) {
       return res.status(403).json({ message: "Access denied" });
     }
     res.json(report);

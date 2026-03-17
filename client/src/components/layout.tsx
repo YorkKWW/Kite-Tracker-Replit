@@ -54,7 +54,7 @@ type ScanResult =
   | { status: "not_found"; serial: string };
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, logout, isAdmin, isHamburg, isCenterManager, isSuperAdmin, viewMode, setViewMode, isSimulating } = useAuth();
+  const { user, logout, isAdmin, isHamburg, isStationLead, isSuperAdmin, viewMode, setViewMode, isSimulating } = useAuth();
   const [location, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -143,7 +143,7 @@ export default function Layout({ children }: LayoutProps) {
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
-  const centerManagerBottomTabs = [
+  const stationLeadBottomTabs = [
     { href: "/equipment", label: "Equipment", icon: Package },
     { href: "/accessories", label: "Accessories", icon: ShirtIcon },
     { href: "/incidents", label: "Incidents", icon: AlertTriangle },
@@ -160,7 +160,7 @@ export default function Layout({ children }: LayoutProps) {
     { href: "/incidents", label: "Incidents", icon: AlertTriangle },
   ];
 
-  const bottomTabs = isCenterManager ? centerManagerBottomTabs : defaultBottomTabs;
+  const bottomTabs = isStationLead ? stationLeadBottomTabs : defaultBottomTabs;
 
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -219,7 +219,7 @@ export default function Layout({ children }: LayoutProps) {
       {isSimulating && (
         <div className="sticky top-0 z-[60] bg-amber-500 text-amber-950 text-center py-1 text-xs font-semibold flex items-center justify-center gap-2" data-testid="banner-simulation">
           <EyeOff className="h-3.5 w-3.5" />
-          Simulated View: {viewMode === "admin" ? "Admin" : viewMode === "manager" ? "Hamburg Manager" : "Center Manager"}
+          Simulated View: {viewMode === "admin" ? "Admin" : viewMode === "manager" ? "Center Manager" : "Station Lead"}
           <Button
             variant="ghost"
             size="sm"
@@ -277,8 +277,8 @@ export default function Layout({ children }: LayoutProps) {
                 <SelectContent>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="manager">Hamburg Manager</SelectItem>
-                  <SelectItem value="center_manager">Center Manager</SelectItem>
+                  <SelectItem value="manager">Center Manager</SelectItem>
+                  <SelectItem value="station_lead">Station Lead</SelectItem>
                 </SelectContent>
               </Select>
             )}

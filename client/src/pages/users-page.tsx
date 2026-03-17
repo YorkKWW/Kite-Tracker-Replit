@@ -29,7 +29,7 @@ function getRoleLabel(u: SafeUser) {
   if (u.role === "admin" && u.isSuperAdmin) return "Super Admin";
   if (u.role === "admin") return "Admin";
   if (u.role === "manager") return "Hamburg Manager";
-  return "Center Manager";
+  return "Station Lead";
 }
 
 function getRoleBadgeVariant(u: SafeUser): "default" | "secondary" | "outline" {
@@ -39,32 +39,32 @@ function getRoleBadgeVariant(u: SafeUser): "default" | "secondary" | "outline" {
 }
 
 const PERMISSIONS = [
-  { label: "View equipment", superAdmin: true, admin: true, manager: true, centerManager: true },
-  { label: "Create & edit equipment", superAdmin: true, admin: true, manager: true, centerManager: false },
-  { label: "Permanently delete equipment", superAdmin: true, admin: false, manager: false, centerManager: false },
-  { label: "View purchase prices & values", superAdmin: true, admin: true, manager: false, centerManager: false },
-  { label: "Import invoices", superAdmin: true, admin: true, manager: true, centerManager: false },
-  { label: "Delete invoices", superAdmin: true, admin: false, manager: false, centerManager: false },
-  { label: "Start, confirm & cancel transfers", superAdmin: true, admin: true, manager: true, centerManager: true },
-  { label: "Create, confirm & complete sales", superAdmin: true, admin: true, manager: false, centerManager: true },
-  { label: "Manage price lists", superAdmin: true, admin: true, manager: false, centerManager: false },
-  { label: "View price lists", superAdmin: true, admin: true, manager: true, centerManager: false },
-  { label: "Create & edit locations", superAdmin: true, admin: true, manager: false, centerManager: false },
-  { label: "Delete locations", superAdmin: true, admin: false, manager: false, centerManager: false },
-  { label: "Create & edit managers & center managers", superAdmin: true, admin: true, manager: false, centerManager: false },
-  { label: "Create & edit admins", superAdmin: true, admin: false, manager: false, centerManager: false },
-  { label: "Delete users", superAdmin: true, admin: false, manager: false, centerManager: false },
-  { label: "View users", superAdmin: true, admin: true, manager: false, centerManager: false },
-  { label: "Create damage reports", superAdmin: true, admin: true, manager: true, centerManager: true },
-  { label: "Change damage report status", superAdmin: true, admin: true, manager: true, centerManager: false },
-  { label: "Manage repairs", superAdmin: true, admin: true, manager: true, centerManager: true },
-  { label: "Perform inventory checks", superAdmin: true, admin: true, manager: true, centerManager: true },
-  { label: "View activity log", superAdmin: true, admin: true, manager: true, centerManager: true },
-  { label: "Send feedback / bug reports", superAdmin: true, admin: true, manager: true, centerManager: true },
-  { label: "Manage feedback", superAdmin: true, admin: true, manager: false, centerManager: false },
-  { label: "Change company settings", superAdmin: true, admin: true, manager: false, centerManager: false },
-  { label: "Use barcode scanner", superAdmin: true, admin: true, manager: true, centerManager: true },
-  { label: "Upload & delete photos", superAdmin: true, admin: true, manager: true, centerManager: true },
+  { label: "View equipment", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Create & edit equipment", superAdmin: true, admin: true, manager: true, stationLead: false },
+  { label: "Permanently delete equipment", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "View purchase prices & values", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Import invoices", superAdmin: true, admin: true, manager: true, stationLead: false },
+  { label: "Delete invoices", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "Start, confirm & cancel transfers", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Create, confirm & complete sales", superAdmin: true, admin: true, manager: false, stationLead: true },
+  { label: "Manage price lists", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "View price lists", superAdmin: true, admin: true, manager: true, stationLead: false },
+  { label: "Create & edit locations", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Delete locations", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "Create & edit managers & station leads", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Create & edit admins", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "Delete users", superAdmin: true, admin: false, manager: false, stationLead: false },
+  { label: "View users", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Create damage reports", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Change damage report status", superAdmin: true, admin: true, manager: true, stationLead: false },
+  { label: "Manage repairs", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Perform inventory checks", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "View activity log", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Send feedback / bug reports", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Manage feedback", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Change company settings", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Use barcode scanner", superAdmin: true, admin: true, manager: true, stationLead: true },
+  { label: "Upload & delete photos", superAdmin: true, admin: true, manager: true, stationLead: true },
 ];
 
 function PermissionsTable() {
@@ -97,13 +97,13 @@ function PermissionsTable() {
                 <th className="text-center p-3 font-medium w-24">
                   <div className="flex flex-col items-center gap-1">
                     <Users className="h-4 w-4" />
-                    <span className="text-xs">Hamburg Manager</span>
+                    <span className="text-xs">Manager</span>
                   </div>
                 </th>
                 <th className="text-center p-3 font-medium w-24">
                   <div className="flex flex-col items-center gap-1">
                     <Users className="h-4 w-4" />
-                    <span className="text-xs">Center Manager</span>
+                    <span className="text-xs">Station Lead</span>
                   </div>
                 </th>
               </tr>
@@ -122,7 +122,7 @@ function PermissionsTable() {
                     {p.manager ? <Check className="h-4 w-4 text-green-600 mx-auto" /> : <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />}
                   </td>
                   <td className="text-center p-3">
-                    {p.centerManager ? <Check className="h-4 w-4 text-green-600 mx-auto" /> : <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />}
+                    {p.stationLead ? <Check className="h-4 w-4 text-green-600 mx-auto" /> : <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />}
                   </td>
                 </tr>
               ))}
@@ -286,7 +286,7 @@ export default function UsersPage() {
                 <SelectContent>
                   {isSuperAdmin && <SelectItem value="admin">Admin</SelectItem>}
                   <SelectItem value="manager">Hamburg Manager</SelectItem>
-                  <SelectItem value="center_manager">Center Manager</SelectItem>
+                  <SelectItem value="station_lead">Station Lead</SelectItem>
                 </SelectContent>
               </Select>
               {!isSuperAdmin && editUser?.role === "admin" && (
@@ -327,7 +327,7 @@ export default function UsersPage() {
                 </label>
               </div>
             )}
-            {(role === "manager" || role === "center_manager") && (
+            {(role === "manager" || role === "station_lead") && (
               <div className="space-y-2">
                 <Label>Assigned Location</Label>
                 <Select value={stationId} onValueChange={setStationId}>
@@ -401,7 +401,7 @@ export default function UsersPage() {
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{u.email}</p>
-                    {(u.role === "manager" || u.role === "center_manager") && (
+                    {(u.role === "manager" || u.role === "station_lead") && (
                       <p className="text-xs text-muted-foreground">Location: {getStationName(u.assignedStationId)}</p>
                     )}
                     {u.canEditEquipment && u.role !== "admin" && u.role !== "manager" && (
