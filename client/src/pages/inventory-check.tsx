@@ -13,7 +13,7 @@ import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, ScanLine, CheckCircle2, Circle, Wrench,
-  AlertTriangle, Star, ClipboardCheck, Package,
+  AlertTriangle, Star, ClipboardCheck, Package, Camera, X, Loader2,
 } from "lucide-react";
 import type { Equipment, InventoryCheck, InventoryCheckItem } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
@@ -33,7 +33,10 @@ export default function InventoryCheckPage() {
   const { toast } = useToast();
   const [scannerOpen, setScannerOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const [uploadingPhotoFor, setUploadingPhotoFor] = useState<number | null>(null);
   const itemRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const photoTargetEquipId = useRef<number | null>(null);
 
   const { data, isLoading } = useQuery<CheckDetail>({
     queryKey: ["/api/inventory-checks", checkId.toString()],
@@ -95,6 +98,53 @@ export default function InventoryCheckPage() {
     });
   };
 
+  const triggerPhotoUpload = (equipmentId: number) => {
+    photoTargetEquipId.current = equipmentId;
+    photoInputRef.current?.click();
+  };
+
+  const handlePhotoFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const equipmentId = photoTargetEquipId.current;
+    if (!file || !equipmentId) return;
+    e.target.value = "";
+
+    setUploadingPhotoFor(equipmentId);
+    try {
+      const urlRes = await fetch(
+        `/api/inventory-checks/${checkId}/items/${equipmentId}/photos/upload-url`,
+        { credentials: "include" }
+      );
+      if (!urlRes.ok) throw new Error("Could not get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!putRes.ok) throw new Error("Upload failed");
+
+      const currentItem = data?.items.find((i) => i.equipmentId === equipmentId);
+      const existingPhotos: string[] = currentItem?.photos ?? [];
+      await apiRequest("PATCH", `/api/inventory-checks/${checkId}/items/${equipmentId}`, {
+        photos: [...existingPhotos, objectPath],
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory-checks", checkId.toString()] });
+      toast({ title: "Photo added" });
+    } catch {
+      toast({ title: "Failed to upload photo", variant: "destructive" });
+    } finally {
+      setUploadingPhotoFor(null);
+    }
+  };
+
+  const removePhoto = (equipmentId: number, photoUrl: string) => {
+    const currentItem = data?.items.find((i) => i.equipmentId === equipmentId);
+    const updated = (currentItem?.photos ?? []).filter((p) => p !== photoUrl);
+    updateItemMutation.mutate({ equipmentId, patch: { photos: updated } });
+  };
+
   const getItem = (equipmentId: number): InventoryCheckItem | undefined =>
     data?.items.find((i) => i.equipmentId === equipmentId);
 
@@ -127,6 +177,16 @@ export default function InventoryCheckPage() {
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-5">
       <BarcodeScanner open={scannerOpen} onClose={() => setScannerOpen(false)} onScan={handleScan} />
+
+      {/* Hidden file input for photo capture — mobile-first */}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handlePhotoFileSelected}
+        data-testid="input-photo-capture"
+      />
 
       {/* Header */}
       <div className="flex items-start gap-3">
@@ -348,7 +408,7 @@ export default function InventoryCheckPage() {
 
                     {/* Notes */}
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1.5">Notes</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-1.5">Notes <span className="font-normal text-muted-foreground/60">(optional)</span></p>
                       {readOnly ? (
                         <p className="text-sm text-muted-foreground">{item?.notes || "—"}</p>
                       ) : (
@@ -356,6 +416,49 @@ export default function InventoryCheckPage() {
                           initialValue={item?.notes || ""}
                           onSave={(notes) => updateItemMutation.mutate({ equipmentId: eq.id, patch: { notes } })}
                         />
+                      )}
+                    </div>
+
+                    {/* Photos — optional */}
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1.5">Photos <span className="font-normal text-muted-foreground/60">(optional)</span></p>
+                      {/* Thumbnail grid */}
+                      {(item?.photos ?? []).length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {(item?.photos ?? []).map((photoUrl) => (
+                            <div key={photoUrl} className="relative group w-20 h-20 rounded-md overflow-hidden border border-border">
+                              <img
+                                src={photoUrl}
+                                alt="Check photo"
+                                className="w-full h-full object-cover"
+                              />
+                              {!readOnly && (
+                                <button
+                                  onClick={() => removePhoto(eq.id, photoUrl)}
+                                  className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  data-testid={`button-remove-photo-${eq.id}`}
+                                >
+                                  <X className="h-3 w-3 text-white" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {!readOnly && (
+                        <button
+                          onClick={() => triggerPhotoUpload(eq.id)}
+                          disabled={uploadingPhotoFor === eq.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                          data-testid={`button-add-photo-${eq.id}`}
+                        >
+                          {uploadingPhotoFor === eq.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Camera className="h-3.5 w-3.5" />
+                          )}
+                          {uploadingPhotoFor === eq.id ? "Uploading…" : "Add Photo"}
+                        </button>
                       )}
                     </div>
                   </div>

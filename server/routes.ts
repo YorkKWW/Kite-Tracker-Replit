@@ -1386,6 +1386,19 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.get("/api/inventory-checks/:id/items/:equipmentId/photos/upload-url", requireAuth, async (req, res) => {
+    const checkId = parseInt(req.params.id);
+    const check = await storage.getInventoryCheck(checkId);
+    if (!check) return res.status(404).json({ message: "Not found" });
+    try {
+      const uploadURL = await objectStorage.getObjectEntityUploadURL();
+      const objectPath = objectStorage.normalizeObjectEntityPath(uploadURL);
+      res.json({ uploadURL, objectPath });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to get upload URL: " + err.message });
+    }
+  });
+
   app.patch("/api/inventory-checks/:id/items/:equipmentId", requireAuth, async (req, res) => {
     const user = req.user as any;
     const checkId = parseInt(req.params.id);

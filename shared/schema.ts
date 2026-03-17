@@ -190,6 +190,7 @@ export const inventoryCheckItems = pgTable("inventory_check_items", {
   needsRepair: integer("needs_repair").notNull().default(0),
   missing: integer("missing").notNull().default(0),
   notes: text("notes"),
+  photos: text("photos").array(),
   checkedAt: timestamp("checked_at"),
   checkedBy: integer("checked_by").references(() => users.id),
 });
