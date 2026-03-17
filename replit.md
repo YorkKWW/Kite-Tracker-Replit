@@ -15,7 +15,7 @@ Full-stack web application for managing kitesurf school equipment across multipl
 - **Super Admin** (`admin` + `isSuperAdmin=true`): Everything an Admin can do, plus: user CRUD, station deletion, equipment deletion, invoice deletion
 - **Admin** (`admin`): Full access to features (equipment, imports, transfers, sales, price lists, activity log, stations), but cannot manage users or delete equipment/invoices/stations
 - **Hamburg Manager** (`manager`): Equipment CRUD, transfers, invoice imports — no user management, no financial data, no activity log
-- **Station Lead** (`station_lead`): Own station only, no purchase prices, no transfers/equipment creation, sees station activity
+- **Center Manager** (`center_manager`): Own station only, no purchase prices, no transfers/equipment creation, sees station activity
 
 ### Super-Admin-only actions (requireSuperAdmin middleware)
 - POST/PATCH/DELETE `/api/users` — user CRUD
@@ -103,7 +103,7 @@ stations, users, equipment, condition_ratings, repairs, transfers, photos, activ
 
 ## School Module
 - **School Setup** (`/school-admin`): Admin-only config accessible via Settings page (name, currency, products/catalog)
-- **School View** (`/school-view`): Unified page with two tabs, accessible to admin/manager/station_lead
+- **School View** (`/school-view`): Unified page with two tabs, accessible to admin/manager/center_manager
   - Nav: Single "School" item (TreePalm icon); visible when user's station has active school_config or user is admin
   - Admin: school selector dropdown when multiple schools exist
   - Tab "Rentals & Courses": Read-only product list; admin sees "Edit in Settings" link

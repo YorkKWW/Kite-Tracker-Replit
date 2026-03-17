@@ -159,7 +159,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Role</p>
-              <p className="font-medium capitalize">{isSuperAdmin ? "Super Admin" : user?.role === "admin" ? "Admin" : user?.role === "manager" ? "Hamburg Manager" : "Station Lead"}</p>
+              <p className="font-medium capitalize">{isSuperAdmin ? "Super Admin" : user?.role === "admin" ? "Admin" : user?.role === "manager" ? "Hamburg Manager" : "Center Manager"}</p>
             </div>
           </div>
         </CardContent>

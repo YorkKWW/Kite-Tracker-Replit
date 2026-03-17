@@ -158,6 +158,16 @@ app.use((req, res, next) => {
       UPDATE users SET is_super_admin = true, role = 'admin' WHERE email = 'york@kiteworldwide.com' AND is_super_admin = false
     `);
 
+    // Rename station_lead → center_manager in user_role enum
+    const hasOldRole = await dbInstance.execute(sql`
+      SELECT 1 FROM pg_enum WHERE enumlabel = 'station_lead'
+        AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'user_role')
+    `);
+    if (hasOldRole.rowCount && hasOldRole.rowCount > 0) {
+      await dbInstance.execute(sql`ALTER TYPE user_role RENAME VALUE 'station_lead' TO 'center_manager'`);
+      console.log('Renamed user_role enum: station_lead → center_manager');
+    }
+
     await dbInstance.execute(sql`
       CREATE TABLE IF NOT EXISTS feedback_comments (
         id SERIAL PRIMARY KEY,
