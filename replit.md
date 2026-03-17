@@ -98,8 +98,23 @@ Bell icon in header with unread badge count. Notifications created automatically
 - **DB Table**: `notifications` (id, userId, type, title, message, link, read, createdAt)
 - **Routes**: `GET /api/notifications`, `GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read`, `POST /api/notifications/mark-all-read`
 
+## Quick Inventory (Center Manager)
+Mobile-first page for station staff to perform two independent inventory tasks:
+- **Equipment Scan**: Reuses existing inventory_checks/inventory_check_items system (barcode scanner, serial-number based)
+- **Accessory Count**: New count-based workflow for accessories (harnesses, wetsuits, helmets, etc.)
+  - Loads station's accessory_inventory as target quantities
+  - Per-row +/- buttons and number input for actual counts
+  - Green/red visual feedback for match/difference
+  - Notes field auto-shows on differences
+  - Saves to `accessory_checks` + `accessory_check_items` (historical, never overwritten)
+- **History**: Last 5 completed equipment checks and accessory counts
+- **Simulation mode**: Admin users simulating station_lead can pick a station
+- **DB Tables**: `accessory_checks` (session header), `accessory_check_items` (per-category counts)
+- **Routes**: `GET /api/stations/:id/quick-inventory`, `GET/POST /api/stations/:id/accessory-checks`, `GET /api/accessory-checks/:id/items`
+- **Nav**: Visible for station_lead role; first item in mobile bottom tabs
+
 ## Database Tables
-stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices, feedback, feedback_comments, notifications, accessory_categories, accessory_inventory, accessory_transfers
+stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices, feedback, feedback_comments, notifications, accessory_categories, accessory_inventory, accessory_transfers, accessory_checks, accessory_check_items
 
 ## Equipment Types
 kite, board, foil, wing, bar_lines

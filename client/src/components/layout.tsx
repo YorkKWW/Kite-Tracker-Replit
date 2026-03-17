@@ -124,19 +124,20 @@ export default function Layout({ children }: LayoutProps) {
           { href: "/invoice-import", label: "Import Invoice", icon: FileUp },
         ]
       : []),
-    ...(isStationLead ? [{ href: "/customers", label: "Customers", icon: Users }] : []),
+    ...(isStationLead ? [
+      { href: "/quick-inventory", label: "Quick Inventory", icon: ClipboardCheck },
+      { href: "/customers", label: "Customers", icon: Users },
+    ] : []),
     ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   const stationLeadBottomTabs = [
+    { href: "/quick-inventory", label: "Inventory", icon: ClipboardCheck },
     { href: "/equipment", label: "Equipment", icon: Package },
     { href: "/accessories", label: "Accessories", icon: ShirtIcon },
     { href: "/incidents", label: "Incidents", icon: AlertTriangle },
     { href: "/repairs", label: "Repairs", icon: Wrench },
-    ...(user?.assignedStationId
-      ? [{ href: `/stations/${user.assignedStationId}`, label: "Inventory", icon: ClipboardCheck }]
-      : []),
   ];
 
   const defaultBottomTabs = [

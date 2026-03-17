@@ -545,6 +545,36 @@ export type AccessoryLossReport = typeof accessoryLossReports.$inferSelect;
 
 export const ACCESSORY_SIZES = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 
+// ─── Accessory Checks (Quick Inventory) ──────────────────────────────────────
+
+export const accessoryChecks = pgTable("accessory_checks", {
+  id: serial("id").primaryKey(),
+  stationId: integer("station_id").notNull().references(() => stations.id),
+  checkedBy: integer("checked_by").notNull().references(() => users.id),
+  checkedAt: timestamp("checked_at").defaultNow(),
+  totalCategories: integer("total_categories").notNull().default(0),
+  totalDifferences: integer("total_differences").notNull().default(0),
+});
+
+export const accessoryCheckItems = pgTable("accessory_check_items", {
+  id: serial("id").primaryKey(),
+  checkId: integer("check_id").notNull().references(() => accessoryChecks.id),
+  categoryId: integer("category_id").notNull().references(() => accessoryCategories.id),
+  size: text("size"),
+  targetQuantity: integer("target_quantity").notNull().default(0),
+  actualQuantity: integer("actual_quantity").notNull().default(0),
+  notes: text("notes"),
+});
+
+export const insertAccessoryCheckSchema = createInsertSchema(accessoryChecks).omit({ id: true, checkedAt: true });
+export const insertAccessoryCheckItemSchema = createInsertSchema(accessoryCheckItems).omit({ id: true });
+
+export type InsertAccessoryCheck = z.infer<typeof insertAccessoryCheckSchema>;
+export type AccessoryCheck = typeof accessoryChecks.$inferSelect;
+
+export type InsertAccessoryCheckItem = z.infer<typeof insertAccessoryCheckItemSchema>;
+export type AccessoryCheckItem = typeof accessoryCheckItems.$inferSelect;
+
 // ─── School Module ────────────────────────────────────────────────────────────
 
 export const schoolProductCategoryEnum = pgEnum("school_product_category", [

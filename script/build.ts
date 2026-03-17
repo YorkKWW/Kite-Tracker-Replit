@@ -87,6 +87,28 @@ async function preMigrate() {
       END $$
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS accessory_checks (
+        id SERIAL PRIMARY KEY,
+        station_id INTEGER NOT NULL REFERENCES stations(id),
+        checked_by INTEGER NOT NULL REFERENCES users(id),
+        checked_at TIMESTAMP DEFAULT NOW(),
+        total_categories INTEGER NOT NULL DEFAULT 0,
+        total_differences INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS accessory_check_items (
+        id SERIAL PRIMARY KEY,
+        check_id INTEGER NOT NULL REFERENCES accessory_checks(id),
+        category_id INTEGER NOT NULL REFERENCES accessory_categories(id),
+        size TEXT,
+        target_quantity INTEGER NOT NULL DEFAULT 0,
+        actual_quantity INTEGER NOT NULL DEFAULT 0,
+        notes TEXT
+      )
+    `);
+
     // Rename constraints from _key to _unique (Drizzle expects _unique)
     const renames = [
       { table: "suppliers", from: "suppliers_name_key", to: "suppliers_name_unique" },

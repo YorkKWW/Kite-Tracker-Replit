@@ -63,6 +63,9 @@ import {
   type AccessoryInventory, type InsertAccessoryInventory,
   type AccessoryTransfer, type InsertAccessoryTransfer,
   type AccessoryLossReport, type InsertAccessoryLossReport,
+  accessoryChecks, accessoryCheckItems,
+  type AccessoryCheck, type InsertAccessoryCheck,
+  type AccessoryCheckItem, type InsertAccessoryCheckItem,
   type SchoolConfig, type InsertSchoolConfig,
   type SchoolProduct, type InsertSchoolProduct,
   type SchoolCustomer, type InsertSchoolCustomer,
@@ -207,6 +210,12 @@ export interface IStorage {
   getAccessoryLossReports(status?: string): Promise<any[]>;
   createAccessoryLossReport(report: InsertAccessoryLossReport): Promise<AccessoryLossReport>;
   resolveAccessoryLossReport(id: number, resolvedBy: number, adminNote: string | null, approved: boolean): Promise<AccessoryLossReport>;
+
+  createAccessoryCheck(check: InsertAccessoryCheck): Promise<AccessoryCheck>;
+  getAccessoryCheckById(id: number): Promise<AccessoryCheck | undefined>;
+  getAccessoryChecks(stationId: number, limit?: number): Promise<(AccessoryCheck & { checkedByName: string })[]>;
+  createAccessoryCheckItems(items: InsertAccessoryCheckItem[]): Promise<AccessoryCheckItem[]>;
+  getAccessoryCheckItems(checkId: number): Promise<(AccessoryCheckItem & { categoryName: string })[]>;
 
   // School module
   getAllSchoolConfigs(): Promise<(SchoolConfig & { stationName: string })[]>;
@@ -1470,6 +1479,57 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSchoolCustomer(id: number): Promise<void> {
     await db.delete(schoolCustomers).where(eq(schoolCustomers.id, id));
+  }
+
+  async createAccessoryCheck(check: InsertAccessoryCheck): Promise<AccessoryCheck> {
+    const [created] = await db.insert(accessoryChecks).values(check).returning();
+    return created;
+  }
+
+  async getAccessoryCheckById(id: number): Promise<AccessoryCheck | undefined> {
+    const [row] = await db.select().from(accessoryChecks).where(eq(accessoryChecks.id, id));
+    return row;
+  }
+
+  async getAccessoryChecks(stationId: number, limit = 10): Promise<(AccessoryCheck & { checkedByName: string })[]> {
+    const rows = await db
+      .select({
+        id: accessoryChecks.id,
+        stationId: accessoryChecks.stationId,
+        checkedBy: accessoryChecks.checkedBy,
+        checkedAt: accessoryChecks.checkedAt,
+        totalCategories: accessoryChecks.totalCategories,
+        totalDifferences: accessoryChecks.totalDifferences,
+        checkedByName: sql<string>`COALESCE(${users.name}, 'Unknown')`,
+      })
+      .from(accessoryChecks)
+      .leftJoin(users, eq(accessoryChecks.checkedBy, users.id))
+      .where(eq(accessoryChecks.stationId, stationId))
+      .orderBy(desc(accessoryChecks.checkedAt))
+      .limit(limit);
+    return rows;
+  }
+
+  async createAccessoryCheckItems(items: InsertAccessoryCheckItem[]): Promise<AccessoryCheckItem[]> {
+    if (items.length === 0) return [];
+    return db.insert(accessoryCheckItems).values(items).returning();
+  }
+
+  async getAccessoryCheckItems(checkId: number): Promise<(AccessoryCheckItem & { categoryName: string })[]> {
+    return db
+      .select({
+        id: accessoryCheckItems.id,
+        checkId: accessoryCheckItems.checkId,
+        categoryId: accessoryCheckItems.categoryId,
+        size: accessoryCheckItems.size,
+        targetQuantity: accessoryCheckItems.targetQuantity,
+        actualQuantity: accessoryCheckItems.actualQuantity,
+        notes: accessoryCheckItems.notes,
+        categoryName: accessoryCategories.name,
+      })
+      .from(accessoryCheckItems)
+      .innerJoin(accessoryCategories, eq(accessoryCheckItems.categoryId, accessoryCategories.id))
+      .where(eq(accessoryCheckItems.checkId, checkId));
   }
 }
 

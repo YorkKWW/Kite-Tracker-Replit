@@ -390,6 +390,28 @@ app.use((req, res, next) => {
         admin_note TEXT
       )
     `);
+    await dbInstance.execute(sql`
+      CREATE TABLE IF NOT EXISTS accessory_checks (
+        id SERIAL PRIMARY KEY,
+        station_id INTEGER NOT NULL REFERENCES stations(id),
+        checked_by INTEGER NOT NULL REFERENCES users(id),
+        checked_at TIMESTAMP DEFAULT NOW(),
+        total_categories INTEGER NOT NULL DEFAULT 0,
+        total_differences INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+    await dbInstance.execute(sql`
+      CREATE TABLE IF NOT EXISTS accessory_check_items (
+        id SERIAL PRIMARY KEY,
+        check_id INTEGER NOT NULL REFERENCES accessory_checks(id),
+        category_id INTEGER NOT NULL REFERENCES accessory_categories(id),
+        size TEXT,
+        target_quantity INTEGER NOT NULL DEFAULT 0,
+        actual_quantity INTEGER NOT NULL DEFAULT 0,
+        notes TEXT
+      )
+    `);
+
     // Rename constraints to match Drizzle-expected naming (idempotent)
     const constraintRenames = [
       { table: "suppliers", from: "suppliers_name_key", to: "suppliers_name_unique" },

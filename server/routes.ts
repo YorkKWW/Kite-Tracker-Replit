@@ -3496,5 +3496,116 @@ export async function registerRoutes(
     });
   });
 
+  // ─── Quick Inventory — Accessory Checks ─────────────────────────────────────
+
+  app.get("/api/stations/:id/accessory-checks", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const stationId = parseInt(req.params.id);
+    if (user.role === "station_lead" && user.assignedStationId !== stationId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
+    const checks = await storage.getAccessoryChecks(stationId, limit);
+    res.json(checks);
+  });
+
+  app.get("/api/accessory-checks/:id/items", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const checkId = parseInt(req.params.id);
+    if (isNaN(checkId)) return res.status(400).json({ message: "Invalid check ID" });
+    const check = await storage.getAccessoryCheckById(checkId);
+    if (!check) return res.status(404).json({ message: "Not found" });
+    if (user.role === "station_lead" && user.assignedStationId !== check.stationId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const items = await storage.getAccessoryCheckItems(checkId);
+    res.json(items);
+  });
+
+  app.post("/api/stations/:id/accessory-checks", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const stationId = parseInt(req.params.id);
+    if (isNaN(stationId)) return res.status(400).json({ message: "Invalid station ID" });
+    if (user.role === "station_lead" && user.assignedStationId !== stationId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const { items } = req.body as { items: { categoryId: number; size: string | null; targetQuantity: number; actualQuantity: number; notes?: string }[] };
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "Non-empty items array required" });
+    }
+    for (const item of items) {
+      if (typeof item.categoryId !== "number" || typeof item.actualQuantity !== "number" || typeof item.targetQuantity !== "number") {
+        return res.status(400).json({ message: "Each item needs categoryId, actualQuantity, targetQuantity as numbers" });
+      }
+      if (item.actualQuantity < 0 || item.targetQuantity < 0) {
+        return res.status(400).json({ message: "Quantities must be non-negative" });
+      }
+    }
+    const totalDifferences = items.filter(i => i.actualQuantity !== i.targetQuantity).length;
+    const check = await storage.createAccessoryCheck({
+      stationId,
+      checkedBy: user.id,
+      totalCategories: items.length,
+      totalDifferences,
+    });
+    const checkItems = await storage.createAccessoryCheckItems(
+      items.map(i => ({
+        checkId: check.id,
+        categoryId: i.categoryId,
+        size: i.size,
+        targetQuantity: i.targetQuantity,
+        actualQuantity: i.actualQuantity,
+        notes: i.notes || null,
+      }))
+    );
+    const stationsList = await storage.getAllStations();
+    const stationName = stationsList.find(s => s.id === stationId)?.name || `Station #${stationId}`;
+    await storage.createActivityLog({
+      userId: user.id,
+      action: "accessory_check_completed",
+      details: `Accessory count at ${stationName}: ${items.length} items checked, ${totalDifferences} differences`,
+    });
+    res.json({ check, items: checkItems });
+  });
+
+  app.get("/api/stations/:id/quick-inventory", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const stationId = parseInt(req.params.id);
+    if (isNaN(stationId)) return res.status(400).json({ message: "Invalid station ID" });
+    if (user.role === "station_lead" && user.assignedStationId !== stationId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const [equipChecks, accChecks, inventory, categories, allStations] = await Promise.all([
+      storage.getInventoryChecks(stationId),
+      storage.getAccessoryChecks(stationId, 5),
+      storage.getAccessoryInventory(stationId),
+      storage.getAllAccessoryCategories(),
+      storage.getAllStations(),
+    ]);
+    const station = allStations.find(s => s.id === stationId);
+    const openEquipCheck = equipChecks.find(c => c.status === "in_progress");
+    const recentEquipChecks = equipChecks.filter(c => c.status === "completed").slice(0, 5);
+    const allUsers = await Promise.all(
+      [...new Set([...recentEquipChecks.map(c => c.startedBy)])].map(id => storage.getUser(id))
+    );
+    const userMap = new Map(allUsers.filter(Boolean).map(u => [u!.id, u!.name]));
+    const enrichedEquipChecks = recentEquipChecks.map(c => ({
+      ...c,
+      startedByName: userMap.get(c.startedBy) || "Unknown",
+    }));
+    let openCheckItems: any[] = [];
+    if (openEquipCheck) {
+      openCheckItems = await storage.getInventoryCheckItems(openEquipCheck.id);
+    }
+    res.json({
+      stationName: station?.name || `Station #${stationId}`,
+      openEquipCheck: openEquipCheck ? { ...openEquipCheck, checkedCount: openCheckItems.filter(i => i.checked).length } : null,
+      recentEquipChecks: enrichedEquipChecks,
+      recentAccChecks: accChecks,
+      accessoryInventory: inventory,
+      accessoryCategories: categories,
+    });
+  });
+
   return httpServer;
 }

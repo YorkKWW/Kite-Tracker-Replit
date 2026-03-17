@@ -27,6 +27,7 @@ import SettingsPage from "@/pages/settings";
 import FeedbackAdminPage from "@/pages/feedback-admin";
 import SchoolAdminPage from "@/pages/school-admin";
 import SchoolCustomersPage from "@/pages/school-customers";
+import QuickInventoryPage from "@/pages/quick-inventory";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
@@ -57,6 +58,7 @@ function AuthenticatedRouter() {
         {isAdmin && <Route path="/stations" component={StationsPage} />}
         <Route path="/stations/:id" component={StationDetailPage} />
         <Route path="/inventory-check/:id" component={InventoryCheckPage} />
+        <Route path="/quick-inventory" component={QuickInventoryPage} />
         {isAdmin && <Route path="/users" component={UsersPage} />}
         <Route path="/feedback" component={FeedbackAdminPage} />
         <Route path="/activity" component={ActivityPage} />

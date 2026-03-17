@@ -1,0 +1,72 @@
+Add a "Quick Inventory" feature to the Center Manager view. This is a high-priority, frequently used function for station staff.
+
+---
+
+NAVIGATION
+
+Add "Quick Inventory" as a prominent nav item in the Center Manager navigation (visible only for users with role "station_lead" and when the View Mode simulator is set to "Center Manager" / "Station Lead"). Use a fitting icon (e.g. clipboard or barcode). Route: /quick-inventory.
+
+---
+
+PAGE LAYOUT (mobile-first)
+
+The page has two independent sections that can be completed separately:
+
+1. Equipment Scan (uses existing inventory_checks / inventory_check_items logic)
+2. Accessory Count (new, see below)
+
+At the top of the page, show the current station name and today's date.
+
+---
+
+SECTION 1 — EQUIPMENT SCAN
+
+Reuse the existing inventory check system (inventory_checks, inventory_check_items, existing API routes).
+
+- If no open inventory_check exists for this station: show a prominent "Start Equipment Scan" button
+- If an open check exists (status = "in_progress"): show a "Resume Equipment Scan" button with a progress indicator (e.g. "12/34 scanned")
+- Tapping either button opens the scan flow (existing inventory-check page or a new mobile-optimized version — your call on the best approach)
+- The scan flow should be mobile-optimized: large scanner at the top, live list below showing scanned vs. remaining items
+- Completing the check works as before (PATCH /api/inventory-checks/:id/complete)
+
+---
+
+SECTION 2 — ACCESSORY COUNT
+
+This is a new workflow for counting accessories (harnesses, wetsuits, helmets, etc.) that have no serial numbers and live in the accessory_inventory table (category_id, station_id, size, quantity).
+
+UI:
+- Load all accessory categories for this station from accessory_inventory, grouped by category
+- Categories with has_sizes = true: show one row per size (e.g. Trapez S, Trapez M, Trapez L)
+- Categories with has_sizes = false: show one row for the category
+- Each row shows: item name/size, target quantity (from accessory_inventory.quantity = the "should" value), and a number input for the actual counted quantity
+- Visual feedback per row: green if actual = target, red if there is a difference, grey if not yet filled in
+- A summary at the bottom: "X/Y categories checked", and a "Save Accessory Count" button
+
+Persistence:
+- Create a new table inventory_check_accessories to store the results permanently
+- Fields should include: station_id, checked_by, checked_at, and per-item: category_id, size (nullable), target_quantity, actual_quantity, notes (optional)
+- This data must be historically retrievable (not overwritten on next count)
+
+The accessory count is saved independently from the equipment scan — separate "Save" button, no dependency on an open equipment check.
+
+---
+
+HISTORY
+
+On the Quick Inventory page, below the two action sections, show a compact history list:
+- Last 5 completed equipment checks for this station (date, who, how many items)
+- Last 5 accessory counts for this station (date, who, summary of differences if any)
+
+---
+
+PERMISSIONS
+
+- Center Manager (station_lead) can start, fill in, and complete both sections
+- Admin can view the history (via the existing station detail or a future admin view — no need to build this now)
+
+---
+
+Only add new features. Do not change existing pages or functionality.
+
+If anything is unclear or you have suggestions for a better approach, ask me before building.
