@@ -8,12 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ScanLine, ClipboardCheck, ChevronDown, ChevronUp, History, AlertTriangle, CheckCircle2, Minus, Plus } from "lucide-react";
-import type { AccessoryCategory, AccessoryInventory, InventoryCheck } from "@shared/schema";
+import { Progress } from "@/components/ui/progress";
+import {
+  Loader2, ScanLine, ClipboardCheck, ChevronDown, ChevronUp,
+  History, AlertTriangle, CheckCircle2, Minus, Plus, Circle, Package,
+} from "lucide-react";
+import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
+import type { AccessoryCategory, AccessoryInventory, InventoryCheck, InventoryCheckItem, Equipment } from "@shared/schema";
 
 interface QuickInventoryData {
   stationName: string;
   openEquipCheck: (InventoryCheck & { checkedCount: number }) | null;
+  openCheckItems: InventoryCheckItem[];
+  openCheckEquipment: Equipment[];
   recentEquipChecks: (InventoryCheck & { startedByName: string })[];
   recentAccChecks: { id: number; stationId: number; checkedBy: number; checkedAt: string; totalCategories: number; totalDifferences: number; checkedByName: string }[];
   accessoryInventory: AccessoryInventory[];
@@ -35,6 +42,7 @@ export default function QuickInventoryPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [showHistory, setShowHistory] = useState(false);
+  const [showEquipList, setShowEquipList] = useState(false);
   const [countRows, setCountRows] = useState<CountRow[] | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -67,7 +75,6 @@ export default function QuickInventoryPage() {
   const initCountRows = () => {
     if (!data) return;
     const rows: CountRow[] = [];
-    const catMap = new Map(data.accessoryCategories.map(c => [c.id, c]));
     for (const cat of data.accessoryCategories.sort((a, b) => a.sortOrder - b.sortOrder)) {
       const catInventory = data.accessoryInventory.filter(i => i.categoryId === cat.id);
       if (catInventory.length === 0) continue;
@@ -156,6 +163,7 @@ export default function QuickInventoryPage() {
   const filledCount = countRows?.filter(r => r.actualQuantity !== null).length ?? 0;
   const totalCount = countRows?.length ?? 0;
   const diffCount = countRows?.filter(r => r.actualQuantity !== null && r.actualQuantity !== r.targetQuantity).length ?? 0;
+  const accProgress = totalCount > 0 ? Math.round((filledCount / totalCount) * 100) : 0;
 
   if (!stationId) {
     return (
@@ -180,6 +188,25 @@ export default function QuickInventoryPage() {
 
   if (!data) return null;
 
+  const equipCheckedCount = data.openEquipCheck?.checkedCount ?? 0;
+  const equipTotalItems = data.openEquipCheck?.totalItems ?? 0;
+  const equipProgress = equipTotalItems > 0 ? Math.round((equipCheckedCount / equipTotalItems) * 100) : 0;
+
+  const openCheckItems = data.openCheckItems ?? [];
+  const openCheckEquipment = data.openCheckEquipment ?? [];
+
+  const getCheckItem = (equipmentId: number): InventoryCheckItem | undefined =>
+    openCheckItems.find(i => i.equipmentId === equipmentId);
+
+  const checkedEquipIds = new Set(openCheckItems.filter(i => i.checked).map(i => i.equipmentId));
+
+  const sortedEquipment = [...openCheckEquipment].sort((a, b) => {
+    const aChecked = checkedEquipIds.has(a.id) ? 1 : 0;
+    const bChecked = checkedEquipIds.has(b.id) ? 1 : 0;
+    if (aChecked !== bChecked) return aChecked - bChecked;
+    return (a.brand + a.model).localeCompare(b.brand + b.model);
+  });
+
   return (
     <div className="max-w-lg mx-auto p-4 space-y-6 pb-28">
       <div>
@@ -200,18 +227,74 @@ export default function QuickInventoryPage() {
         <CardContent>
           {data.openEquipCheck ? (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Check in progress</span>
-                <Badge variant="outline" data-testid="badge-equip-progress">
-                  {data.openEquipCheck.checkedCount}/{data.openEquipCheck.totalItems} scanned
-                </Badge>
-              </div>
-              <div className="w-full bg-secondary rounded-full h-2">
-                <div
-                  className="bg-primary rounded-full h-2 transition-all"
-                  style={{ width: `${data.openEquipCheck.totalItems > 0 ? (data.openEquipCheck.checkedCount / data.openEquipCheck.totalItems) * 100 : 0}%` }}
-                />
-              </div>
+              <button
+                className="w-full text-left"
+                onClick={() => setShowEquipList(!showEquipList)}
+                data-testid="button-toggle-equip-list"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Check in progress</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" data-testid="badge-equip-progress">
+                      {equipCheckedCount}/{equipTotalItems} scanned
+                    </Badge>
+                    {showEquipList ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                </div>
+                <div className="w-full bg-secondary rounded-full h-2 mt-2">
+                  <div
+                    className="bg-primary rounded-full h-2 transition-all"
+                    style={{ width: `${equipProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 text-center">{equipProgress}%</p>
+              </button>
+
+              {showEquipList && (
+                <div className="space-y-1.5 mt-2 max-h-[50vh] overflow-y-auto" data-testid="list-equip-scan">
+                  {sortedEquipment.map(eq => {
+                    const isChecked = checkedEquipIds.has(eq.id);
+                    const item = getCheckItem(eq.id);
+                    const isMissing = !!(item?.missing);
+                    return (
+                      <div
+                        key={eq.id}
+                        className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 transition-colors ${
+                          isMissing
+                            ? "border-red-400 bg-red-50 dark:border-red-800 dark:bg-red-950"
+                            : isChecked
+                              ? "border-green-400 bg-green-50 dark:border-green-800 dark:bg-green-950"
+                              : "border-border bg-muted/30"
+                        }`}
+                        data-testid={`row-equip-scan-${eq.id}`}
+                      >
+                        {isChecked ? (
+                          <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                        ) : (
+                          <Circle className="h-5 w-5 text-muted-foreground/40 shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {eq.brand} {eq.model}
+                          </p>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span>{EQUIPMENT_TYPE_LABELS[eq.type] || eq.type}</span>
+                            <span>·</span>
+                            <span className="font-mono truncate">{eq.serialNumber}</span>
+                          </div>
+                        </div>
+                        {isMissing && (
+                          <Badge variant="destructive" className="text-[10px] shrink-0">Missing</Badge>
+                        )}
+                        {!isChecked && !isMissing && (
+                          <Badge variant="secondary" className="text-[10px] shrink-0 bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300">Open</Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               <Button
                 className="w-full"
                 onClick={() => navigate(`/inventory-check/${data.openEquipCheck!.id}`)}
@@ -266,6 +349,20 @@ export default function QuickInventoryPage() {
                 </p>
               ) : (
                 <>
+                  <div className="space-y-1.5" data-testid="acc-progress-section">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{filledCount}/{totalCount} counted</span>
+                      <span className="text-muted-foreground">{accProgress}%</span>
+                    </div>
+                    <Progress value={accProgress} className="h-2.5" data-testid="progress-acc" />
+                    {diffCount > 0 && (
+                      <p className="text-xs text-red-500 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        {diffCount} difference{diffCount !== 1 ? "s" : ""} found
+                      </p>
+                    )}
+                  </div>
+
                   {data.accessoryCategories
                     .sort((a, b) => a.sortOrder - b.sortOrder)
                     .map(cat => {
@@ -273,11 +370,17 @@ export default function QuickInventoryPage() {
                         .map((r, idx) => ({ ...r, idx }))
                         .filter(r => r.categoryId === cat.id);
                       if (catRows.length === 0) return null;
+                      const catFilled = catRows.filter(r => r.actualQuantity !== null).length;
                       return (
                         <div key={cat.id} className="space-y-2">
-                          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide" data-testid={`text-cat-header-${cat.id}`}>
-                            {cat.name}
-                          </h3>
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide" data-testid={`text-cat-header-${cat.id}`}>
+                              {cat.name}
+                            </h3>
+                            <span className="text-xs text-muted-foreground" data-testid={`text-cat-progress-${cat.id}`}>
+                              {catFilled}/{catRows.length}
+                            </span>
+                          </div>
                           {catRows.map(row => {
                             const filled = row.actualQuantity !== null;
                             const matches = filled && row.actualQuantity === row.targetQuantity;
@@ -364,14 +467,6 @@ export default function QuickInventoryPage() {
                     })}
 
                   <div className="border-t pt-4 space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground" data-testid="text-acc-summary">
-                        {filledCount}/{totalCount} counted
-                        {diffCount > 0 && (
-                          <span className="text-red-500 ml-2">({diffCount} difference{diffCount !== 1 ? "s" : ""})</span>
-                        )}
-                      </span>
-                    </div>
                     <Button
                       className="w-full"
                       onClick={saveAccessoryCount}

@@ -3614,6 +3614,8 @@ export async function registerRoutes(
         totalItems: currentEquipment.length,
         checkedCount: openCheckItems.filter(i => i.checked).length,
       } : null,
+      openCheckItems: openEquipCheck ? openCheckItems : [],
+      openCheckEquipment: openEquipCheck ? currentEquipment : [],
       recentEquipChecks: enrichedEquipChecks,
       recentAccChecks: accChecks,
       accessoryInventory: inventory,
