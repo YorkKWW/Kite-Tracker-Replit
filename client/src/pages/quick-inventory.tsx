@@ -325,9 +325,21 @@ export default function QuickInventoryPage() {
       {/* SECTION 2 — Accessory Count */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <ClipboardCheck className="h-5 w-5" />
-            Accessory Count
+          <CardTitle className="flex items-center justify-between text-lg">
+            <div className="flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5" />
+              Accessory Count
+            </div>
+            {countRows && (
+              <button
+                onClick={() => setCountRows(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors text-sm font-normal flex items-center gap-1"
+                data-testid="button-close-acc-count"
+              >
+                <ChevronUp className="h-4 w-4" />
+                Close
+              </button>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -349,12 +361,12 @@ export default function QuickInventoryPage() {
                 </p>
               ) : (
                 <>
-                  <div className="space-y-1.5" data-testid="acc-progress-section">
+                  <div className="rounded-lg bg-muted/50 border p-3 space-y-2" data-testid="acc-progress-section">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{filledCount}/{totalCount} counted</span>
-                      <span className="text-muted-foreground">{accProgress}%</span>
+                      <span className="font-semibold">{filledCount}/{totalCount} counted</span>
+                      <span className="text-muted-foreground font-medium">{accProgress}%</span>
                     </div>
-                    <Progress value={accProgress} className="h-2.5" data-testid="progress-acc" />
+                    <Progress value={accProgress} className="h-3" data-testid="progress-acc" />
                     {diffCount > 0 && (
                       <p className="text-xs text-red-500 flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" />
