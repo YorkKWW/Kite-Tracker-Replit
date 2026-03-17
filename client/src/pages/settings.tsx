@@ -24,7 +24,7 @@ export default function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const logoRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; duplicates: number; errors: string[]; skippedSerials: string[] } | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [importStationId, setImportStationId] = useState<string>("__unassigned__");
 
@@ -288,11 +288,29 @@ export default function SettingsPage() {
                   <p className="text-sm font-medium">Import Results</p>
                   <div className="flex gap-4 text-sm">
                     <span className="text-green-600 dark:text-green-400">✓ Imported: {importResult.imported}</span>
-                    <span className="text-muted-foreground">Skipped: {importResult.skipped}</span>
+                    {importResult.duplicates > 0 && (
+                      <span className="text-amber-600 dark:text-amber-400">Duplicates: {importResult.duplicates}</span>
+                    )}
+                    {importResult.skipped > importResult.duplicates && (
+                      <span className="text-muted-foreground">Other skipped: {importResult.skipped - (importResult.duplicates || 0)}</span>
+                    )}
                   </div>
-                  {importResult.errors.length > 0 && (
+                  {importResult.duplicates > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      <p>{importResult.duplicates} serial number{importResult.duplicates !== 1 ? "s" : ""} already exist in the system and were skipped.</p>
+                      {importResult.skippedSerials?.length > 0 && (
+                        <details className="mt-1">
+                          <summary className="cursor-pointer text-amber-600 dark:text-amber-400 hover:underline">Show duplicate serials</summary>
+                          <div className="mt-1 max-h-32 overflow-y-auto text-[11px] font-mono space-y-0.5">
+                            {importResult.skippedSerials.map((s, i) => <p key={i}>{s}</p>)}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  )}
+                  {importResult.errors?.length > 0 && (
                     <div className="text-xs text-destructive space-y-1 mt-2 max-h-40 overflow-y-auto">
-                      {importResult.errors.map((err, i) => <p key={i}>{err}</p>)}
+                      {importResult.errors.map((err: string, i: number) => <p key={i}>{err}</p>)}
                     </div>
                   )}
                 </div>

@@ -1481,7 +1481,7 @@ export async function registerRoutes(
         ?? allStationsForImport.find(s => s.name.toLowerCase().includes("warehouse"));
       const fallbackStationId = targetStationId ?? incomingFallback?.id ?? null;
 
-      const results = { imported: 0, skipped: 0, errors: [] as string[] };
+      const results = { imported: 0, skipped: 0, duplicates: 0, errors: [] as string[], skippedSerials: [] as string[] };
 
       for (let i = 1; i < lines.length; i++) {
         // Handle quoted fields that may contain the delimiter
@@ -1501,7 +1501,9 @@ export async function registerRoutes(
 
         const existing = await storage.getEquipmentBySerial(serialNumber.trim());
         if (existing) {
+          results.duplicates++;
           results.skipped++;
+          results.skippedSerials.push(serialNumber.trim());
           continue;
         }
 
@@ -1527,14 +1529,13 @@ export async function registerRoutes(
           if (matched) stationId = matched.id;
         }
 
-        // Condition: CSV typically uses 1–4 (1=best), app stores 1–5 (5=best)
-        // Map: CSV 1→5, 2→4, 3→3, 4→2; if value >4 treat as already app-scale
+        // Condition: CSV values are taken as-is on 1–5 scale (5=best, 1=worst)
         const rawCond = row["condition"] || row["zustand"] || "";
         let conditionRating = 5;
         if (rawCond.trim()) {
           const n = parseInt(rawCond.trim());
           if (!isNaN(n)) {
-            conditionRating = n <= 4 ? 6 - n : Math.min(5, Math.max(1, n));
+            conditionRating = Math.min(5, Math.max(1, n));
           }
         }
 
