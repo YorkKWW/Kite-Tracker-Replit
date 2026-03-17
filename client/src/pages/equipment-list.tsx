@@ -28,7 +28,8 @@ const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
 
 
 export default function EquipmentListPage() {
-  const { isAdmin, isHamburg, isSuperAdmin } = useAuth();
+  const { isAdmin, isHamburg, isSuperAdmin, isSimulating, simStationId, viewMode } = useAuth();
+  const isStationLeadView = (isSimulating && viewMode === "station_lead" && simStationId != null);
   const urlParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const [search, setSearch] = useState(urlParams.get("search") || "");
   const [typeFilter, setTypeFilter] = useState<string>(urlParams.get("type") || "all");
@@ -115,7 +116,12 @@ export default function EquipmentListPage() {
     if (search) params.set("search", search);
     if (typeFilter !== "all") params.set("type", typeFilter);
     if (statusFilter !== "all") params.set("status", statusFilter);
-    if (stationFilter !== "all") params.set("stationId", stationFilter);
+    if (isStationLeadView) {
+      params.set("stationId", String(simStationId));
+      params.set("includeTransfers", "true");
+    } else if (stationFilter !== "all") {
+      params.set("stationId", stationFilter);
+    }
     const q = params.toString();
     return q ? `?${q}` : "";
   };
@@ -281,7 +287,7 @@ export default function EquipmentListPage() {
                 <SelectItem value="in_transfer">In Transfer</SelectItem>
               </SelectContent>
             </Select>
-            {isHamburg && (
+            {isHamburg && !isStationLeadView && (
               <Select value={stationFilter} onValueChange={setStationFilter}>
                 <SelectTrigger data-testid="select-station-filter"><SelectValue placeholder="All Locations" /></SelectTrigger>
                 <SelectContent>
@@ -297,7 +303,17 @@ export default function EquipmentListPage() {
         )}
       </div>
 
-      {!isLoading && incomingStation && incomingCount > 0 && (
+      {isStationLeadView && stationsList && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-sky-50 border-sky-200 text-sky-800 dark:bg-sky-900/10 dark:border-sky-800 dark:text-sky-300 text-sm" data-testid="banner-station-scope">
+          <Package className="h-4 w-4 shrink-0" />
+          <span>
+            Showing fleet for <strong>{stationsList.find(s => s.id === simStationId)?.name ?? `Station ${simStationId}`}</strong>
+            {" "}+ equipment currently in transfer to/from this station
+          </span>
+        </div>
+      )}
+
+      {!isStationLeadView && !isLoading && incomingStation && incomingCount > 0 && (
         <button
           onClick={() => setStationFilter(stationFilter === incomingStation.id.toString() ? "all" : incomingStation.id.toString())}
           className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors w-full sm:w-auto ${stationFilter === incomingStation.id.toString() ? "bg-amber-100 border-amber-400 text-amber-800 dark:bg-amber-900/30 dark:border-amber-600 dark:text-amber-300" : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/10 dark:border-amber-800 dark:text-amber-400"}`}

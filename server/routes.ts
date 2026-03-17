@@ -843,10 +843,14 @@ export async function registerRoutes(
     const filters: any = {};
     if (user.role === "station_lead") {
       filters.stationId = user.assignedStationId;
+      filters.includeTransfersForStation = true;
     } else if (req.query.stationId === "unassigned") {
       filters.unassigned = true;
     } else if (req.query.stationId) {
       filters.stationId = parseInt(req.query.stationId as string);
+      if (req.query.includeTransfers === "true") {
+        filters.includeTransfersForStation = true;
+      }
     }
     if (req.query.type) filters.type = req.query.type;
     if (req.query.status) filters.status = req.query.status;

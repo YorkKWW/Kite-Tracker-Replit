@@ -90,6 +90,8 @@ export interface IStorage {
   getEquipmentByCode(code: string): Promise<Equipment | undefined>;
   getAllEquipment(filters?: {
     stationId?: number;
+    includeTransfersForStation?: boolean;
+    unassigned?: boolean;
     type?: string;
     status?: string;
     conditionRating?: number;
@@ -322,6 +324,7 @@ export class DatabaseStorage implements IStorage {
 
   async getAllEquipment(filters?: {
     stationId?: number;
+    includeTransfersForStation?: boolean;
     unassigned?: boolean;
     type?: string;
     status?: string;
@@ -332,7 +335,29 @@ export class DatabaseStorage implements IStorage {
     if (filters?.unassigned) {
       conditions.push(isNull(equipment.currentStationId));
     } else if (filters?.stationId) {
-      conditions.push(eq(equipment.currentStationId, filters.stationId));
+      if (filters?.includeTransfersForStation) {
+        const sid = filters.stationId;
+        const pendingTransferEqIds = db
+          .select({ equipmentId: transfers.equipmentId })
+          .from(transfers)
+          .where(
+            and(
+              eq(transfers.status, "pending"),
+              or(
+                eq(transfers.fromStationId, sid),
+                eq(transfers.toStationId, sid)
+              )
+            )
+          );
+        conditions.push(
+          or(
+            eq(equipment.currentStationId, sid),
+            inArray(equipment.id, pendingTransferEqIds)
+          )
+        );
+      } else {
+        conditions.push(eq(equipment.currentStationId, filters.stationId));
+      }
     }
     if (filters?.type) {
       conditions.push(eq(equipment.type, filters.type as any));
