@@ -14,7 +14,7 @@ echo "Branch : $BRANCH"
 echo "Commit : $COMMIT"
 echo ""
 
-git -C /home/runner/workspace push "$REPO" "HEAD:main"
+git -C /home/runner/workspace push --force "$REPO" "HEAD:main"
 
 echo ""
 echo "Done — https://github.com/YorkKWW/Kite-Tracker-Replit"
