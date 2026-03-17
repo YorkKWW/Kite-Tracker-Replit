@@ -310,6 +310,49 @@ app.use((req, res, next) => {
       AND NOT EXISTS (SELECT 1 FROM school_products sp WHERE sp.school_config_id = sc.id)
     `);
 
+    // School customers table + enum
+    await dbInstance.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'school_kite_level') THEN
+          CREATE TYPE school_kite_level AS ENUM ('beginner','intermediate','advanced','pro');
+        END IF;
+      END $$
+    `);
+
+    await dbInstance.execute(sql`
+      CREATE TABLE IF NOT EXISTS school_customers (
+        id SERIAL PRIMARY KEY,
+        school_config_id INTEGER NOT NULL REFERENCES school_configs(id),
+        first_name TEXT NOT NULL,
+        last_name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        nationality TEXT NOT NULL,
+        date_of_birth TIMESTAMP NOT NULL,
+        kite_level school_kite_level NOT NULL DEFAULT 'beginner',
+        weight_kg INTEGER,
+        emergency_contact TEXT NOT NULL,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    // Seed Dakhla school customers
+    await dbInstance.execute(sql`
+      INSERT INTO school_customers (school_config_id, first_name, last_name, email, phone, nationality, date_of_birth, kite_level, weight_kg, emergency_contact)
+      SELECT sc.id, c.fn, c.ln, c.em, c.ph, c.nat, c.dob::timestamp, c.lvl::school_kite_level, c.wt, c.ec
+      FROM school_configs sc
+      JOIN stations st ON sc.station_id = st.id
+      CROSS JOIN (VALUES
+        ('Max','Müller','max@example.com','+49 170 1234567','DE','1990-05-15','beginner',82,'Anna Müller +49 170 9876543'),
+        ('Sophie','Laurent','sophie@example.com','+33 6 12345678','FR','1988-03-22','intermediate',62,'Pierre Laurent +33 6 87654321'),
+        ('James','Smith','james@example.com','+44 7700 900123','GB','1995-11-08','advanced',78,'Sarah Smith +44 7700 900456'),
+        ('Ana','García','ana@example.com','+34 612 345 678','ES','1992-07-30','pro',58,'Carlos García +34 612 876 543')
+      ) AS c(fn,ln,em,ph,nat,dob,lvl,wt,ec)
+      WHERE st.name ILIKE '%dakhla%'
+      AND NOT EXISTS (SELECT 1 FROM school_customers cust WHERE cust.school_config_id = sc.id)
+    `);
+
     await dbInstance.execute(sql`
       CREATE TABLE IF NOT EXISTS accessory_loss_reports (
         id SERIAL PRIMARY KEY,

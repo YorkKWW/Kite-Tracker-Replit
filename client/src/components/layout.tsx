@@ -126,7 +126,10 @@ export default function Layout({ children }: LayoutProps) {
         ]
       : []),
     ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
-    ...(isAdmin ? [{ href: "/school-admin", label: "School", icon: GraduationCap }] : []),
+    ...(isAdmin ? [{ href: "/school-admin", label: "School Admin", icon: GraduationCap }] : []),
+    ...(user?.role === "admin" || user?.role === "manager" || user?.role === "station_lead"
+      ? [{ href: "/school-customers", label: "Customers", icon: Users }]
+      : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 

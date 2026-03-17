@@ -99,7 +99,15 @@ Bell icon in header with unread badge count. Notifications created automatically
 - **Routes**: `GET /api/notifications`, `GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read`, `POST /api/notifications/mark-all-read`
 
 ## Database Tables
-stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices, feedback, feedback_comments, notifications, accessory_categories, accessory_inventory, accessory_transfers
+stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices, feedback, feedback_comments, notifications, accessory_categories, accessory_inventory, accessory_transfers, accessory_loss_reports, school_configs, school_products, school_customers
+
+## School Module
+- **School Admin** (`/school-admin`): Admin-only config for kite school per station (name, currency, products/catalog)
+- **School Customers** (`/school-customers`): Walk-in customer management — visible to admin, manager, station_lead
+  - DB: `school_customers` table with kite level enum (beginner/intermediate/advanced/pro), nationality, DOB, weight, emergency contact
+  - API: GET/POST/PATCH/DELETE `/api/school-customers` with server-side authorization (users can only access customers for their station's school config)
+  - Kite Level badges: beginner=blue, intermediate=yellow, advanced=orange, pro=red
+  - Detail view includes "Billing History" placeholder
 
 ## Equipment Types
 kite, board, foil, wing, bar_lines

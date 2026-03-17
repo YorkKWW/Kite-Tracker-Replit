@@ -3322,6 +3322,102 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  // ─── School Customers ────────────────────────────────────────────────────────
+
+  async function getAllowedSchoolConfigIds(user: any): Promise<number[]> {
+    if (user.role === "admin") {
+      const configs = await storage.getAllSchoolConfigs();
+      return configs.map(c => c.id);
+    }
+    if (user.stationId || user.assignedStationId) {
+      const sid = user.stationId || user.assignedStationId;
+      const cfg = await storage.getSchoolConfigByStation(sid);
+      return cfg ? [cfg.id] : [];
+    }
+    return [];
+  }
+
+  app.get("/api/school-customers", requireAuth, async (req, res) => {
+    try {
+      const schoolConfigId = parseInt(req.query.schoolConfigId as string);
+      if (isNaN(schoolConfigId)) return res.status(400).json({ message: "schoolConfigId required" });
+      const allowed = await getAllowedSchoolConfigIds(req.user as any);
+      if (!allowed.includes(schoolConfigId)) return res.status(403).json({ message: "Access denied" });
+      const search = (req.query.search as string) || undefined;
+      const customers = await storage.getSchoolCustomers(schoolConfigId, search);
+      res.json(customers);
+    } catch (e: any) { res.status(500).json({ message: e.message || "Server error" }); }
+  });
+
+  app.get("/api/school-customers/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      const customer = await storage.getSchoolCustomer(id);
+      if (!customer) return res.status(404).json({ message: "Not found" });
+      const allowed = await getAllowedSchoolConfigIds(req.user as any);
+      if (!allowed.includes(customer.schoolConfigId)) return res.status(403).json({ message: "Access denied" });
+      res.json(customer);
+    } catch (e: any) { res.status(500).json({ message: e.message || "Server error" }); }
+  });
+
+  app.post("/api/school-customers", requireAuth, async (req, res) => {
+    try {
+      const schema = z.object({
+        schoolConfigId: z.number().int(),
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        email: z.string().email(),
+        phone: z.string().min(1),
+        nationality: z.string().min(1),
+        dateOfBirth: z.string().refine(v => !isNaN(Date.parse(v)), { message: "Invalid date" }).transform(v => new Date(v)),
+        kiteLevel: z.enum(["beginner", "intermediate", "advanced", "pro"]),
+        weightKg: z.number().int().nullable().optional(),
+        emergencyContact: z.string().min(1),
+        notes: z.string().nullable().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+      const allowed = await getAllowedSchoolConfigIds(req.user as any);
+      if (!allowed.includes(parsed.data.schoolConfigId)) return res.status(403).json({ message: "Access denied" });
+      const customer = await storage.createSchoolCustomer(parsed.data as any);
+      res.status(201).json(customer);
+    } catch (e: any) { res.status(500).json({ message: e.message || "Server error" }); }
+  });
+
+  app.patch("/api/school-customers/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      const schema = z.object({
+        firstName: z.string().min(1).optional(),
+        lastName: z.string().min(1).optional(),
+        email: z.string().email().optional(),
+        phone: z.string().min(1).optional(),
+        nationality: z.string().min(1).optional(),
+        dateOfBirth: z.string().refine(v => !isNaN(Date.parse(v)), { message: "Invalid date" }).transform(v => new Date(v)).optional(),
+        kiteLevel: z.enum(["beginner", "intermediate", "advanced", "pro"]).optional(),
+        weightKg: z.number().int().nullable().optional(),
+        emergencyContact: z.string().min(1).optional(),
+        notes: z.string().nullable().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+      const updated = await storage.updateSchoolCustomer(id, parsed.data as any);
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (e: any) { res.status(500).json({ message: e.message || "Server error" }); }
+  });
+
+  app.delete("/api/school-customers/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+      await storage.deleteSchoolCustomer(id);
+      res.json({ message: "Deleted" });
+    } catch (e: any) { res.status(500).json({ message: e.message || "Server error" }); }
+  });
+
   app.post("/api/admin/fix-equipment-sizes", requireAdmin, async (req, res) => {
     const { db: dbInstance } = await import("./db");
     const { sql } = await import("drizzle-orm");
