@@ -6,3 +6,9 @@ id = "DAipbnpIlr6BbwBduR_Om"
 uri = "file://KiteTracker-export.tar.gz"
 type = "unspecified"
 title = "KiteTracker – Kompletter Code (tar.gz)"
+
+[[outputs]]
+id = "nrp8RMkkZA5ASEctwLnfl"
+uri = "file://docs/inventory-check-system.md"
+type = "text"
+title = "Inventory Check System — Reconnaissance Report"
