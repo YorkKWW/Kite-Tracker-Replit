@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileSpreadsheet, Loader2, Building2, Image, MapPin, Users, FileText, MessageSquarePlus, ChevronRight } from "lucide-react";
+import { Upload, FileSpreadsheet, Loader2, Building2, Image, MapPin, Users, FileText, MessageSquarePlus, ChevronRight, TreePalm } from "lucide-react";
 import type { CompanySettings, Station } from "@shared/schema";
 
 export default function SettingsPage() {
@@ -112,6 +112,7 @@ export default function SettingsPage() {
   const adminLinks = [
     ...(isAdmin ? [{ href: "/stations", label: "Locations", icon: MapPin, description: "Manage stations & locations" }] : []),
     ...(isAdmin ? [{ href: "/users", label: "Users", icon: Users, description: "Manage user accounts & roles" }] : []),
+    ...(isAdmin ? [{ href: "/school-admin", label: "School Setup", icon: TreePalm, description: "Configure schools, manage products & pricing" }] : []),
     { href: "/activity", label: "Activity Log", icon: FileText, description: "View system activity & audit trail" },
     { href: "/feedback", label: "Feedback & Bug Reports", icon: MessageSquarePlus, description: isAdmin ? "Review user feedback" : "View your feedback", badge: isAdmin ? feedbackCountData?.count : undefined },
   ];
