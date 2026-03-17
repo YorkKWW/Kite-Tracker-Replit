@@ -381,6 +381,25 @@ app.use((req, res, next) => {
         admin_note TEXT
       )
     `);
+    // Rename constraints to match Drizzle-expected naming (idempotent)
+    const constraintRenames = [
+      { table: "suppliers", from: "suppliers_name_key", to: "suppliers_name_unique" },
+      { table: "accessory_categories", from: "accessory_categories_name_key", to: "accessory_categories_name_unique" },
+      { table: "school_configs", from: "school_configs_station_id_key", to: "school_configs_station_id_unique" },
+      { table: "sales_invoices", from: "sales_invoices_invoice_number_key", to: "sales_invoices_invoice_number_unique" },
+    ];
+    for (const { table, from, to } of constraintRenames) {
+      await dbInstance.execute(sql.raw(`
+        DO $$ BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.table_constraints
+            WHERE table_name = '${table}' AND constraint_name = '${from}'
+          ) THEN
+            ALTER TABLE ${table} RENAME CONSTRAINT ${from} TO ${to};
+          END IF;
+        END $$
+      `));
+    }
   } catch (e) {
     console.error("Equipment size migration error:", e);
   }
