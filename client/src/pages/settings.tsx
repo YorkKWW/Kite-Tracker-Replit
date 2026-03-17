@@ -7,9 +7,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileSpreadsheet, Loader2, Building2, Image, MapPin, Users, FileText, MessageSquarePlus, ChevronRight } from "lucide-react";
-import type { CompanySettings } from "@shared/schema";
+import type { CompanySettings, Station } from "@shared/schema";
 
 export default function SettingsPage() {
   const { user, isAdmin, isSuperAdmin } = useAuth();
@@ -25,6 +26,12 @@ export default function SettingsPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [importStationId, setImportStationId] = useState<string>("__unassigned__");
+
+  const { data: stations = [] } = useQuery<Station[]>({
+    queryKey: ["/api/stations"],
+    enabled: isAdmin,
+  });
 
   const { data: companyData, isLoading: loadingCompany } = useQuery<CompanySettings>({
     queryKey: ["/api/company-settings"],
@@ -53,6 +60,9 @@ export default function SettingsPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (importStationId !== "__unassigned__") {
+        formData.append("targetStationId", importStationId);
+      }
       const res = await fetch("/api/equipment/import", { method: "POST", body: formData, credentials: "include" });
       if (!res.ok) { const err = await res.json(); throw new Error(err.message); }
       const result = await res.json();
@@ -249,10 +259,24 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Upload a CSV file with columns: serial_number, type, brand, model, year, station_id, condition, notes, purchase_price, current_value
+                Supports semicolon- or comma-separated CSV. Recognised columns: Serial Number, Equipment Type, Brand, Model, Size (m²), Color, Condition, Date of Purchase, Location, Purchase Price, Notes. Existing serials are skipped.
               </p>
+              <div className="space-y-1">
+                <Label className="text-xs">Assign to Station</Label>
+                <Select value={importStationId} onValueChange={setImportStationId}>
+                  <SelectTrigger data-testid="select-import-station">
+                    <SelectValue placeholder="Unassigned (use Location column)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__unassigned__">Unassigned (use Location column)</SelectItem>
+                    {stations.filter(s => !s.isVirtual).map(s => (
+                      <SelectItem key={s.id} value={String(s.id)} data-testid={`option-station-${s.id}`}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div>
-                <Label htmlFor="csv-import" className="flex items-center justify-center gap-2 p-6 border-2 border-dashed rounded-md cursor-pointer text-muted-foreground transition-colors">
+                <Label htmlFor="csv-import" className="flex items-center justify-center gap-2 p-6 border-2 border-dashed rounded-md cursor-pointer text-muted-foreground hover:bg-accent/20 transition-colors">
                   {importing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
                   <span className="text-sm">{importing ? "Importing..." : "Select CSV file"}</span>
                 </Label>
@@ -262,11 +286,11 @@ export default function SettingsPage() {
                 <div className="p-4 rounded-md bg-muted/50 space-y-2">
                   <p className="text-sm font-medium">Import Results</p>
                   <div className="flex gap-4 text-sm">
-                    <span className="text-green-600 dark:text-green-400">Imported: {importResult.imported}</span>
+                    <span className="text-green-600 dark:text-green-400">✓ Imported: {importResult.imported}</span>
                     <span className="text-muted-foreground">Skipped: {importResult.skipped}</span>
                   </div>
                   {importResult.errors.length > 0 && (
-                    <div className="text-xs text-destructive space-y-1 mt-2">
+                    <div className="text-xs text-destructive space-y-1 mt-2 max-h-40 overflow-y-auto">
                       {importResult.errors.map((err, i) => <p key={i}>{err}</p>)}
                     </div>
                   )}

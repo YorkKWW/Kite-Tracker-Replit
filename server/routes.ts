@@ -1426,57 +1426,140 @@ export async function registerRoutes(
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     try {
-      const content = fs.readFileSync(req.file.path, "utf-8");
+      const content = fs.readFileSync(req.file.path, "utf-8").replace(/\r/g, "");
       const lines = content.split("\n").filter((l) => l.trim());
       if (lines.length < 2) return res.status(400).json({ message: "File is empty or has no data rows" });
 
-      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
-      const results = { imported: 0, skipped: 0, errors: [] as string[] };
+      // Auto-detect delimiter: semicolon or comma
+      const delimiter = lines[0].includes(";") ? ";" : ",";
+      const rawHeaders = lines[0].split(delimiter).map((h) => h.trim().replace(/['"]/g, ""));
+
+      // Normalise header → internal key
+      function normaliseHeader(h: string): string {
+        return h.toLowerCase()
+          .replace(/\s+/g, "_")
+          .replace(/[^a-z0-9_]/g, "");
+      }
+      const headers = rawHeaders.map(normaliseHeader);
+
+      // Equipment type mapping (handles plural/German/capitalised values)
+      const TYPE_MAP: Record<string, string> = {
+        kites: "kite", kite: "kite",
+        boards: "board", board: "board",
+        bars: "bar_lines", bar: "bar_lines", bar_lines: "bar_lines",
+        wetsuits: "wetsuit", wetsuit: "wetsuit",
+        wings: "wing", wing: "wing",
+        foilboards: "foilboard", foilboard: "foilboard",
+        foils: "foil", foil: "foil",
+        harnesses: "harness", harness: "harness",
+        helmets: "helmet_safety", helmet: "helmet_safety",
+      };
 
       const allStationsForImport = await storage.getAllStations();
+      // targetStationId can be passed from the frontend to assign a specific station
+      const targetStationId = req.body?.targetStationId ? parseInt(req.body.targetStationId) : null;
       const incomingFallback = allStationsForImport.find(s => s.isVirtual && s.name.includes("Incoming"))
         ?? allStationsForImport.find(s => s.name.toLowerCase().includes("incoming"))
         ?? allStationsForImport.find(s => s.name.toLowerCase().includes("warehouse"));
-      const incomingStationId = incomingFallback?.id ?? null;
+      const fallbackStationId = targetStationId ?? incomingFallback?.id ?? null;
+
+      const results = { imported: 0, skipped: 0, errors: [] as string[] };
 
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(",").map((v) => v.trim().replace(/['"]/g, ""));
+        // Handle quoted fields that may contain the delimiter
+        const values = lines[i].split(delimiter).map((v) => v.trim().replace(/^["']|["']$/g, ""));
         const row: Record<string, string> = {};
-        headers.forEach((h, idx) => {
-          row[h] = values[idx] || "";
-        });
+        headers.forEach((h, idx) => { row[h] = values[idx] || ""; });
 
-        const serialNumber = row["serial_number"] || row["serialnumber"] || row["serial"];
-        if (!serialNumber) {
+        // Serial number — handle multiple possible header names
+        const serialNumber =
+          row["serial_number"] || row["serialnumber"] || row["serial"] ||
+          row["serial_nr"] || row["sn"] || "";
+        if (!serialNumber.trim()) {
           results.errors.push(`Row ${i + 1}: Missing serial number`);
           results.skipped++;
           continue;
         }
 
-        const existing = await storage.getEquipmentBySerial(serialNumber);
+        const existing = await storage.getEquipmentBySerial(serialNumber.trim());
         if (existing) {
           results.skipped++;
           continue;
         }
 
+        // Equipment type — handles "Equipment Type" column and plural/capitalised values
+        const rawType = row["equipment_type"] || row["type"] || row["typ"] || "kite";
+        const resolvedType = (TYPE_MAP[rawType.toLowerCase().trim()] ?? rawType.toLowerCase().trim()) as any;
+
+        // Size — fix European decimal comma → dot
+        const rawSize = (row["size_m"] || row["size"] || row["gre"] || "").replace(",", ".");
+        const sizeVal = rawSize.trim();
+
+        // Model — use model column; optionally append size if not already in model name
+        const baseModel = row["model"] || row["modell"] || "Unknown";
+        const model = baseModel.trim();
+
+        // Station: honour "Location" column if it matches a station name, else fall back
+        const locationCol = row["location"] || row["standort"] || row["station"] || "";
+        let stationId: number | null = fallbackStationId;
+        if (locationCol.trim()) {
+          const matched = allStationsForImport.find(s =>
+            s.name.toLowerCase() === locationCol.trim().toLowerCase()
+          );
+          if (matched) stationId = matched.id;
+        }
+
+        // Condition: CSV typically uses 1–4 (1=best), app stores 1–5 (5=best)
+        // Map: CSV 1→5, 2→4, 3→3, 4→2; if value >4 treat as already app-scale
+        const rawCond = row["condition"] || row["zustand"] || "";
+        let conditionRating = 5;
+        if (rawCond.trim()) {
+          const n = parseInt(rawCond.trim());
+          if (!isNaN(n)) {
+            conditionRating = n <= 4 ? 6 - n : Math.min(5, Math.max(1, n));
+          }
+        }
+
+        // Purchase date
+        const rawDate = row["date_of_purchase"] || row["purchase_date"] || row["date"] || "";
+        let purchaseDate: Date | null = null;
+        if (rawDate.trim()) {
+          const d = new Date(rawDate.trim());
+          if (!isNaN(d.getTime())) purchaseDate = d;
+        }
+
+        // Prices — remove € signs and spaces, fix decimal comma
+        function parsePrice(raw: string): string | null {
+          if (!raw.trim()) return null;
+          const cleaned = raw.replace(/[€$\s]/g, "").replace(",", ".");
+          return isNaN(parseFloat(cleaned)) ? null : cleaned;
+        }
+        const purchasePrice = parsePrice(row["purchase_price_"] || row["purchase_price"] || row["preis"] || "");
+        const currentValue = parsePrice(row["current_value_"] || row["current_value"] || row["aktueller_wert"] || "") ?? purchasePrice;
+
         try {
           await storage.createEquipment({
-            serialNumber,
-            type: (row["type"] || "kite") as any,
-            brand: row["brand"] || "Unknown",
-            model: row["model"] || "Unknown",
-            yearOfPurchase: row["year"] ? parseInt(row["year"]) : null,
-            currentStationId: row["station_id"] ? parseInt(row["station_id"]) : incomingStationId,
+            serialNumber: serialNumber.trim(),
+            sku: row["sku"] || null,
+            type: resolvedType,
+            brand: (row["brand"] || row["marke"] || "Unknown").trim(),
+            model,
+            purchaseDate,
+            yearOfPurchase: purchaseDate ? purchaseDate.getFullYear() : (row["year"] ? parseInt(row["year"]) : null),
+            currentStationId: stationId,
             status: "active",
-            conditionRating: row["condition"] ? parseInt(row["condition"]) : 5,
-            notes: row["notes"] || null,
-            purchasePrice: row["purchase_price"] || null,
-            currentValue: row["current_value"] || row["purchase_price"] || null,
-            typeSpecificFields: {},
+            conditionRating,
+            notes: (row["notes"] || row["bemerkung"] || "").trim() || null,
+            purchasePrice,
+            currentValue,
+            typeSpecificFields: {
+              ...(sizeVal ? { size: sizeVal } : {}),
+              ...(row["color"] || row["farbe"] ? { color: (row["color"] || row["farbe"]).trim() } : {}),
+            },
           });
           results.imported++;
         } catch (err: any) {
-          results.errors.push(`Row ${i + 1}: ${err.message}`);
+          results.errors.push(`Row ${i + 1} (${serialNumber}): ${err.message}`);
           results.skipped++;
         }
       }
