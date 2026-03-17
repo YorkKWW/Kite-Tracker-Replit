@@ -3340,6 +3340,80 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  // ─── School Customers ───────────────────────────────────────────────────────
+
+  app.get("/api/school-customers/:schoolConfigId", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin" && user.role !== "station_lead") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const customers = await storage.getSchoolCustomers(parseInt(req.params.schoolConfigId));
+    res.json(customers);
+  });
+
+  app.get("/api/school-customer/:id", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin" && user.role !== "station_lead") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const customer = await storage.getSchoolCustomer(parseInt(req.params.id));
+    if (!customer) return res.status(404).json({ message: "Not found" });
+    res.json(customer);
+  });
+
+  app.post("/api/school-customers", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin" && user.role !== "station_lead") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    const schema = z.object({
+      schoolConfigId: z.number().int(),
+      firstName: z.string().min(1),
+      lastName: z.string().min(1),
+      email: z.string().email(),
+      phone: z.string().min(1),
+      nationality: z.string().min(1),
+      dateOfBirth: z.string().min(1),
+      kiteLevel: z.enum(["Beginner", "Intermediate", "Advanced", "Pro"]),
+      weightKg: z.number().int().nullable().optional(),
+      emergencyContact: z.string().min(1),
+      arrivalDate: z.string().min(1),
+      departureDate: z.string().min(1),
+      notes: z.string().nullable().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+    const created = await storage.createSchoolCustomer({ ...parsed.data, createdBy: user.id });
+    res.status(201).json(created);
+  });
+
+  app.patch("/api/school-customers/:id", requireAdmin, async (req, res) => {
+    const schema = z.object({
+      firstName: z.string().min(1).optional(),
+      lastName: z.string().min(1).optional(),
+      email: z.string().email().optional(),
+      phone: z.string().min(1).optional(),
+      nationality: z.string().min(1).optional(),
+      dateOfBirth: z.string().min(1).optional(),
+      kiteLevel: z.enum(["Beginner", "Intermediate", "Advanced", "Pro"]).optional(),
+      weightKg: z.number().int().nullable().optional(),
+      emergencyContact: z.string().min(1).optional(),
+      arrivalDate: z.string().min(1).optional(),
+      departureDate: z.string().min(1).optional(),
+      notes: z.string().nullable().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+    const updated = await storage.updateSchoolCustomer(parseInt(req.params.id), parsed.data);
+    if (!updated) return res.status(404).json({ message: "Not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/school-customers/:id", requireAdmin, async (req, res) => {
+    await storage.deleteSchoolCustomer(parseInt(req.params.id));
+    res.json({ success: true });
+  });
+
   app.post("/api/admin/fix-equipment-sizes", requireAdmin, async (req, res) => {
     const { db: dbInstance } = await import("./db");
     const { sql } = await import("drizzle-orm");

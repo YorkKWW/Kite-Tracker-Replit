@@ -572,13 +572,39 @@ export const schoolProducts = pgTable("school_products", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const kiteLevelEnum = pgEnum("kite_level", [
+  "Beginner", "Intermediate", "Advanced", "Pro",
+]);
+
+export const schoolCustomers = pgTable("school_customers", {
+  id: serial("id").primaryKey(),
+  schoolConfigId: integer("school_config_id").notNull().references(() => schoolConfigs.id),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  nationality: text("nationality").notNull(),
+  dateOfBirth: text("date_of_birth").notNull(),
+  kiteLevel: kiteLevelEnum("kite_level").notNull(),
+  weightKg: integer("weight_kg"),
+  emergencyContact: text("emergency_contact").notNull(),
+  arrivalDate: text("arrival_date").notNull(),
+  departureDate: text("departure_date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
 export const insertSchoolConfigSchema = createInsertSchema(schoolConfigs).omit({ id: true, createdAt: true });
 export const insertSchoolProductSchema = createInsertSchema(schoolProducts).omit({ id: true, createdAt: true });
+export const insertSchoolCustomerSchema = createInsertSchema(schoolCustomers).omit({ id: true, createdAt: true });
 
 export type InsertSchoolConfig = z.infer<typeof insertSchoolConfigSchema>;
 export type SchoolConfig = typeof schoolConfigs.$inferSelect;
 export type InsertSchoolProduct = z.infer<typeof insertSchoolProductSchema>;
 export type SchoolProduct = typeof schoolProducts.$inferSelect;
+export type InsertSchoolCustomer = z.infer<typeof insertSchoolCustomerSchema>;
+export type SchoolCustomer = typeof schoolCustomers.$inferSelect;
 
 export const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   kite: "Kites",

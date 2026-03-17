@@ -124,6 +124,7 @@ export default function Layout({ children }: LayoutProps) {
           { href: "/invoice-import", label: "Import Invoice", icon: FileUp },
         ]
       : []),
+    ...(isStationLead ? [{ href: "/customers", label: "Customers", icon: Users }] : []),
     ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];

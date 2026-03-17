@@ -1,0 +1,49 @@
+# Replit Prompt — Customer Management
+
+> Mode: **Power**
+
+```
+Add a "Customers" page to the School module. Show it in the top navigation, but ONLY visible in the Center Manager view (users with role "station_lead" and when the View Mode simulator is set to "Center Manager" or "Station Lead"). Admins and Hamburg Managers should NOT see this menu item in their normal view.
+
+The page is for registering walk-in guests at a busy kite school reception. It needs to be fast to use.
+
+Customer form with these sections:
+
+"Personal Info":
+- First name (required)
+- Last name (required)
+- Email (required, validated)
+- Phone (required)
+- Nationality (required, country dropdown)
+- Date of birth (required, date picker)
+
+"Kite Info":
+- Kite Level (required, dropdown: Beginner / Intermediate / Advanced / Pro)
+- Weight in kg (optional — used for kite size recommendation)
+- Emergency contact (required — name and phone number in one text field)
+
+"Stay":
+- Arrival date (required, date picker)
+- Departure date (required, date picker)
+
+"Notes":
+- Notes (optional, free text)
+
+Customer list view:
+- Columns: Name, Email, Kite Level (colored badge), Nationality, Arrival, Departure, Status
+- Kite Level badges: Beginner = blue, Intermediate = yellow, Advanced = orange, Pro = red
+- Show a "Currently here" badge for customers where arrival ≤ today ≤ departure
+- Search across name and email
+- Filter toggle: "Active guests only" (currently on site)
+- Clicking a row opens a detail view with editable customer info and a placeholder section "Billing History" showing "No billing history yet"
+
+Permissions:
+- Center Manager can create and view customers
+- Admin can additionally edit and delete
+
+Seed 4 sample customers for the Dakhla school with realistic data, different kite levels, and a mix of currently here / arriving soon / leaving tomorrow.
+
+Only add new features. Do not change existing pages or functionality.
+
+If anything is unclear or you have suggestions for a better approach, ask me before building.
+```
