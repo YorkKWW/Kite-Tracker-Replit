@@ -591,7 +591,7 @@ export default function AccessoriesPage() {
                 onCheckedChange={v => setNewCatHasSizes(!!v)}
                 data-testid="checkbox-has-sizes"
               />
-              <label htmlFor="has-sizes" className="text-sm cursor-pointer">Size-specific (XS–XL)</label>
+              <label htmlFor="has-sizes" className="text-sm cursor-pointer">Size-specific (XS–XXL)</label>
             </div>
           </div>
           <DialogFooter>

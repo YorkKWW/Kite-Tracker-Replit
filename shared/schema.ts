@@ -542,7 +542,7 @@ export type AccessoryTransfer = typeof accessoryTransfers.$inferSelect;
 export type InsertAccessoryLossReport = z.infer<typeof insertAccessoryLossReportSchema>;
 export type AccessoryLossReport = typeof accessoryLossReports.$inferSelect;
 
-export const ACCESSORY_SIZES = ["XS", "S", "M", "L", "XL"] as const;
+export const ACCESSORY_SIZES = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 
 export const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   kite: "Kites",
