@@ -206,6 +206,62 @@ app.use((req, res, next) => {
       UPDATE feedback SET ticket_number = 'FB-' || LPAD(id::text, 4, '0')
       WHERE ticket_number IS NULL
     `);
+
+    // Accessory tables
+    await dbInstance.execute(sql`
+      CREATE TABLE IF NOT EXISTS accessory_categories (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        has_sizes BOOLEAN NOT NULL DEFAULT true,
+        is_default BOOLEAN NOT NULL DEFAULT false,
+        sort_order INTEGER NOT NULL DEFAULT 100
+      )
+    `);
+
+    await dbInstance.execute(sql`
+      CREATE TABLE IF NOT EXISTS accessory_inventory (
+        id SERIAL PRIMARY KEY,
+        category_id INTEGER NOT NULL REFERENCES accessory_categories(id),
+        station_id INTEGER NOT NULL REFERENCES stations(id),
+        size TEXT NOT NULL DEFAULT 'One Size',
+        quantity INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+
+    await dbInstance.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS accessory_inventory_unique
+      ON accessory_inventory (category_id, station_id, size)
+    `);
+
+    await dbInstance.execute(sql`
+      CREATE TABLE IF NOT EXISTS accessory_transfers (
+        id SERIAL PRIMARY KEY,
+        category_id INTEGER NOT NULL REFERENCES accessory_categories(id),
+        size TEXT NOT NULL DEFAULT 'One Size',
+        quantity INTEGER NOT NULL DEFAULT 1,
+        from_station_id INTEGER NOT NULL REFERENCES stations(id),
+        to_station_id INTEGER NOT NULL REFERENCES stations(id),
+        transferred_by INTEGER REFERENCES users(id),
+        transferred_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await dbInstance.execute(sql`
+      CREATE TABLE IF NOT EXISTS accessory_loss_reports (
+        id SERIAL PRIMARY KEY,
+        category_id INTEGER NOT NULL REFERENCES accessory_categories(id),
+        station_id INTEGER NOT NULL REFERENCES stations(id),
+        size TEXT NOT NULL DEFAULT 'One Size',
+        quantity INTEGER NOT NULL DEFAULT 1,
+        reason TEXT NOT NULL,
+        reported_by INTEGER NOT NULL REFERENCES users(id),
+        reported_at TIMESTAMP DEFAULT NOW(),
+        status TEXT NOT NULL DEFAULT 'pending',
+        resolved_by INTEGER REFERENCES users(id),
+        resolved_at TIMESTAMP,
+        admin_note TEXT
+      )
+    `);
   } catch (e) {
     console.error("Equipment size migration error:", e);
   }
