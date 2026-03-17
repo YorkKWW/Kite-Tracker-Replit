@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "DAipbnpIlr6BbwBduR_Om"
+uri = "file://KiteTracker-export.tar.gz"
+type = "unspecified"
+title = "KiteTracker – Kompletter Code (tar.gz)"
