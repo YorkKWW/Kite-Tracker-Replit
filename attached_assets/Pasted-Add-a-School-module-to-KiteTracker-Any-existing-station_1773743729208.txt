@@ -1,0 +1,60 @@
+Add a "School" module to KiteTracker. Any existing station can optionally have a kite school attached. The admin activates and configures schools per station.
+
+DATABASE — Add two new tables:
+
+"school_configs":
+- id (serial, PK)
+- stationId (integer, references stations, unique — one school per station)
+- schoolName (text, required, e.g. "KiteWorldWide Dakhla School")
+- currency (varchar 3, required, default 'MAD')
+- isActive (boolean, default true)
+- contactEmail (text, optional)
+- createdAt (timestamp, defaultNow)
+
+"school_products":
+- id (serial, PK)
+- schoolConfigId (integer, references school_configs)
+- name (text, required)
+- description (text, optional)
+- category (new pgEnum "school_product_category": 'Course', 'Lesson', 'Package', 'Rental', 'Other')
+- defaultPrice (decimal 10,2, required)
+- isActive (boolean, default true)
+- sortOrder (integer, default 0)
+- createdAt (timestamp, defaultNow)
+
+Create insert schemas and type exports for both, same pattern as existing tables.
+
+ADMIN PAGE — "School Admin", only visible to admin users. Add to sidebar under a new "School" group with GraduationCap icon.
+
+Section 1 — School Configuration:
+- List all stations, show whether a school is configured (badge)
+- "Enable School" button for stations without school → dialog with fields: School Name, Currency (dropdown: MAD, EUR, USD, TZS, CVE, BRL), Contact Email
+- Stations with school: show name, currency, active status, "Edit" and "Deactivate" buttons
+
+Section 2 — Product Catalog:
+- Dropdown to select which school to manage
+- Product table: Name, Category, Price (formatted with school currency), Status, Sort Order
+- "Add Product" button → form: Name, Description, Category, Default Price, Sort Order
+- Inline edit and activate/deactivate per product
+
+API ROUTES:
+- GET /api/school-configs (list with station name joined)
+- POST /api/school-configs (admin only)
+- PATCH /api/school-configs/:id (admin only)
+- GET /api/school-products?schoolConfigId=X
+- POST /api/school-products (admin only)
+- PATCH /api/school-products/:id (admin only)
+
+SEED DATA for Dakhla station — school config with currency MAD, plus these products:
+"5-Day Beginner Course" | Course | 6500
+"3-Day Refresher Course" | Course | 4200
+"Private Lesson 1h" | Lesson | 800
+"Private Lesson 2h" | Lesson | 1400
+"3h Lesson Package" | Package | 2100
+"Kite Rental per Day" | Rental | 500
+"Harness Rental per Day" | Rental | 200
+"Foil Lesson 1h" | Lesson | 1000
+"Wing Lesson 1h" | Lesson | 900
+"Downwinder Tour" | Other | 1200
+
+Only add new files, tables, and routes.

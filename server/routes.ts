@@ -3157,6 +3157,88 @@ export async function registerRoutes(
     }
   });
 
+  // ─── School Module Routes ─────────────────────────────────────────────────
+
+  app.get("/api/school-configs", requireAuth, async (_req, res) => {
+    const configs = await storage.getAllSchoolConfigs();
+    res.json(configs);
+  });
+
+  app.post("/api/school-configs", requireAdmin, async (req, res) => {
+    const schema = z.object({
+      stationId: z.number().int().positive(),
+      schoolName: z.string().min(1),
+      currency: z.string().length(3).default("MAD"),
+      isActive: z.boolean().default(true),
+      contactEmail: z.string().email().optional().nullable(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+    try {
+      const config = await storage.createSchoolConfig(parsed.data);
+      res.json(config);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/school-configs/:id", requireAdmin, async (req, res) => {
+    const schema = z.object({
+      schoolName: z.string().min(1).optional(),
+      currency: z.string().length(3).optional(),
+      isActive: z.boolean().optional(),
+      contactEmail: z.string().email().nullable().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+    const updated = await storage.updateSchoolConfig(parseInt(req.params.id), parsed.data);
+    if (!updated) return res.status(404).json({ message: "Not found" });
+    res.json(updated);
+  });
+
+  app.get("/api/school-products", requireAuth, async (req, res) => {
+    const schoolConfigId = req.query.schoolConfigId ? parseInt(req.query.schoolConfigId as string) : undefined;
+    if (!schoolConfigId) return res.status(400).json({ message: "schoolConfigId required" });
+    const products = await storage.getSchoolProducts(schoolConfigId);
+    res.json(products);
+  });
+
+  app.post("/api/school-products", requireAdmin, async (req, res) => {
+    const schema = z.object({
+      schoolConfigId: z.number().int().positive(),
+      name: z.string().min(1),
+      description: z.string().nullable().optional(),
+      category: z.enum(["Course", "Lesson", "Package", "Rental", "Other"]),
+      defaultPrice: z.union([z.string(), z.number()]).transform(v => String(v)),
+      isActive: z.boolean().default(true),
+      sortOrder: z.number().int().default(0),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+    try {
+      const product = await storage.createSchoolProduct(parsed.data);
+      res.json(product);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/school-products/:id", requireAdmin, async (req, res) => {
+    const schema = z.object({
+      name: z.string().min(1).optional(),
+      description: z.string().nullable().optional(),
+      category: z.enum(["Course", "Lesson", "Package", "Rental", "Other"]).optional(),
+      defaultPrice: z.union([z.string(), z.number()]).transform(v => String(v)).optional(),
+      isActive: z.boolean().optional(),
+      sortOrder: z.number().int().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+    const updated = await storage.updateSchoolProduct(parseInt(req.params.id), parsed.data);
+    if (!updated) return res.status(404).json({ message: "Not found" });
+    res.json(updated);
+  });
+
   app.post("/api/admin/fix-equipment-sizes", requireAdmin, async (req, res) => {
     const { db: dbInstance } = await import("./db");
     const { sql } = await import("drizzle-orm");

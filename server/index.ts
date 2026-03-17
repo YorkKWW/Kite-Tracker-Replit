@@ -246,6 +246,70 @@ app.use((req, res, next) => {
       )
     `);
 
+    // School module tables
+    await dbInstance.execute(sql`
+      DO $$ BEGIN
+        CREATE TYPE school_product_category AS ENUM ('Course','Lesson','Package','Rental','Other');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$
+    `);
+
+    await dbInstance.execute(sql`
+      CREATE TABLE IF NOT EXISTS school_configs (
+        id SERIAL PRIMARY KEY,
+        station_id INTEGER NOT NULL UNIQUE REFERENCES stations(id),
+        school_name TEXT NOT NULL,
+        currency VARCHAR(3) NOT NULL DEFAULT 'MAD',
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        contact_email TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await dbInstance.execute(sql`
+      CREATE TABLE IF NOT EXISTS school_products (
+        id SERIAL PRIMARY KEY,
+        school_config_id INTEGER NOT NULL REFERENCES school_configs(id),
+        name TEXT NOT NULL,
+        description TEXT,
+        category school_product_category NOT NULL,
+        default_price DECIMAL(10,2) NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    // Seed Dakhla school if not exists
+    await dbInstance.execute(sql`
+      INSERT INTO school_configs (station_id, school_name, currency, is_active, contact_email)
+      SELECT id, 'KiteWorldWide Dakhla School', 'MAD', true, NULL
+      FROM stations WHERE name ILIKE '%dakhla%'
+      AND NOT EXISTS (SELECT 1 FROM school_configs sc JOIN stations st ON sc.station_id = st.id WHERE st.name ILIKE '%dakhla%')
+      LIMIT 1
+    `);
+
+    await dbInstance.execute(sql`
+      INSERT INTO school_products (school_config_id, name, category, default_price, sort_order)
+      SELECT sc.id, p.name, p.cat::school_product_category, p.price, p.ord
+      FROM school_configs sc
+      JOIN stations st ON sc.station_id = st.id
+      CROSS JOIN (VALUES
+        ('5-Day Beginner Course',   'Course',  6500, 1),
+        ('3-Day Refresher Course',  'Course',  4200, 2),
+        ('Private Lesson 1h',       'Lesson',   800, 3),
+        ('Private Lesson 2h',       'Lesson',  1400, 4),
+        ('3h Lesson Package',       'Package', 2100, 5),
+        ('Kite Rental per Day',     'Rental',   500, 6),
+        ('Harness Rental per Day',  'Rental',   200, 7),
+        ('Foil Lesson 1h',          'Lesson',  1000, 8),
+        ('Wing Lesson 1h',          'Lesson',   900, 9),
+        ('Downwinder Tour',         'Other',   1200, 10)
+      ) AS p(name, cat, price, ord)
+      WHERE st.name ILIKE '%dakhla%'
+      AND NOT EXISTS (SELECT 1 FROM school_products sp WHERE sp.school_config_id = sc.id)
+    `);
+
     await dbInstance.execute(sql`
       CREATE TABLE IF NOT EXISTS accessory_loss_reports (
         id SERIAL PRIMARY KEY,

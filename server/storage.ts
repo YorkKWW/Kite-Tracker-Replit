@@ -34,6 +34,7 @@ import {
   companySettings, customers, salesInvoices, saleItems, priceLists, priceListItems,
   damageReports, damageReportPhotos, feedback, feedbackAttachments, feedbackComments, notifications,
   accessoryCategories, accessoryInventory, accessoryTransfers, accessoryLossReports,
+  schoolConfigs, schoolProducts,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -62,6 +63,8 @@ import {
   type AccessoryInventory, type InsertAccessoryInventory,
   type AccessoryTransfer, type InsertAccessoryTransfer,
   type AccessoryLossReport, type InsertAccessoryLossReport,
+  type SchoolConfig, type InsertSchoolConfig,
+  type SchoolProduct, type InsertSchoolProduct,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -203,6 +206,16 @@ export interface IStorage {
   getAccessoryLossReports(status?: string): Promise<any[]>;
   createAccessoryLossReport(report: InsertAccessoryLossReport): Promise<AccessoryLossReport>;
   resolveAccessoryLossReport(id: number, resolvedBy: number, adminNote: string | null, approved: boolean): Promise<AccessoryLossReport>;
+
+  // School module
+  getAllSchoolConfigs(): Promise<(SchoolConfig & { stationName: string })[]>;
+  getSchoolConfig(id: number): Promise<SchoolConfig | undefined>;
+  getSchoolConfigByStation(stationId: number): Promise<SchoolConfig | undefined>;
+  createSchoolConfig(config: InsertSchoolConfig): Promise<SchoolConfig>;
+  updateSchoolConfig(id: number, data: Partial<InsertSchoolConfig>): Promise<SchoolConfig | undefined>;
+  getSchoolProducts(schoolConfigId: number): Promise<SchoolProduct[]>;
+  createSchoolProduct(product: InsertSchoolProduct): Promise<SchoolProduct>;
+  updateSchoolProduct(id: number, data: Partial<InsertSchoolProduct>): Promise<SchoolProduct | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1384,6 +1397,51 @@ export class DatabaseStorage implements IStorage {
 
       return updated;
     });
+  }
+
+  // ─── School Module ───────────────────────────────────────────────────────────
+
+  async getAllSchoolConfigs(): Promise<(SchoolConfig & { stationName: string })[]> {
+    const rows = await db.select().from(schoolConfigs);
+    const sts = await db.select().from(stations);
+    const stMap = Object.fromEntries(sts.map(s => [s.id, s.name]));
+    return rows.map(r => ({ ...r, stationName: stMap[r.stationId] ?? "?" }));
+  }
+
+  async getSchoolConfig(id: number): Promise<SchoolConfig | undefined> {
+    const [row] = await db.select().from(schoolConfigs).where(eq(schoolConfigs.id, id));
+    return row;
+  }
+
+  async getSchoolConfigByStation(stationId: number): Promise<SchoolConfig | undefined> {
+    const [row] = await db.select().from(schoolConfigs).where(eq(schoolConfigs.stationId, stationId));
+    return row;
+  }
+
+  async createSchoolConfig(config: InsertSchoolConfig): Promise<SchoolConfig> {
+    const [created] = await db.insert(schoolConfigs).values(config).returning();
+    return created;
+  }
+
+  async updateSchoolConfig(id: number, data: Partial<InsertSchoolConfig>): Promise<SchoolConfig | undefined> {
+    const [updated] = await db.update(schoolConfigs).set(data).where(eq(schoolConfigs.id, id)).returning();
+    return updated;
+  }
+
+  async getSchoolProducts(schoolConfigId: number): Promise<SchoolProduct[]> {
+    return db.select().from(schoolProducts)
+      .where(eq(schoolProducts.schoolConfigId, schoolConfigId))
+      .orderBy(schoolProducts.sortOrder, schoolProducts.name);
+  }
+
+  async createSchoolProduct(product: InsertSchoolProduct): Promise<SchoolProduct> {
+    const [created] = await db.insert(schoolProducts).values(product).returning();
+    return created;
+  }
+
+  async updateSchoolProduct(id: number, data: Partial<InsertSchoolProduct>): Promise<SchoolProduct | undefined> {
+    const [updated] = await db.update(schoolProducts).set(data).where(eq(schoolProducts.id, id)).returning();
+    return updated;
   }
 }
 

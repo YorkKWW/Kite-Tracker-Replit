@@ -544,6 +544,42 @@ export type AccessoryLossReport = typeof accessoryLossReports.$inferSelect;
 
 export const ACCESSORY_SIZES = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 
+// ─── School Module ────────────────────────────────────────────────────────────
+
+export const schoolProductCategoryEnum = pgEnum("school_product_category", [
+  "Course", "Lesson", "Package", "Rental", "Other",
+]);
+
+export const schoolConfigs = pgTable("school_configs", {
+  id: serial("id").primaryKey(),
+  stationId: integer("station_id").notNull().references(() => stations.id).unique(),
+  schoolName: text("school_name").notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("MAD"),
+  isActive: boolean("is_active").notNull().default(true),
+  contactEmail: text("contact_email"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const schoolProducts = pgTable("school_products", {
+  id: serial("id").primaryKey(),
+  schoolConfigId: integer("school_config_id").notNull().references(() => schoolConfigs.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: schoolProductCategoryEnum("category").notNull(),
+  defaultPrice: decimal("default_price", { precision: 10, scale: 2 }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSchoolConfigSchema = createInsertSchema(schoolConfigs).omit({ id: true, createdAt: true });
+export const insertSchoolProductSchema = createInsertSchema(schoolProducts).omit({ id: true, createdAt: true });
+
+export type InsertSchoolConfig = z.infer<typeof insertSchoolConfigSchema>;
+export type SchoolConfig = typeof schoolConfigs.$inferSelect;
+export type InsertSchoolProduct = z.infer<typeof insertSchoolProductSchema>;
+export type SchoolProduct = typeof schoolProducts.$inferSelect;
+
 export const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   kite: "Kites",
   board: "Kiteboards",
