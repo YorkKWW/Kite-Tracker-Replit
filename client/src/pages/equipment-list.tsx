@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -30,6 +30,11 @@ const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
 export default function EquipmentListPage() {
   const { isAdmin, isHamburg, isSuperAdmin, isSimulating, simStationId, viewMode } = useAuth();
   const isStationLeadView = (isSimulating && viewMode === "station_lead" && simStationId != null);
+
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+  }, [simStationId, viewMode]);
+
   const urlParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const [search, setSearch] = useState(urlParams.get("search") || "");
   const [typeFilter, setTypeFilter] = useState<string>(urlParams.get("type") || "all");
@@ -133,6 +138,7 @@ export default function EquipmentListPage() {
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
+    staleTime: 0,
   });
 
   const { data: stationsList } = useQuery<Station[]>({
