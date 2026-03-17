@@ -33,6 +33,7 @@ export default function InventoryCheckPage() {
   const { toast } = useToast();
   const [scannerOpen, setScannerOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const [ratingRequired, setRatingRequired] = useState<number | null>(null);
   const [uploadingPhotoFor, setUploadingPhotoFor] = useState<number | null>(null);
   const itemRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const photoInputRef = useRef<HTMLInputElement | null>(null);
@@ -86,7 +87,11 @@ export default function InventoryCheckPage() {
     setExpandedItems((prev) => new Set(prev).add(eq.id));
     const currentItem = data?.items.find((i) => i.equipmentId === eq.id);
     if (!currentItem?.checked) {
-      updateItemMutation.mutate({ equipmentId: eq.id, patch: { checked: 1 } });
+      if (!currentItem?.conditionRating) {
+        setRatingRequired(eq.id);
+      } else {
+        updateItemMutation.mutate({ equipmentId: eq.id, patch: { checked: 1 } });
+      }
     }
   };
 
@@ -279,6 +284,12 @@ export default function InventoryCheckPage() {
                     <button
                       className="shrink-0 touch-manipulation"
                       onClick={() => {
+                        if (!isChecked && !item?.conditionRating) {
+                          setExpandedItems((prev) => new Set(prev).add(eq.id));
+                          setRatingRequired(eq.id);
+                          return;
+                        }
+                        setRatingRequired(null);
                         updateItemMutation.mutate({
                           equipmentId: eq.id,
                           patch: { checked: isChecked ? 0 : 1 },
@@ -340,18 +351,38 @@ export default function InventoryCheckPage() {
                 {/* Expanded detail editor */}
                 {(expanded || (readOnly && (item?.notes || item?.conditionRating || isMissing || needsRepair))) && (
                   <div className="mt-3 pt-3 border-t space-y-3">
-                    {/* Condition stars */}
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1.5">Condition</p>
+                    {/* Condition stars — mandatory */}
+                    <div
+                      className={cn(
+                        "rounded-lg p-2 -mx-2 transition-colors",
+                        ratingRequired === eq.id && "bg-red-500/5 ring-1 ring-red-500/40"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">Condition</p>
+                        {ratingRequired === eq.id && (
+                          <span className="text-[10px] font-medium text-red-500 uppercase tracking-wide">
+                            Required
+                          </span>
+                        )}
+                      </div>
                       <div className="flex gap-1">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <button
                             key={star}
                             disabled={readOnly}
-                            onClick={() => updateItemMutation.mutate({
-                              equipmentId: eq.id,
-                              patch: { conditionRating: item?.conditionRating === star ? null : star },
-                            })}
+                            onClick={() => {
+                              const newRating = item?.conditionRating === star ? null : star;
+                              const wasRequired = ratingRequired === eq.id;
+                              setRatingRequired(null);
+                              updateItemMutation.mutate({
+                                equipmentId: eq.id,
+                                patch: {
+                                  conditionRating: newRating,
+                                  ...(wasRequired && newRating ? { checked: 1 } : {}),
+                                },
+                              });
+                            }}
                             className={cn("p-1 rounded transition-colors", readOnly ? "cursor-default" : "hover:bg-muted")}
                             data-testid={`button-star-${eq.id}-${star}`}
                           >
@@ -360,7 +391,9 @@ export default function InventoryCheckPage() {
                                 "h-5 w-5",
                                 (item?.conditionRating ?? 0) >= star
                                   ? "fill-yellow-400 text-yellow-400"
-                                  : "text-muted-foreground/30"
+                                  : ratingRequired === eq.id
+                                    ? "text-red-400/50"
+                                    : "text-muted-foreground/30"
                               )}
                             />
                           </button>
