@@ -29,7 +29,7 @@ function getRoleLabel(u: SafeUser) {
   if (u.role === "admin" && u.isSuperAdmin) return "Super Admin";
   if (u.role === "admin") return "Admin";
   if (u.role === "manager") return "Hamburg Manager";
-  return "Station Lead";
+  return "Center Manager";
 }
 
 function getRoleBadgeVariant(u: SafeUser): "default" | "secondary" | "outline" {
@@ -51,7 +51,7 @@ const PERMISSIONS = [
   { label: "View price lists", superAdmin: true, admin: true, manager: true, stationLead: false },
   { label: "Create & edit locations", superAdmin: true, admin: true, manager: false, stationLead: false },
   { label: "Delete locations", superAdmin: true, admin: false, manager: false, stationLead: false },
-  { label: "Create & edit managers & station leads", superAdmin: true, admin: true, manager: false, stationLead: false },
+  { label: "Create & edit Hamburg Managers & Center Managers", superAdmin: true, admin: true, manager: false, stationLead: false },
   { label: "Create & edit admins", superAdmin: true, admin: false, manager: false, stationLead: false },
   { label: "Delete users", superAdmin: true, admin: false, manager: false, stationLead: false },
   { label: "View users", superAdmin: true, admin: true, manager: false, stationLead: false },
@@ -97,13 +97,13 @@ function PermissionsTable() {
                 <th className="text-center p-3 font-medium w-24">
                   <div className="flex flex-col items-center gap-1">
                     <Users className="h-4 w-4" />
-                    <span className="text-xs">Manager</span>
+                    <span className="text-xs">Hamburg Mgr.</span>
                   </div>
                 </th>
                 <th className="text-center p-3 font-medium w-24">
                   <div className="flex flex-col items-center gap-1">
                     <Users className="h-4 w-4" />
-                    <span className="text-xs">Station Lead</span>
+                    <span className="text-xs">Center Mgr.</span>
                   </div>
                 </th>
               </tr>
@@ -286,7 +286,7 @@ export default function UsersPage() {
                 <SelectContent>
                   {isSuperAdmin && <SelectItem value="admin">Admin</SelectItem>}
                   <SelectItem value="manager">Hamburg Manager</SelectItem>
-                  <SelectItem value="station_lead">Station Lead</SelectItem>
+                  <SelectItem value="station_lead">Center Manager</SelectItem>
                 </SelectContent>
               </Select>
               {!isSuperAdmin && editUser?.role === "admin" && (

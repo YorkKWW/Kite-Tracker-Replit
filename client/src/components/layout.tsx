@@ -206,7 +206,7 @@ export default function Layout({ children }: LayoutProps) {
       {isSimulating && (
         <div className="sticky top-0 z-[60] bg-amber-500 text-amber-950 text-center py-1 text-xs font-semibold flex items-center justify-center gap-2" data-testid="banner-simulation">
           <EyeOff className="h-3.5 w-3.5" />
-          Simulated View: {viewMode === "admin" ? "Admin" : viewMode === "manager" ? "Center Manager" : "Station Lead"}
+          Simulated View: {viewMode === "admin" ? "Admin" : viewMode === "manager" ? "Hamburg Manager" : "Center Manager"}
           <Button
             variant="ghost"
             size="sm"
@@ -264,8 +264,8 @@ export default function Layout({ children }: LayoutProps) {
                 <SelectContent>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="manager">Center Manager</SelectItem>
-                  <SelectItem value="station_lead">Station Lead</SelectItem>
+                  <SelectItem value="manager">Hamburg Manager</SelectItem>
+                  <SelectItem value="station_lead">Center Manager</SelectItem>
                 </SelectContent>
               </Select>
             )}
