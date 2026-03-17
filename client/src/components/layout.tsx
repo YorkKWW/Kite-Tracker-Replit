@@ -36,7 +36,6 @@ import {
   Eye,
   EyeOff,
   Shirt as ShirtIcon,
-  GraduationCap,
 } from "lucide-react";
 import type { ViewMode } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -126,7 +125,6 @@ export default function Layout({ children }: LayoutProps) {
         ]
       : []),
     ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
-    ...(isAdmin ? [{ href: "/school-admin", label: "School", icon: GraduationCap }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
