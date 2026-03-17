@@ -3584,12 +3584,13 @@ export async function registerRoutes(
     if (user.role === "station_lead" && user.assignedStationId !== stationId) {
       return res.status(403).json({ message: "Access denied" });
     }
-    const [equipChecks, accChecks, inventory, categories, allStations] = await Promise.all([
+    const [equipChecks, accChecks, inventory, categories, allStations, currentEquipment] = await Promise.all([
       storage.getInventoryChecks(stationId),
       storage.getAccessoryChecks(stationId, 5),
       storage.getAccessoryInventory(stationId),
       storage.getAllAccessoryCategories(),
       storage.getAllStations(),
+      storage.getAllEquipment({ stationId }),
     ]);
     const station = allStations.find(s => s.id === stationId);
     const openEquipCheck = equipChecks.find(c => c.status === "in_progress");
@@ -3608,7 +3609,11 @@ export async function registerRoutes(
     }
     res.json({
       stationName: station?.name || `Station #${stationId}`,
-      openEquipCheck: openEquipCheck ? { ...openEquipCheck, checkedCount: openCheckItems.filter(i => i.checked).length } : null,
+      openEquipCheck: openEquipCheck ? {
+        ...openEquipCheck,
+        totalItems: currentEquipment.length,
+        checkedCount: openCheckItems.filter(i => i.checked).length,
+      } : null,
       recentEquipChecks: enrichedEquipChecks,
       recentAccChecks: accChecks,
       accessoryInventory: inventory,
