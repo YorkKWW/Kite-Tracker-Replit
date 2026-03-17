@@ -495,6 +495,7 @@ export const accessoryInventory = pgTable("accessory_inventory", {
   stationId: integer("station_id").notNull().references(() => stations.id),
   size: text("size").notNull().default("Einheitsgröße"),
   quantity: integer("quantity").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => [
   uniqueIndex("accessory_inventory_unique").on(t.categoryId, t.stationId, t.size),
 ]);
