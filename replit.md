@@ -99,18 +99,7 @@ Bell icon in header with unread badge count. Notifications created automatically
 - **Routes**: `GET /api/notifications`, `GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read`, `POST /api/notifications/mark-all-read`
 
 ## Database Tables
-stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices, feedback, feedback_comments, notifications, accessory_categories, accessory_inventory, accessory_transfers, accessory_loss_reports, school_configs, school_products, school_customers
-
-## School Module
-- **School Setup** (`/school-admin`): Admin-only config accessible via Settings page (name, currency, products/catalog)
-- **School View** (`/school-view`): Unified page with two tabs, accessible to admin/manager/station_lead
-  - Nav: Single "School" item (TreePalm icon); visible when user's station has active school_config or user is admin
-  - Admin: school selector dropdown when multiple schools exist
-  - Tab "Rentals & Courses": Read-only product list; admin sees "Edit in Settings" link
-  - Tab "Customers": Walk-in customer management (search, add, detail view, kite level badges)
-  - DB: `school_customers` table with kite level enum (beginner/intermediate/advanced/pro), nationality, DOB, weight, emergency contact
-  - API: GET/POST/PATCH/DELETE `/api/school-customers` with server-side authorization
-  - Kite Level badges: beginner=blue, intermediate=yellow, advanced=orange, pro=red
+stations, users, equipment, condition_ratings, repairs, transfers, photos, activity_log, inventory_checks, inventory_check_items, suppliers, invoices, feedback, feedback_comments, notifications, accessory_categories, accessory_inventory, accessory_transfers
 
 ## Equipment Types
 kite, board, foil, wing, bar_lines

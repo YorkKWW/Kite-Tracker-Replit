@@ -34,7 +34,7 @@ import {
   companySettings, customers, salesInvoices, saleItems, priceLists, priceListItems,
   damageReports, damageReportPhotos, feedback, feedbackAttachments, feedbackComments, notifications,
   accessoryCategories, accessoryInventory, accessoryTransfers, accessoryLossReports,
-  schoolConfigs, schoolProducts, schoolCustomers,
+  schoolConfigs, schoolProducts,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -65,7 +65,6 @@ import {
   type AccessoryLossReport, type InsertAccessoryLossReport,
   type SchoolConfig, type InsertSchoolConfig,
   type SchoolProduct, type InsertSchoolProduct,
-  type SchoolCustomer, type InsertSchoolCustomer,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -217,13 +216,6 @@ export interface IStorage {
   getSchoolProducts(schoolConfigId: number): Promise<SchoolProduct[]>;
   createSchoolProduct(product: InsertSchoolProduct): Promise<SchoolProduct>;
   updateSchoolProduct(id: number, data: Partial<InsertSchoolProduct>): Promise<SchoolProduct | undefined>;
-
-  // School customers
-  getSchoolCustomers(schoolConfigId: number, search?: string): Promise<SchoolCustomer[]>;
-  getSchoolCustomer(id: number): Promise<SchoolCustomer | undefined>;
-  createSchoolCustomer(customer: InsertSchoolCustomer): Promise<SchoolCustomer>;
-  updateSchoolCustomer(id: number, data: Partial<InsertSchoolCustomer>): Promise<SchoolCustomer | undefined>;
-  deleteSchoolCustomer(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1450,44 +1442,6 @@ export class DatabaseStorage implements IStorage {
   async updateSchoolProduct(id: number, data: Partial<InsertSchoolProduct>): Promise<SchoolProduct | undefined> {
     const [updated] = await db.update(schoolProducts).set(data).where(eq(schoolProducts.id, id)).returning();
     return updated;
-  }
-
-  // ─── School Customers ────────────────────────────────────────────────────────
-
-  async getSchoolCustomers(schoolConfigId: number, search?: string): Promise<SchoolCustomer[]> {
-    const conditions = [eq(schoolCustomers.schoolConfigId, schoolConfigId)];
-    if (search?.trim()) {
-      const term = `%${search.trim()}%`;
-      conditions.push(
-        or(
-          ilike(schoolCustomers.firstName, term),
-          ilike(schoolCustomers.lastName, term),
-          ilike(schoolCustomers.email, term),
-        )!,
-      );
-    }
-    return db.select().from(schoolCustomers)
-      .where(and(...conditions))
-      .orderBy(desc(schoolCustomers.createdAt));
-  }
-
-  async getSchoolCustomer(id: number): Promise<SchoolCustomer | undefined> {
-    const [row] = await db.select().from(schoolCustomers).where(eq(schoolCustomers.id, id));
-    return row;
-  }
-
-  async createSchoolCustomer(customer: InsertSchoolCustomer): Promise<SchoolCustomer> {
-    const [created] = await db.insert(schoolCustomers).values(customer).returning();
-    return created;
-  }
-
-  async updateSchoolCustomer(id: number, data: Partial<InsertSchoolCustomer>): Promise<SchoolCustomer | undefined> {
-    const [updated] = await db.update(schoolCustomers).set(data).where(eq(schoolCustomers.id, id)).returning();
-    return updated;
-  }
-
-  async deleteSchoolCustomer(id: number): Promise<void> {
-    await db.delete(schoolCustomers).where(eq(schoolCustomers.id, id));
   }
 }
 

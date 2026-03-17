@@ -37,7 +37,6 @@ import {
   EyeOff,
   Shirt as ShirtIcon,
   GraduationCap,
-  TreePalm,
 } from "lucide-react";
 import type { ViewMode } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -112,16 +111,6 @@ export default function Layout({ children }: LayoutProps) {
     },
   });
 
-  type SchoolConfigInfo = { id: number; stationId: number; isActive: boolean; stationName: string };
-  const { data: schoolConfigs = [] } = useQuery<SchoolConfigInfo[]>({
-    queryKey: ["/api/school-configs"],
-    staleTime: 60000,
-  });
-
-  const hasActiveSchool = isAdmin || schoolConfigs.some(
-    (c) => c.isActive && c.stationId === user?.assignedStationId
-  );
-
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/equipment", label: "Equipment", icon: Package },
@@ -137,9 +126,7 @@ export default function Layout({ children }: LayoutProps) {
         ]
       : []),
     ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
-    ...(hasActiveSchool
-      ? [{ href: "/school-view", label: "School", icon: TreePalm }]
-      : []),
+    ...(isAdmin ? [{ href: "/school-admin", label: "School", icon: GraduationCap }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
