@@ -68,7 +68,8 @@ type LossReport = {
 
 export default function AccessoriesPage() {
   const { toast } = useToast();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isSimulating, simStationId, viewMode } = useAuth();
+  const isStationLeadView = isSimulating && viewMode === "station_lead" && simStationId != null;
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [newCatHasSizes, setNewCatHasSizes] = useState(true);
@@ -110,9 +111,15 @@ export default function AccessoriesPage() {
     enabled: activeTab === "reports" || activeTab === "overview",
   });
 
-  const pendingReports = lossReports.filter(r => r.status === "pending");
+  const allRealStations = stationsList.filter(s => !s.isVirtual);
+  const displayStations = isStationLeadView
+    ? allRealStations.filter(s => s.id === simStationId)
+    : allRealStations;
 
-  const realStations = stationsList.filter(s => !s.isVirtual);
+  const displayedLossReports = isStationLeadView
+    ? lossReports.filter(r => r.stationId === simStationId)
+    : lossReports;
+  const pendingReports = displayedLossReports.filter(r => r.status === "pending");
 
   const createCategoryMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/accessory-categories", { name: newCatName, hasSizes: newCatHasSizes }),
@@ -241,13 +248,16 @@ export default function AccessoriesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowLossDialog(true)}
+            onClick={() => {
+              if (isStationLeadView && simStationId != null) setLossStationId(String(simStationId));
+              setShowLossDialog(true);
+            }}
             data-testid="button-report-loss"
           >
             <AlertTriangle className="h-4 w-4 mr-1.5" />
             Report Damage
           </Button>
-          {isAdmin && (
+          {isAdmin && !isStationLeadView && (
             <>
               <Button
                 variant="outline"
@@ -324,11 +334,11 @@ export default function AccessoriesPage() {
             <h2 className="font-semibold">Loss & Damage Reports</h2>
           </CardHeader>
           <CardContent>
-            {lossReports.length === 0 ? (
+            {displayedLossReports.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">No reports</p>
             ) : (
               <div className="space-y-3">
-                {lossReports.map(r => (
+                {displayedLossReports.map(r => (
                   <div key={r.id} className={`border rounded-lg p-3 text-sm ${r.status === "pending" ? "border-orange-300 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30" : ""}`} data-testid={`row-report-${r.id}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="space-y-1">
@@ -429,7 +439,7 @@ export default function AccessoriesPage() {
               <p className="text-muted-foreground text-sm mt-1">Create a category to get started</p>
             </div>
           ) : (
-            realStations.map(station => {
+            displayStations.map(station => {
               const stationTotal = categories.reduce((sum, cat) => {
                 if (cat.hasSizes) {
                   return sum + ACCESSORY_SIZES.reduce((s, sz) => s + getQty(cat.id, station.id, sz), 0);
@@ -654,7 +664,7 @@ export default function AccessoriesPage() {
                 <Select value={transferFrom} onValueChange={setTransferFrom}>
                   <SelectTrigger data-testid="select-transfer-from"><SelectValue placeholder="Source" /></SelectTrigger>
                   <SelectContent>
-                    {realStations.map(s => (
+                    {allRealStations.map(s => (
                       <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -665,7 +675,7 @@ export default function AccessoriesPage() {
                 <Select value={transferTo} onValueChange={setTransferTo}>
                   <SelectTrigger data-testid="select-transfer-to"><SelectValue placeholder="Destination" /></SelectTrigger>
                   <SelectContent>
-                    {realStations.filter(s => String(s.id) !== transferFrom).map(s => (
+                    {allRealStations.filter(s => String(s.id) !== transferFrom).map(s => (
                       <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -711,14 +721,20 @@ export default function AccessoriesPage() {
             </div>
             <div className="space-y-2">
               <Label>Station</Label>
-              <Select value={lossStationId} onValueChange={setLossStationId}>
-                <SelectTrigger data-testid="select-loss-station"><SelectValue placeholder="Select station" /></SelectTrigger>
-                <SelectContent>
-                  {realStations.map(s => (
-                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isStationLeadView ? (
+                <div className="h-9 px-3 flex items-center rounded-md border bg-muted text-sm text-muted-foreground" data-testid="select-loss-station">
+                  {displayStations.find(s => s.id === simStationId)?.name ?? "—"}
+                </div>
+              ) : (
+                <Select value={lossStationId} onValueChange={setLossStationId}>
+                  <SelectTrigger data-testid="select-loss-station"><SelectValue placeholder="Select station" /></SelectTrigger>
+                  <SelectContent>
+                    {allRealStations.map(s => (
+                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             {selectedLossCat?.hasSizes && (
               <div className="space-y-2">
