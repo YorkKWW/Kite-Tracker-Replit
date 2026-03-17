@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { GraduationCap, Plus, Pencil, Building2, BookOpen } from "lucide-react";
 import type { Station } from "@shared/schema";
 
-const CURRENCIES = ["MAD", "EUR", "USD", "TZS", "CVE", "BRL"] as const;
+const CURRENCIES = ["MAD", "EUR", "BRL"] as const;
 const CATEGORIES = ["Course", "Lesson", "Package", "Rental", "Other"] as const;
 
 type SchoolConfigWithStation = {
@@ -63,7 +63,6 @@ export default function SchoolAdminPage() {
   // School config form state
   const [schoolName, setSchoolName] = useState("");
   const [currency, setCurrency] = useState<string>("MAD");
-  const [contactEmail, setContactEmail] = useState("");
 
   // Product form state
   const [prodName, setProdName] = useState("");
@@ -134,7 +133,7 @@ export default function SchoolAdminPage() {
 
   function openEnableDialog(stationId: number) {
     setEnableStationId(stationId);
-    setSchoolName(""); setCurrency("MAD"); setContactEmail("");
+    setSchoolName(""); setCurrency("MAD");
     setShowEnableDialog(true);
   }
 
@@ -142,7 +141,6 @@ export default function SchoolAdminPage() {
     setEditConfigId(config.id);
     setSchoolName(config.schoolName);
     setCurrency(config.currency);
-    setContactEmail(config.contactEmail ?? "");
   }
 
   function openAddProduct() {
@@ -197,7 +195,7 @@ export default function SchoolAdminPage() {
           ) : (
             <div className="space-y-3">
               {stations
-                .filter(s => s.name !== "In Transfer")
+                .filter(s => !["In Transfer", "Office Hamburg Warehouse", "Service Center Heidenau"].includes(s.name))
                 .map(station => {
                   const config = schoolConfigs.find(c => c.stationId === station.id);
                   return (
@@ -382,17 +380,6 @@ export default function SchoolAdminPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="contact-email">Contact Email (optional)</Label>
-              <Input
-                id="contact-email"
-                data-testid="input-contact-email"
-                type="email"
-                placeholder="school@example.com"
-                value={contactEmail}
-                onChange={e => setContactEmail(e.target.value)}
-              />
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEnableDialog(false)}>Cancel</Button>
@@ -404,7 +391,6 @@ export default function SchoolAdminPage() {
                 schoolName: schoolName.trim(),
                 currency,
                 isActive: true,
-                contactEmail: contactEmail.trim() || null,
               })}
             >
               Enable School
@@ -439,15 +425,6 @@ export default function SchoolAdminPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label>Contact Email (optional)</Label>
-              <Input
-                data-testid="input-edit-contact-email"
-                type="email"
-                value={contactEmail}
-                onChange={e => setContactEmail(e.target.value)}
-              />
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditConfigId(null)}>Cancel</Button>
@@ -459,7 +436,6 @@ export default function SchoolAdminPage() {
                 data: {
                   schoolName: schoolName.trim(),
                   currency,
-                  contactEmail: contactEmail.trim() || null,
                 },
               })}
             >
