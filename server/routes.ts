@@ -632,6 +632,24 @@ const upload = multer({
   },
 });
 
+const uploadCsv = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      cb(null, uniqueSuffix + path.extname(file.originalname));
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === ".csv" || ext === ".txt" || file.mimetype === "text/csv" || file.mimetype === "text/plain") {
+      return cb(null, true);
+    }
+    cb(new Error("Only CSV files are allowed"));
+  },
+});
+
 async function checkEquipmentAccess(req: any, equipmentId: number): Promise<boolean> {
   const user = req.user as any;
   if (user.role === "admin" || user.role === "manager") return true;
@@ -1422,7 +1440,7 @@ export async function registerRoutes(
     res.json(stats);
   });
 
-  app.post("/api/equipment/import", requireHamburg, upload.single("file"), async (req, res) => {
+  app.post("/api/equipment/import", requireHamburg, uploadCsv.single("file"), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     try {
