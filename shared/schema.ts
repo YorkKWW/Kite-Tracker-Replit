@@ -572,23 +572,23 @@ export const schoolProducts = pgTable("school_products", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const kiteLevelEnum = pgEnum("kite_level", [
-  "Beginner", "Intermediate", "Advanced", "Pro",
-]);
+export const KITE_LEVELS = ["Beginner", "Intermediate", "Advanced", "Pro"] as const;
+export type KiteLevel = typeof KITE_LEVELS[number];
 
-export const guestTypeEnum = pgEnum("guest_type", ["KiteWorldWide", "Walk-in"]);
+export const GUEST_TYPES = ["KiteWorldWide", "Walk-in"] as const;
+export type GuestType = typeof GUEST_TYPES[number];
 
 export const schoolCustomers = pgTable("school_customers", {
   id: serial("id").primaryKey(),
   schoolConfigId: integer("school_config_id").notNull().references(() => schoolConfigs.id),
-  guestType: guestTypeEnum("guest_type").notNull().default("Walk-in"),
+  guestType: text("guest_type").notNull().default("Walk-in").$type<GuestType>(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email").notNull(),
   phone: text("phone").notNull(),
   nationality: text("nationality").notNull(),
   dateOfBirth: text("date_of_birth").notNull(),
-  kiteLevel: kiteLevelEnum("kite_level").notNull(),
+  kiteLevel: text("kite_level").notNull().$type<KiteLevel>(),
   weightKg: integer("weight_kg"),
   emergencyContact: text("emergency_contact").notNull(),
   arrivalDate: text("arrival_date").notNull(),

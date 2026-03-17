@@ -311,31 +311,17 @@ app.use((req, res, next) => {
     `);
 
     await dbInstance.execute(sql`
-      DO $$ BEGIN
-        CREATE TYPE kite_level AS ENUM ('Beginner', 'Intermediate', 'Advanced', 'Pro');
-      EXCEPTION WHEN duplicate_object THEN NULL;
-      END $$
-    `);
-
-    await dbInstance.execute(sql`
-      DO $$ BEGIN
-        CREATE TYPE guest_type AS ENUM ('KiteWorldWide', 'Walk-in');
-      EXCEPTION WHEN duplicate_object THEN NULL;
-      END $$
-    `);
-
-    await dbInstance.execute(sql`
       CREATE TABLE IF NOT EXISTS school_customers (
         id SERIAL PRIMARY KEY,
         school_config_id INTEGER NOT NULL REFERENCES school_configs(id),
-        guest_type guest_type NOT NULL DEFAULT 'Walk-in',
+        guest_type TEXT NOT NULL DEFAULT 'Walk-in',
         first_name TEXT NOT NULL,
         last_name TEXT NOT NULL,
         email TEXT NOT NULL,
         phone TEXT NOT NULL,
         nationality TEXT NOT NULL,
         date_of_birth TEXT NOT NULL,
-        kite_level kite_level NOT NULL,
+        kite_level TEXT NOT NULL,
         weight_kg INTEGER,
         emergency_contact TEXT NOT NULL,
         arrival_date TEXT NOT NULL,
@@ -347,12 +333,35 @@ app.use((req, res, next) => {
     `);
 
     await dbInstance.execute(sql`
-      ALTER TABLE school_customers ADD COLUMN IF NOT EXISTS guest_type guest_type NOT NULL DEFAULT 'Walk-in'
+      ALTER TABLE school_customers ADD COLUMN IF NOT EXISTS guest_type TEXT NOT NULL DEFAULT 'Walk-in'
     `);
+
+    // Convert enum columns to text if they were previously created as enums
+    await dbInstance.execute(sql.raw(`
+      DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'school_customers' AND column_name = 'kite_level'
+            AND data_type = 'USER-DEFINED'
+        ) THEN
+          ALTER TABLE school_customers ALTER COLUMN kite_level DROP DEFAULT;
+          ALTER TABLE school_customers ALTER COLUMN kite_level TYPE TEXT USING kite_level::TEXT;
+        END IF;
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'school_customers' AND column_name = 'guest_type'
+            AND data_type = 'USER-DEFINED'
+        ) THEN
+          ALTER TABLE school_customers ALTER COLUMN guest_type DROP DEFAULT;
+          ALTER TABLE school_customers ALTER COLUMN guest_type TYPE TEXT USING guest_type::TEXT;
+          ALTER TABLE school_customers ALTER COLUMN guest_type SET DEFAULT 'Walk-in';
+        END IF;
+      END $$
+    `));
 
     await dbInstance.execute(sql`
       INSERT INTO school_customers (school_config_id, guest_type, first_name, last_name, email, phone, nationality, date_of_birth, kite_level, weight_kg, emergency_contact, arrival_date, departure_date, notes)
-      SELECT sc.id, c.gt::guest_type, c.fn, c.ln, c.em, c.ph, c.nat, c.dob, c.kl::kite_level, c.wt, c.ec, c.arr, c.dep, c.nt
+      SELECT sc.id, c.gt, c.fn, c.ln, c.em, c.ph, c.nat, c.dob, c.kl, c.wt, c.ec, c.arr, c.dep, c.nt
       FROM school_configs sc
       JOIN stations st ON sc.station_id = st.id
       CROSS JOIN (VALUES
