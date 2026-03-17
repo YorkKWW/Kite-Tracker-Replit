@@ -51,15 +51,28 @@ type ScanResult =
   | { status: "found"; id: number; serial: string; brand: string; model: string; type: string }
   | { status: "not_found"; serial: string };
 
+function isKiteSchoolStation(name: string) {
+  const lower = name.toLowerCase();
+  return !["hamburg", "heidenau", "transfer", "incoming", "warehouse"].some(kw => lower.includes(kw));
+}
+
 export default function Layout({ children }: LayoutProps) {
-  const { user, logout, isAdmin, isHamburg, isStationLead, isSuperAdmin, viewMode, setViewMode, isSimulating } = useAuth();
+  const { user, logout, isAdmin, isHamburg, isStationLead, isSuperAdmin, viewMode, setViewMode, isSimulating, simStationId, setSimStationId } = useAuth();
   const [location, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [quickType, setQuickType] = useState("kite");
   const [quickBrand, setQuickBrand] = useState("");
+  const [stationPickerOpen, setStationPickerOpen] = useState(false);
   const { toast } = useToast();
+
+  const { data: allStations } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ["/api/stations"],
+    enabled: !!isSuperAdmin,
+    staleTime: 60000,
+  });
+  const kiteSchoolStations = (allStations ?? []).filter(s => isKiteSchoolStation(s.name));
 
   const handleScan = async (code: string) => {
     try {
@@ -206,7 +219,25 @@ export default function Layout({ children }: LayoutProps) {
       {isSimulating && (
         <div className="sticky top-0 z-[60] bg-amber-500 text-amber-950 text-center py-1 text-xs font-semibold flex items-center justify-center gap-2" data-testid="banner-simulation">
           <EyeOff className="h-3.5 w-3.5" />
-          Simulated View: {viewMode === "admin" ? "Admin" : viewMode === "manager" ? "Hamburg Manager" : "Center Manager"}
+          Simulated View: {viewMode === "admin" ? "Admin" : viewMode === "manager" ? "Hamburg Manager" : (
+            <>
+              Center Manager
+              {simStationId && allStations && (
+                <span className="font-normal">
+                  — {allStations.find(s => s.id === simStationId)?.name ?? ""}
+                </span>
+              )}
+              {viewMode === "station_lead" && (
+                <button
+                  className="underline font-normal hover:no-underline"
+                  onClick={() => setStationPickerOpen(true)}
+                  data-testid="button-change-station"
+                >
+                  {simStationId ? "Change" : "Pick station"}
+                </button>
+              )}
+            </>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -255,7 +286,13 @@ export default function Layout({ children }: LayoutProps) {
             {user?.isSuperAdmin && (
               <Select
                 value={viewMode ?? "super_admin"}
-                onValueChange={(v) => setViewMode(v === "super_admin" ? null : v as ViewMode)}
+                onValueChange={(v) => {
+                  if (v === "station_lead") {
+                    setStationPickerOpen(true);
+                  } else {
+                    setViewMode(v === "super_admin" ? null : v as ViewMode);
+                  }
+                }}
               >
                 <SelectTrigger className="h-8 w-auto gap-1 text-xs border-dashed" data-testid="select-view-mode">
                   <Eye className="h-3.5 w-3.5" />
@@ -570,6 +607,39 @@ export default function Layout({ children }: LayoutProps) {
           </button>
         </div>
       </nav>
+
+      <Dialog open={stationPickerOpen} onOpenChange={setStationPickerOpen}>
+        <DialogContent className="sm:max-w-sm" data-testid="dialog-station-picker">
+          <DialogHeader>
+            <DialogTitle>Select Station — Center Manager View</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 pt-2">
+            {kiteSchoolStations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No kite school stations found.</p>
+            ) : (
+              kiteSchoolStations.map(s => (
+                <button
+                  key={s.id}
+                  className={cn(
+                    "w-full text-left px-4 py-3 rounded-lg border text-sm font-medium transition-colors",
+                    simStationId === s.id
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border hover:border-primary/50 hover:bg-accent"
+                  )}
+                  onClick={() => {
+                    setSimStationId(s.id);
+                    setViewMode("station_lead");
+                    setStationPickerOpen(false);
+                  }}
+                  data-testid={`button-pick-station-${s.id}`}
+                >
+                  {s.name}
+                </button>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

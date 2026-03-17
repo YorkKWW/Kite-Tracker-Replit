@@ -20,12 +20,15 @@ interface AuthContextType {
   viewMode: ViewMode | null;
   setViewMode: (mode: ViewMode | null) => void;
   isSimulating: boolean;
+  simStationId: number | null;
+  setSimStationId: (id: number | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [viewMode, setViewMode] = useState<ViewMode | null>(null);
+  const [viewMode, setViewModeRaw] = useState<ViewMode | null>(null);
+  const [simStationId, setSimStationId] = useState<number | null>(null);
 
   const { data: user, isLoading } = useQuery<AuthUser | null>({
     queryKey: ["/api/auth/me"],
@@ -56,6 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     queryClient.setQueryData(["/api/auth/me"], null);
     queryClient.clear();
+  };
+
+  const setViewMode = (mode: ViewMode | null) => {
+    setViewModeRaw(mode);
+    if (mode !== "station_lead") {
+      setSimStationId(null);
+    }
   };
 
   const actualSuperAdmin = user?.role === "admin" && user?.isSuperAdmin === true;
@@ -90,6 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         viewMode: actualSuperAdmin ? viewMode : null,
         setViewMode: actualSuperAdmin ? setViewMode : () => {},
         isSimulating,
+        simStationId: isSimulating && viewMode === "station_lead" ? simStationId : null,
+        setSimStationId: actualSuperAdmin ? setSimStationId : () => {},
       }}
     >
       {children}

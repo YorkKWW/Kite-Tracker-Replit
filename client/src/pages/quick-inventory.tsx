@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ScanLine, ClipboardCheck, ChevronDown, ChevronUp, History, AlertTriangle, CheckCircle2, Minus, Plus } from "lucide-react";
-import type { AccessoryCategory, AccessoryInventory, InventoryCheck, Station } from "@shared/schema";
+import type { AccessoryCategory, AccessoryInventory, InventoryCheck } from "@shared/schema";
 
 interface QuickInventoryData {
   stationName: string;
@@ -32,20 +31,14 @@ interface CountRow {
 }
 
 export default function QuickInventoryPage() {
-  const { user, isStationLead, isSimulating } = useAuth();
+  const { user, isSimulating, simStationId } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [showHistory, setShowHistory] = useState(false);
   const [countRows, setCountRows] = useState<CountRow[] | null>(null);
   const [saving, setSaving] = useState(false);
-  const [simStationId, setSimStationId] = useState<number | null>(null);
 
   const stationId = isSimulating ? simStationId : user?.assignedStationId;
-
-  const { data: stations } = useQuery<Station[]>({
-    queryKey: ["/api/stations"],
-    enabled: isSimulating && !simStationId,
-  });
 
   const { data, isLoading } = useQuery<QuickInventoryData>({
     queryKey: ["/api/stations", stationId, "quick-inventory"],
@@ -165,27 +158,14 @@ export default function QuickInventoryPage() {
   const diffCount = countRows?.filter(r => r.actualQuantity !== null && r.actualQuantity !== r.targetQuantity).length ?? 0;
 
   if (!stationId) {
-    if (isSimulating && stations) {
-      return (
-        <div className="max-w-lg mx-auto p-4 space-y-4">
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Quick Inventory</h1>
-          <p className="text-sm text-muted-foreground">Simulation mode — select a station:</p>
-          <Select onValueChange={(v) => setSimStationId(parseInt(v))} data-testid="select-sim-station">
-            <SelectTrigger>
-              <SelectValue placeholder="Choose station..." />
-            </SelectTrigger>
-            <SelectContent>
-              {stations.map(s => (
-                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      );
-    }
     return (
-      <div className="p-4 text-center text-muted-foreground" data-testid="text-no-station">
-        No station assigned. Please contact an admin.
+      <div className="p-6 text-center space-y-2" data-testid="text-no-station">
+        <ClipboardCheck className="h-10 w-10 mx-auto text-muted-foreground/50" />
+        <p className="text-muted-foreground text-sm">
+          {isSimulating
+            ? "No station selected. Use the simulation banner above to pick a station."
+            : "No station assigned. Please contact an admin."}
+        </p>
       </div>
     );
   }
