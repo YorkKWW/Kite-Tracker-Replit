@@ -143,6 +143,15 @@ Quantity-based inventory managed per station (not individual items like equipmen
 - Activity logging
 - Role-based access control (financial data hidden from managers)
 
+## Customer Management
+- **DB Table**: `school_customers` with `guest_type` enum (`KiteWorldWide` | `Walk-in`)
+- **Guest Types**: KiteWorldWide = pre-booked via ERP (future auto-import), Walk-in = direct booking billed on-site
+- **Kite Level**: `kite_level` enum (Beginner/Intermediate/Advanced/Pro)
+- **Access**: Center Manager (station_lead) and Admin; nav visible for station_lead only
+- **Routes**: `/customers` page; API: GET/POST/PATCH/DELETE `/api/school-customers`
+- **Fields**: guestType, firstName, lastName, email, phone, nationality, dateOfBirth, kiteLevel, weightKg, emergencyContact, arrivalDate, departureDate, notes
+- **Seed data**: 4 sample guests at Dakhla (2 KWW + 2 Walk-in)
+
 ## Object Storage
 Photos uploaded via Replit Object Storage presigned URL flow:
 1. Client GETs upload URL from /api/equipment/:id/photos/upload-url

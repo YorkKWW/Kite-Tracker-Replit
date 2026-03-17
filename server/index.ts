@@ -318,9 +318,17 @@ app.use((req, res, next) => {
     `);
 
     await dbInstance.execute(sql`
+      DO $$ BEGIN
+        CREATE TYPE guest_type AS ENUM ('KiteWorldWide', 'Walk-in');
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$
+    `);
+
+    await dbInstance.execute(sql`
       CREATE TABLE IF NOT EXISTS school_customers (
         id SERIAL PRIMARY KEY,
         school_config_id INTEGER NOT NULL REFERENCES school_configs(id),
+        guest_type guest_type NOT NULL DEFAULT 'Walk-in',
         first_name TEXT NOT NULL,
         last_name TEXT NOT NULL,
         email TEXT NOT NULL,
@@ -339,16 +347,20 @@ app.use((req, res, next) => {
     `);
 
     await dbInstance.execute(sql`
-      INSERT INTO school_customers (school_config_id, first_name, last_name, email, phone, nationality, date_of_birth, kite_level, weight_kg, emergency_contact, arrival_date, departure_date, notes)
-      SELECT sc.id, c.fn, c.ln, c.em, c.ph, c.nat, c.dob, c.kl::kite_level, c.wt, c.ec, c.arr, c.dep, c.nt
+      ALTER TABLE school_customers ADD COLUMN IF NOT EXISTS guest_type guest_type NOT NULL DEFAULT 'Walk-in'
+    `);
+
+    await dbInstance.execute(sql`
+      INSERT INTO school_customers (school_config_id, guest_type, first_name, last_name, email, phone, nationality, date_of_birth, kite_level, weight_kg, emergency_contact, arrival_date, departure_date, notes)
+      SELECT sc.id, c.gt::guest_type, c.fn, c.ln, c.em, c.ph, c.nat, c.dob, c.kl::kite_level, c.wt, c.ec, c.arr, c.dep, c.nt
       FROM school_configs sc
       JOIN stations st ON sc.station_id = st.id
       CROSS JOIN (VALUES
-        ('Sophie', 'Müller', 'sophie.mueller@gmail.com', '+49 170 1234567', 'Germany', '1992-05-15', 'Beginner', 62, 'Hans Müller +49 170 9876543', '2026-03-14', '2026-03-21', 'First kite trip, very excited'),
-        ('Jean-Pierre', 'Dubois', 'jp.dubois@outlook.fr', '+33 6 12345678', 'France', '1988-11-20', 'Intermediate', 78, 'Marie Dubois +33 6 87654321', '2026-03-15', '2026-03-22', NULL),
-        ('Carlos', 'Rodriguez', 'carlos.r@yahoo.es', '+34 612 345 678', 'Spain', '1995-03-08', 'Advanced', 82, 'Ana Rodriguez +34 612 876 543', '2026-03-16', '2026-03-18', 'Wants to try foiling'),
-        ('Emma', 'Thompson', 'emma.t@icloud.com', '+44 7700 123456', 'United Kingdom', '1990-08-25', 'Pro', 65, 'James Thompson +44 7700 654321', '2026-03-10', '2026-03-24', 'Competition rider, bringing own gear')
-      ) AS c(fn, ln, em, ph, nat, dob, kl, wt, ec, arr, dep, nt)
+        ('KiteWorldWide', 'Sophie', 'Müller', 'sophie.mueller@gmail.com', '+49 170 1234567', 'Germany', '1992-05-15', 'Beginner', 62, 'Hans Müller +49 170 9876543', '2026-03-14', '2026-03-21', 'First kite trip, very excited'),
+        ('KiteWorldWide', 'Jean-Pierre', 'Dubois', 'jp.dubois@outlook.fr', '+33 6 12345678', 'France', '1988-11-20', 'Intermediate', 78, 'Marie Dubois +33 6 87654321', '2026-03-15', '2026-03-22', NULL),
+        ('Walk-in', 'Carlos', 'Rodriguez', 'carlos.r@yahoo.es', '+34 612 345 678', 'Spain', '1995-03-08', 'Advanced', 82, 'Ana Rodriguez +34 612 876 543', '2026-03-16', '2026-03-18', 'Wants to try foiling'),
+        ('Walk-in', 'Emma', 'Thompson', 'emma.t@icloud.com', '+44 7700 123456', 'United Kingdom', '1990-08-25', 'Pro', 65, 'James Thompson +44 7700 654321', '2026-03-10', '2026-03-24', 'Competition rider, bringing own gear')
+      ) AS c(gt, fn, ln, em, ph, nat, dob, kl, wt, ec, arr, dep, nt)
       WHERE st.name ILIKE '%dakhla%'
       AND NOT EXISTS (SELECT 1 FROM school_customers cst WHERE cst.school_config_id = sc.id)
     `);

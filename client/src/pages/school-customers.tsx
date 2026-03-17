@@ -77,6 +77,7 @@ export default function SchoolCustomersPage() {
   const [phone, setPhone] = useState("");
   const [nationality, setNationality] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const [guestType, setGuestType] = useState<"KiteWorldWide" | "Walk-in">("Walk-in");
   const [kiteLevel, setKiteLevel] = useState("Beginner");
   const [weightKg, setWeightKg] = useState("");
   const [emergencyContact, setEmergencyContact] = useState("");
@@ -141,7 +142,7 @@ export default function SchoolCustomersPage() {
   });
 
   function resetForm() {
-    setFirstName(""); setLastName(""); setEmail(""); setPhone("");
+    setGuestType("Walk-in"); setFirstName(""); setLastName(""); setEmail(""); setPhone("");
     setNationality(""); setDateOfBirth(""); setKiteLevel("Beginner");
     setWeightKg(""); setEmergencyContact(""); setArrivalDate("");
     setDepartureDate(""); setNotes("");
@@ -159,6 +160,7 @@ export default function SchoolCustomersPage() {
 
   function startEdit() {
     if (!selectedCustomer) return;
+    setGuestType((selectedCustomer as any).guestType ?? "Walk-in");
     setFirstName(selectedCustomer.firstName);
     setLastName(selectedCustomer.lastName);
     setEmail(selectedCustomer.email);
@@ -178,6 +180,7 @@ export default function SchoolCustomersPage() {
     if (!activeSchool) return;
     createMutation.mutate({
       schoolConfigId: activeSchool.id,
+      guestType,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: email.trim(),
@@ -198,6 +201,7 @@ export default function SchoolCustomersPage() {
     updateMutation.mutate({
       id: selectedCustomer.id,
       data: {
+        guestType,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
@@ -223,6 +227,42 @@ export default function SchoolCustomersPage() {
 
   const formFields = (
     <div className="space-y-5">
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Guest Type</p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            data-testid="btn-guest-type-kww"
+            onClick={() => setGuestType("KiteWorldWide")}
+            className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-medium transition-colors ${
+              guestType === "KiteWorldWide"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-card border-border text-muted-foreground hover:bg-accent/50"
+            }`}
+          >
+            KiteWorldWide
+          </button>
+          <button
+            type="button"
+            data-testid="btn-guest-type-walkin"
+            onClick={() => setGuestType("Walk-in")}
+            className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-medium transition-colors ${
+              guestType === "Walk-in"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-card border-border text-muted-foreground hover:bg-accent/50"
+            }`}
+          >
+            Walk-in
+          </button>
+        </div>
+        {guestType === "KiteWorldWide" && (
+          <p className="text-[11px] text-muted-foreground mt-1.5">Pre-booked guest — billing via KiteWorldWide ERP</p>
+        )}
+        {guestType === "Walk-in" && (
+          <p className="text-[11px] text-muted-foreground mt-1.5">Direct booking — billed on-site at the center</p>
+        )}
+      </div>
+
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Personal Info</p>
         <div className="grid grid-cols-2 gap-3">
@@ -323,7 +363,10 @@ export default function SchoolCustomersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg" data-testid="text-customer-name">{c.firstName} {c.lastName}</CardTitle>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <Badge variant={(c as any).guestType === "KiteWorldWide" ? "default" : "secondary"} className="text-xs" data-testid="badge-guest-type">
+                    {(c as any).guestType === "KiteWorldWide" ? "KiteWorldWide" : "Walk-in"}
+                  </Badge>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${KITE_LEVEL_COLORS[c.kiteLevel]}`}>{c.kiteLevel}</span>
                   {here && <Badge variant="outline" className="text-xs text-green-700 border-green-300 bg-green-50 dark:bg-green-900/20 dark:text-green-400">Currently here</Badge>}
                 </div>
@@ -430,8 +473,8 @@ export default function SchoolCustomersPage() {
         <p className="text-sm text-muted-foreground py-8 text-center">{search || activeOnly ? "No matching customers." : "No customers registered yet."}</p>
       ) : (
         <div className="space-y-1">
-          <div className="hidden md:grid grid-cols-[1fr_1fr_100px_100px_80px_80px_80px] gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border-b">
-            <span>Name</span><span>Email</span><span>Level</span><span>Nationality</span><span>Arrival</span><span>Departure</span><span>Status</span>
+          <div className="hidden md:grid grid-cols-[1fr_90px_1fr_100px_80px_80px_80px_80px] gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border-b">
+            <span>Name</span><span>Type</span><span>Email</span><span>Level</span><span>Nationality</span><span>Arrival</span><span>Departure</span><span>Status</span>
           </div>
           {filtered.map(c => {
             const here = isCurrentlyHere(c.arrivalDate, c.departureDate);
@@ -440,15 +483,23 @@ export default function SchoolCustomersPage() {
                 key={c.id}
                 data-testid={`row-customer-${c.id}`}
                 onClick={() => openDetail(c)}
-                className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_1fr_100px_100px_80px_80px_80px] gap-2 px-3 py-3 rounded-lg border bg-card hover:bg-accent/30 cursor-pointer transition-colors items-center"
+                className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_90px_1fr_100px_80px_80px_80px_80px] gap-2 px-3 py-3 rounded-lg border bg-card hover:bg-accent/30 cursor-pointer transition-colors items-center"
               >
                 <span className="font-medium text-sm">{c.firstName} {c.lastName}</span>
+                <span className="hidden md:block">
+                  <Badge variant={(c as any).guestType === "KiteWorldWide" ? "default" : "secondary"} className="text-[10px]">
+                    {(c as any).guestType === "KiteWorldWide" ? "KWW" : "Walk-in"}
+                  </Badge>
+                </span>
                 <span className="text-sm text-muted-foreground hidden md:block truncate">{c.email}</span>
                 <span className="hidden md:block"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${KITE_LEVEL_COLORS[c.kiteLevel]}`}>{c.kiteLevel}</span></span>
                 <span className="text-xs text-muted-foreground hidden md:block">{c.nationality}</span>
                 <span className="text-xs hidden md:block">{c.arrivalDate.slice(5)}</span>
                 <span className="text-xs hidden md:block">{c.departureDate.slice(5)}</span>
-                <span className="md:hidden flex items-center gap-2">
+                <span className="md:hidden flex items-center gap-2 flex-wrap">
+                  <Badge variant={(c as any).guestType === "KiteWorldWide" ? "default" : "secondary"} className="text-[10px]">
+                    {(c as any).guestType === "KiteWorldWide" ? "KWW" : "Walk-in"}
+                  </Badge>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${KITE_LEVEL_COLORS[c.kiteLevel]}`}>{c.kiteLevel}</span>
                   {here && <Badge variant="outline" className="text-[10px] text-green-700 border-green-300 bg-green-50 dark:bg-green-900/20 dark:text-green-400">Here</Badge>}
                 </span>

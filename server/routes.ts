@@ -3368,6 +3368,7 @@ export async function registerRoutes(
     }
     const schema = z.object({
       schoolConfigId: z.number().int(),
+      guestType: z.enum(["KiteWorldWide", "Walk-in"]).optional().default("Walk-in"),
       firstName: z.string().min(1),
       lastName: z.string().min(1),
       email: z.string().email(),
@@ -3389,6 +3390,7 @@ export async function registerRoutes(
 
   app.patch("/api/school-customers/:id", requireAdmin, async (req, res) => {
     const schema = z.object({
+      guestType: z.enum(["KiteWorldWide", "Walk-in"]).optional(),
       firstName: z.string().min(1).optional(),
       lastName: z.string().min(1).optional(),
       email: z.string().email().optional(),

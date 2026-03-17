@@ -576,9 +576,12 @@ export const kiteLevelEnum = pgEnum("kite_level", [
   "Beginner", "Intermediate", "Advanced", "Pro",
 ]);
 
+export const guestTypeEnum = pgEnum("guest_type", ["KiteWorldWide", "Walk-in"]);
+
 export const schoolCustomers = pgTable("school_customers", {
   id: serial("id").primaryKey(),
   schoolConfigId: integer("school_config_id").notNull().references(() => schoolConfigs.id),
+  guestType: guestTypeEnum("guest_type").notNull().default("Walk-in"),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email").notNull(),
