@@ -609,7 +609,7 @@ export default function Layout({ children }: LayoutProps) {
       </nav>
 
       <Dialog open={stationPickerOpen} onOpenChange={setStationPickerOpen}>
-        <DialogContent className="sm:max-w-sm" data-testid="dialog-station-picker">
+        <DialogContent className="sm:max-w-sm" aria-describedby={undefined} data-testid="dialog-station-picker">
           <DialogHeader>
             <DialogTitle>Select Station — Center Manager View</DialogTitle>
           </DialogHeader>

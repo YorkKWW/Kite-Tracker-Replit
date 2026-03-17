@@ -26,14 +26,21 @@ type DashboardStats = {
 };
 
 export default function DashboardPage() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isSimulating, simStationId, viewMode } = useAuth();
+  const isStationLeadView = isSimulating && viewMode === "station_lead" && simStationId != null;
+  const dashboardQuery = isStationLeadView ? `/api/dashboard?stationId=${simStationId}` : "/api/dashboard";
 
   const { data: stats, isLoading } = useQuery<DashboardStats>({
-    queryKey: ["/api/dashboard"],
+    queryKey: ["/api/dashboard", isStationLeadView ? simStationId : null],
+    queryFn: async () => {
+      const res = await fetch(dashboardQuery, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
     staleTime: 0,
   });
 
-  const { data: pendingTransfers } = useQuery<Transfer[]>({
+  const { data: allPendingTransfers } = useQuery<Transfer[]>({
     queryKey: ["/api/transfers", "?status=pending"],
     staleTime: 0,
     queryFn: async () => {
@@ -43,6 +50,10 @@ export default function DashboardPage() {
     },
   });
 
+  const pendingTransfers = isStationLeadView && simStationId != null
+    ? allPendingTransfers?.filter((t) => t.fromStationId === simStationId || t.toStationId === simStationId)
+    : allPendingTransfers;
+
   const { data: openFeedbackData } = useQuery<{ count: number }>({
     queryKey: ["/api/feedback/open-count"],
     staleTime: 0,
@@ -51,9 +62,12 @@ export default function DashboardPage() {
 
   const { data: stationsList } = useQuery<Station[]>({ queryKey: ["/api/stations"] });
   const { data: allEquipment } = useQuery<Equipment[]>({
-    queryKey: ["/api/equipment"],
+    queryKey: ["/api/equipment", isStationLeadView ? `?stationId=${simStationId}&includeTransfers=true` : ""],
     queryFn: async () => {
-      const res = await fetch("/api/equipment", { credentials: "include" });
+      const url = isStationLeadView
+        ? `/api/equipment?stationId=${simStationId}&includeTransfers=true`
+        : "/api/equipment";
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
@@ -123,7 +137,11 @@ export default function DashboardPage() {
           Welcome back, {user?.name}
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          {isAdmin ? "Overview of all stations" : "Your station overview"}
+          {isStationLeadView
+            ? `Station overview — ${stationsList?.find(s => s.id === simStationId)?.name ?? "..."}`
+            : isAdmin
+              ? "Overview of all stations"
+              : "Your station overview"}
         </p>
       </div>
 

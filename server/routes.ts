@@ -1439,7 +1439,12 @@ export async function registerRoutes(
 
   app.get("/api/dashboard", requireAuth, async (req, res) => {
     const user = req.user as any;
-    const stationId = user.role === "station_lead" ? user.assignedStationId : undefined;
+    let stationId: number | undefined;
+    if (user.role === "station_lead") {
+      stationId = user.assignedStationId;
+    } else if (req.query.stationId) {
+      stationId = parseInt(req.query.stationId as string);
+    }
     const stats = await storage.getDashboardStats(stationId);
     res.json(stats);
   });

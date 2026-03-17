@@ -775,10 +775,70 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDashboardStats(stationId?: number) {
-    const allEquipment = stationId
-      ? await db.select().from(equipment).where(eq(equipment.currentStationId, stationId))
-      : await db.select().from(equipment);
+    if (stationId) {
+      // Station-scoped view: only own station + in-transfer to/from it
+      const pendingTransfersForStation = await db
+        .select()
+        .from(transfers)
+        .where(
+          and(
+            eq(transfers.status, "pending"),
+            or(
+              eq(transfers.fromStationId, stationId),
+              eq(transfers.toStationId, stationId)
+            )
+          )
+        );
 
+      const inTransferEqIds = pendingTransfersForStation.map((t) => t.equipmentId);
+
+      const ownEq = await db.select().from(equipment).where(eq(equipment.currentStationId, stationId));
+      const inTransferEq = inTransferEqIds.length > 0
+        ? await db.select().from(equipment).where(
+            and(
+              inArray(equipment.id, inTransferEqIds),
+              eq(equipment.status, "in_transfer")
+            )
+          )
+        : [];
+
+      const stationRecord = await db.select().from(stations).where(eq(stations.id, stationId));
+      const stationName = stationRecord[0]?.name ?? `Station ${stationId}`;
+
+      const activeOwn = ownEq.filter((e) => e.status !== "in_transfer");
+
+      const equipmentPerStation = [{
+        stationId,
+        stationName,
+        count: activeOwn.length,
+        kites: activeOwn.filter((e) => e.type === "kite").length,
+        wings: activeOwn.filter((e) => e.type === "wing").length,
+        boards: activeOwn.filter((e) => e.type === "board" || e.type === "foilboard").length,
+        totalValue: activeOwn.reduce((sum, e) => sum + (parseFloat(e.currentValue ?? "0") || 0), 0),
+      }];
+
+      const byType = inTransferEq.reduce((acc, e) => {
+        acc[e.type] = (acc[e.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      return {
+        totalEquipment: activeOwn.length + inTransferEq.length,
+        equipmentPerStation,
+        needsAttention: [...ownEq, ...inTransferEq].filter((e) => e.conditionRating <= 2).length,
+        inTransfer: inTransferEq.length,
+        inTransferBreakdown: {
+          kites: inTransferEq.filter((e) => e.type === "kite").length,
+          wings: inTransferEq.filter((e) => e.type === "wing").length,
+          boards: inTransferEq.filter((e) => e.type === "board" || e.type === "foilboard").length,
+          totalValue: inTransferEq.reduce((sum, e) => sum + (parseFloat(e.currentValue ?? "0") || 0), 0),
+          byType,
+        },
+      };
+    }
+
+    // Admin / full view
+    const allEquipment = await db.select().from(equipment);
     const allStations = await db.select().from(stations);
 
     const equipmentPerStation = allStations.map((s) => {
@@ -808,7 +868,6 @@ export class DatabaseStorage implements IStorage {
     }
 
     const inTransferEq = allEquipment.filter((e) => e.status === "in_transfer");
-
     const byType = inTransferEq.reduce((acc, e) => {
       acc[e.type] = (acc[e.type] || 0) + 1;
       return acc;
