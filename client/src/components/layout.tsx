@@ -138,10 +138,7 @@ export default function Layout({ children }: LayoutProps) {
       : []),
     ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
     ...(hasActiveSchool
-      ? [
-          { href: "/school-products", label: "Products", icon: Tag, group: "school" },
-          { href: "/school-customers", label: "Customers", icon: Users, group: "school" },
-        ]
+      ? [{ href: "/school-view", label: "School", icon: TreePalm }]
       : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
@@ -242,40 +239,29 @@ export default function Layout({ children }: LayoutProps) {
           </div>
 
           <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item, idx) => {
-              const prevItem = navItems[idx - 1] as any;
-              const showSchoolDivider = (item as any).group === "school" && (!prevItem || prevItem.group !== "school");
-              return (
-                <span key={item.href} className="flex items-center gap-1">
-                  {showSchoolDivider && (
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground px-1 border-l ml-1 pl-2">
-                      <TreePalm className="h-3.5 w-3.5" />
+            {navItems.map((item) => (
+              <Link key={item.href} href={item.href}>
+                <Button
+                  variant={isActive(item.href) ? "secondary" : "ghost"}
+                  size="sm"
+                  className={cn("gap-2 relative")}
+                  data-testid={`link-nav-${item.label.toLowerCase()}`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                  {item.href === "/incidents" && openDamageCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center" data-testid="badge-open-incidents">
+                      {openDamageCount > 9 ? "9+" : openDamageCount}
                     </span>
                   )}
-                  <Link href={item.href}>
-                    <Button
-                      variant={isActive(item.href) ? "secondary" : "ghost"}
-                      size="sm"
-                      className={cn("gap-2 relative")}
-                      data-testid={`link-nav-${item.label.toLowerCase()}`}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {item.label}
-                      {item.href === "/incidents" && openDamageCount > 0 && (
-                        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center" data-testid="badge-open-incidents">
-                          {openDamageCount > 9 ? "9+" : openDamageCount}
-                        </span>
-                      )}
-                      {item.href === "/feedback" && openFeedbackCount > 0 && (
-                        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center" data-testid="badge-open-feedback">
-                          {openFeedbackCount > 9 ? "9+" : openFeedbackCount}
-                        </span>
-                      )}
-                    </Button>
-                  </Link>
-                </span>
-              );
-            })}
+                  {item.href === "/feedback" && openFeedbackCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center" data-testid="badge-open-feedback">
+                      {openFeedbackCount > 9 ? "9+" : openFeedbackCount}
+                    </span>
+                  )}
+                </Button>
+              </Link>
+            ))}
           </nav>
 
           <div className="flex items-center gap-1">
@@ -532,41 +518,29 @@ export default function Layout({ children }: LayoutProps) {
         <div className="md:hidden fixed bottom-16 left-0 right-0 z-40 bg-background border-t rounded-t-xl shadow-lg p-2 space-y-1 max-h-[60vh] overflow-y-auto safe-area-bottom">
           {navItems
             .filter((item) => !bottomTabs.some((bt) => bt.href === item.href))
-            .map((item, idx, arr) => {
-              const prevItem = arr[idx - 1] as any;
-              const showSchoolHeader = (item as any).group === "school" && (!prevItem || prevItem.group !== "school");
-              return (
-                <span key={item.href}>
-                  {showSchoolHeader && (
-                    <div className="flex items-center gap-2 px-3 pt-3 pb-1">
-                      <TreePalm className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">School</span>
-                    </div>
-                  )}
-                  <Link href={item.href}>
-                    <Button
-                      variant={isActive(item.href) ? "secondary" : "ghost"}
-                      className="w-full justify-start gap-3 relative"
-                      onClick={() => setMobileMenuOpen(false)}
-                      data-testid={`link-mobile-nav-${item.label.toLowerCase()}`}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {item.label}
-                      {item.href === "/incidents" && openDamageCount > 0 && (
-                        <span className="ml-auto h-5 min-w-[20px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
-                          {openDamageCount > 9 ? "9+" : openDamageCount}
-                        </span>
-                      )}
-                      {item.href === "/feedback" && openFeedbackCount > 0 && (
-                        <span className="ml-auto h-5 min-w-[20px] rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
-                          {openFeedbackCount > 9 ? "9+" : openFeedbackCount}
-                        </span>
-                      )}
-                    </Button>
-                  </Link>
-                </span>
-              );
-            })}
+            .map((item) => (
+            <Link key={item.href} href={item.href}>
+              <Button
+                variant={isActive(item.href) ? "secondary" : "ghost"}
+                className="w-full justify-start gap-3 relative"
+                onClick={() => setMobileMenuOpen(false)}
+                data-testid={`link-mobile-nav-${item.label.toLowerCase()}`}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+                {item.href === "/incidents" && openDamageCount > 0 && (
+                  <span className="ml-auto h-5 min-w-[20px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                    {openDamageCount > 9 ? "9+" : openDamageCount}
+                  </span>
+                )}
+                {item.href === "/feedback" && openFeedbackCount > 0 && (
+                  <span className="ml-auto h-5 min-w-[20px] rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                    {openFeedbackCount > 9 ? "9+" : openFeedbackCount}
+                  </span>
+                )}
+              </Button>
+            </Link>
+          ))}
         </div>
       )}
 

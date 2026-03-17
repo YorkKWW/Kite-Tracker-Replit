@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { Users, Plus, ArrowLeft, Trash2, Pencil, Search, X } from "lucide-react";
+import { TreePalm, Tag, Users, Plus, ArrowLeft, Trash2, Pencil, Search, X, Settings } from "lucide-react";
 import type { SchoolCustomer } from "@shared/schema";
 
 type SchoolConfig = {
@@ -23,6 +24,25 @@ type SchoolConfig = {
   currency: string;
   isActive: boolean;
   stationName: string;
+};
+
+type SchoolProduct = {
+  id: number;
+  schoolConfigId: number;
+  name: string;
+  description: string | null;
+  category: string;
+  defaultPrice: string;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Course: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  Lesson: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  Package: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  Rental: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  Other: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
 };
 
 const KITE_LEVELS = ["beginner", "intermediate", "advanced", "pro"] as const;
@@ -38,36 +58,196 @@ const NATIONALITIES = [
   "AF","AL","DZ","AD","AO","AG","AR","AM","AU","AT","AZ","BS","BH","BD","BB","BY","BE","BZ","BJ","BT","BO","BA","BW","BR","BN","BG","BF","BI","KH","CM","CA","CV","CF","TD","CL","CN","CO","KM","CG","CR","CI","HR","CU","CY","CZ","DK","DJ","DM","DO","EC","EG","SV","GQ","ER","EE","ET","FJ","FI","FR","GA","GM","GE","DE","GH","GR","GD","GT","GN","GW","GY","HT","HN","HU","IS","IN","ID","IR","IQ","IE","IL","IT","JM","JP","JO","KZ","KE","KI","KW","KG","LA","LV","LB","LS","LR","LY","LI","LT","LU","MK","MG","MW","MY","MV","ML","MT","MH","MR","MU","MX","FM","MD","MC","MN","ME","MA","MZ","MM","NA","NR","NP","NL","NZ","NI","NE","NG","NO","OM","PK","PW","PA","PG","PY","PE","PH","PL","PT","QA","RO","RU","RW","KN","LC","VC","WS","SM","ST","SA","SN","RS","SC","SL","SG","SK","SI","SB","SO","ZA","KR","SS","ES","LK","SD","SR","SZ","SE","CH","SY","TW","TJ","TZ","TH","TL","TG","TO","TT","TN","TR","TM","TV","UG","UA","AE","GB","US","UY","UZ","VU","VE","VN","YE","ZM","ZW"
 ];
 
-export default function SchoolCustomersPage() {
+function formatPrice(price: string | number, currency: string): string {
+  const num = typeof price === "string" ? parseFloat(price) : price;
+  return new Intl.NumberFormat("en-US", { style: "currency", currency, minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(num);
+}
+
+export default function SchoolViewPage() {
   const { user, isAdmin } = useAuth();
+  const { toast } = useToast();
+  const [tab, setTab] = useState<"products" | "customers">("products");
+  const [selectedConfigId, setSelectedConfigId] = useState<string>("");
+
+  const { data: configs = [], isLoading: configsLoading } = useQuery<SchoolConfig[]>({
+    queryKey: ["/api/school-configs"],
+    staleTime: 60000,
+  });
+
+  const activeConfigs = useMemo(() => configs.filter(c => c.isActive), [configs]);
+
+  const activeConfig = useMemo(() => {
+    if (!user) return null;
+    if (isAdmin) {
+      if (selectedConfigId) return activeConfigs.find(c => c.id === parseInt(selectedConfigId)) || null;
+      return activeConfigs[0] || null;
+    }
+    return activeConfigs.find(c => c.stationId === user.assignedStationId) || null;
+  }, [activeConfigs, user, isAdmin, selectedConfigId]);
+
+  if (configsLoading) {
+    return <div className="p-4 space-y-3"><Skeleton className="h-8 w-48" /><Skeleton className="h-64 w-full" /></div>;
+  }
+
+  if (!activeConfig) {
+    return (
+      <div className="p-4">
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <TreePalm className="h-12 w-12 mx-auto mb-3 opacity-40" />
+            <p>No school configured for your station.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <TreePalm className="h-5 w-5 shrink-0" />
+          <h1 className="text-lg font-bold truncate" data-testid="text-school-title">{activeConfig.schoolName}</h1>
+        </div>
+        {isAdmin && activeConfigs.length > 1 && (
+          <Select value={String(activeConfig.id)} onValueChange={setSelectedConfigId}>
+            <SelectTrigger className="w-48" data-testid="select-school-config">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {activeConfigs.map(c => (
+                <SelectItem key={c.id} value={String(c.id)}>{c.schoolName}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      <div className="flex gap-1 border-b">
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === "products" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setTab("products")}
+          data-testid="tab-products"
+        >
+          <Tag className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
+          Rentals & Courses
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === "customers" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setTab("customers")}
+          data-testid="tab-customers"
+        >
+          <Users className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
+          Customers
+        </button>
+      </div>
+
+      {tab === "products" ? (
+        <ProductsTab config={activeConfig} />
+      ) : (
+        <CustomersTab config={activeConfig} />
+      )}
+    </div>
+  );
+}
+
+function ProductsTab({ config }: { config: SchoolConfig }) {
+  const { isAdmin } = useAuth();
+
+  const { data: products = [], isLoading } = useQuery<SchoolProduct[]>({
+    queryKey: ["/api/school-products", config.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/school-products?schoolConfigId=${config.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load");
+      return res.json();
+    },
+    staleTime: 0,
+  });
+
+  const sortedProducts = useMemo(() => {
+    return products.filter(p => p.isActive).sort((a, b) => {
+      const catOrder = a.category.localeCompare(b.category);
+      if (catOrder !== 0) return catOrder;
+      return a.name.localeCompare(b.name);
+    });
+  }, [products]);
+
+  if (isLoading) {
+    return <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {isAdmin && (
+        <div className="flex justify-end">
+          <Link href="/school-admin">
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" data-testid="link-edit-settings">
+              <Settings className="h-3.5 w-3.5 mr-1" /> Edit in Settings
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      {sortedProducts.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Tag className="h-10 w-10 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">No products configured yet.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="border rounded-md overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead className="text-right">Price</TableHead>
+                <TableHead className="hidden sm:table-cell">Description</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedProducts.map((p) => (
+                <TableRow key={p.id} data-testid={`row-product-${p.id}`}>
+                  <TableCell className="font-medium" data-testid={`text-product-name-${p.id}`}>{p.name}</TableCell>
+                  <TableCell>
+                    <Badge className={`text-xs ${CATEGORY_COLORS[p.category] || CATEGORY_COLORS.Other}`}>
+                      {p.category}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm" data-testid={`text-product-price-${p.id}`}>
+                    {formatPrice(p.defaultPrice, config.currency)}
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                    {p.description || "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CustomersTab({ config }: { config: SchoolConfig }) {
+  const { isAdmin } = useAuth();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<SchoolCustomer | null>(null);
   const [editMode, setEditMode] = useState(false);
 
-  const { data: configs = [], isLoading: configsLoading } = useQuery<SchoolConfig[]>({
-    queryKey: ["/api/school-configs"],
-    staleTime: 0,
-  });
-
-  const activeConfig = useMemo(() => {
-    if (!user) return null;
-    if (isAdmin) return configs[0] || null;
-    return configs.find(c => c.stationId === user.stationId) || null;
-  }, [configs, user, isAdmin]);
-
-  const { data: customers = [], isLoading: customersLoading } = useQuery<SchoolCustomer[]>({
-    queryKey: ["/api/school-customers", activeConfig?.id, search],
+  const { data: customers = [], isLoading } = useQuery<SchoolCustomer[]>({
+    queryKey: ["/api/school-customers", config.id, search],
     queryFn: async () => {
-      if (!activeConfig) return [];
-      const params = new URLSearchParams({ schoolConfigId: String(activeConfig.id) });
+      const params = new URLSearchParams({ schoolConfigId: String(config.id) });
       if (search.trim()) params.set("search", search.trim());
       const res = await fetch(`/api/school-customers?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load");
       return res.json();
     },
-    enabled: !!activeConfig,
     staleTime: 0,
   });
 
@@ -85,16 +265,12 @@ export default function SchoolCustomersPage() {
 
   const openEdit = (c: SchoolCustomer) => {
     setFormData({
-      firstName: c.firstName,
-      lastName: c.lastName,
-      email: c.email,
-      phone: c.phone,
+      firstName: c.firstName, lastName: c.lastName, email: c.email, phone: c.phone,
       nationality: c.nationality,
       dateOfBirth: c.dateOfBirth ? new Date(c.dateOfBirth).toISOString().split("T")[0] : "",
       kiteLevel: c.kiteLevel,
       weightKg: c.weightKg ? String(c.weightKg) : "",
-      emergencyContact: c.emergencyContact,
-      notes: c.notes || "",
+      emergencyContact: c.emergencyContact, notes: c.notes || "",
     });
     setSelectedCustomer(c);
     setEditMode(true);
@@ -134,55 +310,32 @@ export default function SchoolCustomersPage() {
 
   const handleSubmit = () => {
     const payload: any = {
-      firstName: formData.firstName.trim(),
-      lastName: formData.lastName.trim(),
-      email: formData.email.trim(),
-      phone: formData.phone.trim(),
-      nationality: formData.nationality,
-      dateOfBirth: formData.dateOfBirth,
+      firstName: formData.firstName.trim(), lastName: formData.lastName.trim(),
+      email: formData.email.trim(), phone: formData.phone.trim(),
+      nationality: formData.nationality, dateOfBirth: formData.dateOfBirth,
       kiteLevel: formData.kiteLevel,
       weightKg: formData.weightKg ? parseInt(formData.weightKg) : null,
       emergencyContact: formData.emergencyContact.trim(),
       notes: formData.notes.trim() || null,
     };
-
     if (!payload.firstName || !payload.lastName || !payload.email || !payload.phone || !payload.dateOfBirth || !payload.emergencyContact) {
       toast({ title: "Fill all required fields", variant: "destructive" });
       return;
     }
-
     if (editMode && selectedCustomer) {
       updateMutation.mutate({ id: selectedCustomer.id, data: payload });
     } else {
-      payload.schoolConfigId = activeConfig!.id;
+      payload.schoolConfigId = config.id;
       createMutation.mutate(payload);
     }
   };
 
-  if (configsLoading) {
-    return <div className="p-4 space-y-3"><Skeleton className="h-8 w-48" /><Skeleton className="h-64 w-full" /></div>;
-  }
-
-  if (!activeConfig) {
-    return (
-      <div className="p-4">
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <Users className="h-12 w-12 mx-auto mb-3 opacity-40" />
-            <p>No school configured for your station.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   if (selectedCustomer && !showForm) {
     return (
-      <div className="p-4 space-y-4 max-w-2xl mx-auto">
+      <div className="space-y-4 max-w-2xl mx-auto">
         <Button variant="ghost" size="sm" onClick={() => setSelectedCustomer(null)} data-testid="button-back-customers">
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
-
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -236,33 +389,29 @@ export default function SchoolCustomersPage() {
   }
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold flex items-center gap-2">
-          <Users className="h-5 w-5" /> {activeConfig.schoolName} — Customers
-        </h1>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search name or email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 pr-9"
+            data-testid="input-search-customers"
+          />
+          {search && (
+            <button className="absolute right-3 top-1/2 -translate-y-1/2" onClick={() => setSearch("")}>
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+        </div>
         <Button size="sm" onClick={openCreate} data-testid="button-add-customer">
-          <Plus className="h-4 w-4 mr-1" /> Add Customer
+          <Plus className="h-4 w-4 mr-1" /> Add
         </Button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search name or email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 pr-9"
-          data-testid="input-search-customers"
-        />
-        {search && (
-          <button className="absolute right-3 top-1/2 -translate-y-1/2" onClick={() => setSearch("")}>
-            <X className="h-4 w-4 text-muted-foreground" />
-          </button>
-        )}
-      </div>
-
-      {customersLoading ? (
+      {isLoading ? (
         <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
       ) : customers.length === 0 ? (
         <Card>
@@ -314,7 +463,6 @@ export default function SchoolCustomersPage() {
           <DialogHeader>
             <DialogTitle>{editMode ? "Edit Customer" : "Add Customer"}</DialogTitle>
           </DialogHeader>
-
           <div className="space-y-4">
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Personal Info</p>
@@ -354,7 +502,6 @@ export default function SchoolCustomersPage() {
                 </div>
               </div>
             </div>
-
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Kite Info</p>
               <div className="grid grid-cols-2 gap-3">
@@ -377,13 +524,11 @@ export default function SchoolCustomersPage() {
                 <Input placeholder="Name + Phone" value={formData.emergencyContact} onChange={e => setFormData(f => ({ ...f, emergencyContact: e.target.value }))} data-testid="input-emergency" />
               </div>
             </div>
-
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Notes</p>
               <Textarea placeholder="Optional notes..." value={formData.notes} onChange={e => setFormData(f => ({ ...f, notes: e.target.value }))} rows={3} data-testid="input-notes" />
             </div>
           </div>
-
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setShowForm(false)} data-testid="button-cancel">Cancel</Button>
             <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-customer">
