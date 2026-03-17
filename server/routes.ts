@@ -1444,19 +1444,59 @@ export async function registerRoutes(
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     try {
-      const content = fs.readFileSync(req.file.path, "utf-8").replace(/\r/g, "");
+      // Strip BOM + normalise line endings
+      const content = fs.readFileSync(req.file.path, "utf-8")
+        .replace(/^\uFEFF/, "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n");
       const lines = content.split("\n").filter((l) => l.trim());
       if (lines.length < 2) return res.status(400).json({ message: "File is empty or has no data rows" });
 
-      // Auto-detect delimiter: semicolon or comma
-      const delimiter = lines[0].includes(";") ? ";" : ",";
-      const rawHeaders = lines[0].split(delimiter).map((h) => h.trim().replace(/['"]/g, ""));
+      // Auto-detect delimiter: semicolon or comma (check header row, ignoring quoted sections)
+      const headerLine = lines[0];
+      const unquoted = headerLine.replace(/"[^"]*"/g, "");
+      const delimiter = unquoted.includes(";") ? ";" : ",";
+
+      // Proper CSV field parser that respects quoted fields
+      function parseCSVLine(line: string, delim: string): string[] {
+        const fields: string[] = [];
+        let current = "";
+        let inQuotes = false;
+        for (let j = 0; j < line.length; j++) {
+          const ch = line[j];
+          if (inQuotes) {
+            if (ch === '"' && line[j + 1] === '"') {
+              current += '"';
+              j++;
+            } else if (ch === '"') {
+              inQuotes = false;
+            } else {
+              current += ch;
+            }
+          } else {
+            if (ch === '"') {
+              inQuotes = true;
+            } else if (ch === delim) {
+              fields.push(current.trim());
+              current = "";
+            } else {
+              current += ch;
+            }
+          }
+        }
+        fields.push(current.trim());
+        return fields;
+      }
+
+      const rawHeaders = parseCSVLine(lines[0], delimiter).map(h => h.replace(/['"]/g, ""));
 
       // Normalise header → internal key
       function normaliseHeader(h: string): string {
-        return h.toLowerCase()
+        const cleaned = h.toLowerCase()
+          .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
           .replace(/\s+/g, "_")
           .replace(/[^a-z0-9_]/g, "");
+        return cleaned;
       }
       const headers = rawHeaders.map(normaliseHeader);
 
@@ -1483,18 +1523,21 @@ export async function registerRoutes(
 
       const results = { imported: 0, skipped: 0, duplicates: 0, errors: [] as string[], skippedSerials: [] as string[] };
 
+      console.log(`[CSV Import] Delimiter: "${delimiter}", Headers: ${JSON.stringify(headers)}, Rows: ${lines.length - 1}`);
+
       for (let i = 1; i < lines.length; i++) {
-        // Handle quoted fields that may contain the delimiter
-        const values = lines[i].split(delimiter).map((v) => v.trim().replace(/^["']|["']$/g, ""));
+        const values = parseCSVLine(lines[i], delimiter);
         const row: Record<string, string> = {};
         headers.forEach((h, idx) => { row[h] = values[idx] || ""; });
 
-        // Serial number — handle multiple possible header names
+        // Serial number — handle multiple possible header names (EN + DE)
         const serialNumber =
           row["serial_number"] || row["serialnumber"] || row["serial"] ||
-          row["serial_nr"] || row["sn"] || "";
+          row["serial_nr"] || row["sn"] || row["seriennummer"] || row["serien_nummer"] ||
+          row["seriennr"] || row["serien_nr"] || row["s_n"] || "";
+        
         if (!serialNumber.trim()) {
-          results.errors.push(`Row ${i + 1}: Missing serial number`);
+          results.errors.push(`Row ${i + 1}: Missing serial number (columns: ${headers.join(", ")})`);
           results.skipped++;
           continue;
         }
