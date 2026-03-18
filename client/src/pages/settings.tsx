@@ -276,12 +276,15 @@ export default function SettingsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="p-4 rounded-md bg-amber-500/10 border border-amber-500/30">
+                <p className="text-sm text-amber-700 dark:text-amber-400">CSV Import is currently disabled. We're working on improving the import process to ensure data integrity.</p>
+              </div>
               <div>
-                <Label htmlFor="csv-import" className="flex items-center justify-center gap-2 p-6 border-2 border-dashed rounded-md cursor-pointer text-muted-foreground hover:bg-accent/20 transition-colors">
-                  {importing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-                  <span className="text-sm">{importing ? "Importing..." : "Select CSV file"}</span>
+                <Label htmlFor="csv-import" className="flex items-center justify-center gap-2 p-6 border-2 border-dashed rounded-md cursor-not-allowed text-muted-foreground/50 bg-muted/30 transition-colors">
+                  <Upload className="h-5 w-5" />
+                  <span className="text-sm">CSV Import Disabled</span>
                 </Label>
-                <input ref={fileRef} id="csv-import" type="file" accept=".csv" className="hidden" onChange={handleImport} disabled={importing} data-testid="input-csv-import" />
+                <input ref={fileRef} id="csv-import" type="file" accept=".csv" className="hidden" onChange={handleImport} disabled={true} data-testid="input-csv-import" />
               </div>
               {importResult && (
                 <div className="p-4 rounded-md bg-muted/50 space-y-2">

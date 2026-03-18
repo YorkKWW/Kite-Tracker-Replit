@@ -1463,6 +1463,8 @@ export async function registerRoutes(
   });
 
   app.post("/api/equipment/import", requireHamburg, uploadCsv.single("file"), async (req, res) => {
+    return res.status(503).json({ message: "CSV Import is currently disabled. We're working on improving the import process to ensure data integrity." });
+    
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     try {
