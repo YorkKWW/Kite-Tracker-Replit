@@ -1535,6 +1535,17 @@ export async function registerRoutes(
         helmets: "helmet_safety", helmet: "helmet_safety",
       };
 
+      const STATUS_MAP: Record<string, string> = {
+        active: "active", aktiv: "active", ok: "active", good: "active",
+        in_repair: "in_repair", repair: "in_repair", reparatur: "in_repair",
+        in_reparatur: "in_repair", "in repair": "in_repair", defekt: "in_repair",
+        retired: "retired", ausgemustert: "retired", entsorgt: "retired",
+        sold: "sold", verkauft: "sold",
+        in_transfer: "in_transfer", transfer: "in_transfer", "in transfer": "in_transfer",
+        missing: "missing", vermisst: "missing", fehlt: "missing",
+      };
+      const VALID_STATUSES = new Set(["active", "in_repair", "retired", "sold", "in_transfer", "missing"]);
+
       const allStationsForImport = await storage.getAllStations();
       // targetStationId can be passed from the frontend to assign a specific station
       const targetStationId = req.body?.targetStationId ? parseInt(req.body.targetStationId) : null;
@@ -1545,7 +1556,7 @@ export async function registerRoutes(
 
       const results = { imported: 0, skipped: 0, duplicates: 0, errors: [] as string[], skippedSerials: [] as string[] };
 
-      console.log(`[CSV Import] Delimiter: "${delimiter}", Headers: ${JSON.stringify(headers)}, Rows: ${lines.length - 1}`);
+      console.log(`[CSV Import] Delimiter: "${delimiter}", Headers: ${JSON.stringify(headers)}, Rows: ${lines.length - 1}, HasStatusColumn: ${headers.some(h => ["status","zustand_status","equipment_status","state"].includes(h))}`);
 
       for (let i = 1; i < lines.length; i++) {
         const values = parseCSVLine(lines[i], delimiter);
@@ -1594,8 +1605,20 @@ export async function registerRoutes(
           if (matched) stationId = matched.id;
         }
 
+        // Status — map from CSV or default to "active"
+        const rawStatus = row["status"] || row["zustand_status"] || row["equipment_status"] || row["state"] || "";
+        let status: string = "active";
+        if (rawStatus.trim()) {
+          const mapped = STATUS_MAP[rawStatus.trim().toLowerCase().replace(/\s+/g, "_")];
+          if (mapped) {
+            status = mapped;
+          } else if (VALID_STATUSES.has(rawStatus.trim().toLowerCase())) {
+            status = rawStatus.trim().toLowerCase();
+          }
+        }
+
         // Condition: CSV values are taken as-is on 1–5 scale (5=best, 1=worst)
-        const rawCond = row["condition"] || row["zustand"] || "";
+        const rawCond = row["condition"] || row["condition_rating"] || row["zustand"] || row["bewertung"] || "";
         let conditionRating = 5;
         if (rawCond.trim()) {
           const n = parseInt(rawCond.trim());
@@ -1605,7 +1628,7 @@ export async function registerRoutes(
         }
 
         // Purchase date
-        const rawDate = row["date_of_purchase"] || row["purchase_date"] || row["date"] || "";
+        const rawDate = row["date_of_purchase"] || row["purchase_date"] || row["date"] || row["kaufdatum"] || "";
         let purchaseDate: Date | null = null;
         if (rawDate.trim()) {
           const d = new Date(rawDate.trim());
@@ -1618,8 +1641,10 @@ export async function registerRoutes(
           const cleaned = raw.replace(/[€$\s]/g, "").replace(",", ".");
           return isNaN(parseFloat(cleaned)) ? null : cleaned;
         }
-        const purchasePrice = parsePrice(row["purchase_price_"] || row["purchase_price"] || row["preis"] || "");
-        const currentValue = parsePrice(row["current_value_"] || row["current_value"] || row["aktueller_wert"] || "") ?? purchasePrice;
+        const purchasePrice = parsePrice(row["purchase_price_"] || row["purchase_price"] || row["preis"] || row["einkaufspreis"] || "");
+        const currentValue = parsePrice(row["current_value_"] || row["current_value"] || row["aktueller_wert"] || row["zeitwert"] || "") ?? purchasePrice;
+        const salePrice = parsePrice(row["sale_price"] || row["sale_price_"] || row["verkaufspreis"] || "");
+        const invoiceReference = (row["invoice_reference"] || row["invoice_ref"] || row["rechnungsnummer"] || row["rechnung"] || "").trim() || null;
 
         try {
           await storage.createEquipment({
@@ -1629,13 +1654,15 @@ export async function registerRoutes(
             brand: (row["brand"] || row["marke"] || "Unknown").trim(),
             model,
             purchaseDate,
-            yearOfPurchase: purchaseDate ? purchaseDate.getFullYear() : (row["year"] ? parseInt(row["year"]) : null),
+            yearOfPurchase: purchaseDate ? purchaseDate.getFullYear() : (row["year"] || row["year_of_purchase"] || row["baujahr"] || row["kaufjahr"] ? parseInt(row["year"] || row["year_of_purchase"] || row["baujahr"] || row["kaufjahr"]) : null),
             currentStationId: stationId,
-            status: "active",
+            status: status as any,
             conditionRating,
             notes: (row["notes"] || row["bemerkung"] || "").trim() || null,
             purchasePrice,
             currentValue,
+            salePrice,
+            invoiceReference,
             typeSpecificFields: {
               ...(sizeVal ? { size: sizeVal } : {}),
               ...(row["color"] || row["farbe"] ? { color: (row["color"] || row["farbe"]).trim() } : {}),
