@@ -558,23 +558,23 @@ function WindBarCard({
   const maxBar = 35;
   const barHeightPct = Math.min(100, (wind / maxBar) * 100);
   const hour = new Date(time).getHours();
-  const label = `${String(hour).padStart(2, "0")}:00`;
+  const label = `${String(hour).padStart(2, "0")}h`;
   const dir = degToCompass(direction);
 
   return (
-    <div className={`flex flex-col items-center gap-1 min-w-[48px] ${isNow ? "opacity-100" : "opacity-90"}`}>
-      <span className={`text-[10px] font-medium ${isNow ? "text-sky-600 dark:text-sky-400 font-bold" : "text-muted-foreground"}`}>
+    <div className={`flex flex-col items-center gap-0.5 min-w-[36px]`}>
+      <span className={`text-[9px] font-medium leading-tight ${isNow ? "text-sky-600 dark:text-sky-400 font-bold" : "text-muted-foreground"}`}>
         {isNow ? "Now" : label}
       </span>
-      <div className={`text-[9px] font-medium ${windTextColor(wind)}`}>{dir}</div>
-      <div className="relative h-16 w-7 flex items-end justify-center">
+      <div className={`text-[8px] font-medium leading-tight ${windTextColor(wind)}`}>{dir}</div>
+      <div className="relative h-10 w-5 flex items-end justify-center">
         <div
-          className={`w-5 rounded-t-sm transition-all ${windBarColor(wind)} ${isCurrent ? "ring-2 ring-offset-1 ring-sky-400" : ""}`}
-          style={{ height: `${Math.max(6, barHeightPct)}%` }}
+          className={`w-4 rounded-t-sm transition-all ${windBarColor(wind)} ${isCurrent ? "ring-1 ring-offset-1 ring-sky-400" : ""}`}
+          style={{ height: `${Math.max(8, barHeightPct)}%` }}
         />
       </div>
-      <span className={`text-xs font-bold tabular-nums ${windTextColor(wind)}`}>{Math.round(wind)}</span>
-      <span className={`text-[9px] text-muted-foreground`}>{Math.round(temp)}°</span>
+      <span className={`text-[10px] font-bold tabular-nums leading-tight ${windTextColor(wind)}`}>{Math.round(wind)}</span>
+      <span className="text-[8px] text-muted-foreground leading-tight">{Math.round(temp)}°</span>
     </div>
   );
 }
@@ -664,10 +664,18 @@ function WeatherWidget({ stationName }: { stationName: string }) {
     .filter(({ time }) => {
       const d = new Date(time);
       return d >= sunriseDate && d <= sunsetDate;
-    });
+    })
+    .filter((_, idx) => idx % 2 === 0);
 
   const nowHourStr = nowTime.substring(0, 13);
-  const nowIdx = activeDay === 0 ? dayHours.findIndex(h => h.time.substring(0, 13) === nowHourStr) : -1;
+  const nowHourNum = parseInt(nowHourStr.substring(11, 13), 10);
+  const nowIdx = activeDay === 0
+    ? dayHours.reduce((best, h, i) => {
+        const hNum = parseInt(h.time.substring(11, 13), 10);
+        const bestNum = best >= 0 ? parseInt(dayHours[best].time.substring(11, 13), 10) : 99;
+        return Math.abs(hNum - nowHourNum) < Math.abs(bestNum - nowHourNum) ? i : best;
+      }, -1)
+    : -1;
 
   const peakHour = [...dayHours].sort((a, b) => b.wind - a.wind)[0];
   const goodHours = dayHours.filter(h => h.wind >= 12 && h.wind < 28);
@@ -675,76 +683,62 @@ function WeatherWidget({ stationName }: { stationName: string }) {
   return (
     <Card className="border-sky-200 dark:border-sky-800 overflow-hidden">
       <CardContent className="p-0">
-        {/* Header: current conditions (today only) */}
-        {activeDay === 0 && (
-          <div className="px-4 pt-4 pb-3 bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/30 dark:to-blue-950/20 border-b border-sky-100 dark:border-sky-900">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <Wind className="h-3.5 w-3.5 text-sky-500" />
-                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-                  Wind · {coords.label}
-                </span>
-              </div>
-              <span className="text-[11px] text-muted-foreground">{currentDesc}</span>
-            </div>
-            <div className="flex items-center gap-5">
-              <div className="flex items-baseline gap-1">
-                <span className={`text-3xl font-bold tabular-nums ${windTextColor(currentWind)}`} data-testid="text-wind-speed">
-                  {currentWind}
-                </span>
-                <span className="text-xs text-muted-foreground">kn</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Navigation
-                  className="h-4 w-4 text-sky-500 shrink-0"
-                  style={{ transform: `rotate(${data.current.wind_direction_10m}deg)` }}
-                />
-                <span className="text-sm font-semibold text-sky-600 dark:text-sky-400">{currentDir}</span>
-              </div>
-              <div className="flex items-center gap-0.5">
-                <Thermometer className="h-3.5 w-3.5 text-orange-400" />
-                <span className="text-sm font-semibold">{currentTemp}°C</span>
-              </div>
-              <span className={`ml-auto text-xs font-semibold ${currentRating.color}`} data-testid="text-kite-rating">
-                {currentRating.label}
+        {/* Compact header row: station + current now + tabs */}
+        <div className="flex items-center border-b border-border px-3 py-2 gap-2">
+          <Wind className="h-3 w-3 text-sky-500 shrink-0" />
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide shrink-0">
+            {coords.label}
+          </span>
+          {activeDay === 0 && (
+            <div className="flex items-center gap-2 ml-1">
+              <span className={`text-xs font-bold tabular-nums ${windTextColor(currentWind)}`} data-testid="text-wind-speed">
+                {currentWind} kn
+              </span>
+              <Navigation
+                className="h-3 w-3 text-sky-500 shrink-0"
+                style={{ transform: `rotate(${data.current.wind_direction_10m}deg)` }}
+              />
+              <span className="text-[10px] font-semibold text-sky-600 dark:text-sky-400">{currentDir}</span>
+              <Thermometer className="h-3 w-3 text-orange-400" />
+              <span className="text-[10px] font-medium">{currentTemp}°</span>
+              <span className={`text-[10px] font-semibold ${currentRating.color}`} data-testid="text-kite-rating">
+                · {currentRating.label}
               </span>
             </div>
+          )}
+          <div className="flex ml-auto shrink-0">
+            {(["Today", "Tomorrow"] as const).map((label, i) => (
+              <button
+                key={label}
+                onClick={() => setActiveDay(i as 0 | 1)}
+                className={`px-2.5 py-0.5 text-[10px] font-semibold rounded-full transition-colors ${
+                  activeDay === i
+                    ? "bg-sky-500 text-white"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-testid={`button-weather-${label.toLowerCase()}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-        )}
-
-        {/* Day tabs */}
-        <div className="flex border-b border-border">
-          {(["Today", "Tomorrow"] as const).map((label, i) => (
-            <button
-              key={label}
-              onClick={() => setActiveDay(i as 0 | 1)}
-              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
-                activeDay === i
-                  ? "bg-sky-50 dark:bg-sky-950/30 text-sky-600 dark:text-sky-400 border-b-2 border-sky-500"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              data-testid={`button-weather-${label.toLowerCase()}`}
-            >
-              {label}
-            </button>
-          ))}
         </div>
 
-        {/* Sunrise / sunset info */}
-        <div className="flex items-center justify-between px-4 py-1.5 text-[10px] text-muted-foreground bg-amber-50/60 dark:bg-amber-950/10 border-b border-border">
-          <span>🌅 {fmt(sunrise)} sunrise</span>
-          <span className="font-medium text-amber-700 dark:text-amber-400">
+        {/* Sunrise / sunset + best window */}
+        <div className="flex items-center justify-between px-3 py-1 text-[9px] text-muted-foreground bg-amber-50/40 dark:bg-amber-950/10 border-b border-border">
+          <span>🌅 {fmt(sunrise)}</span>
+          <span className="font-medium text-amber-700 dark:text-amber-400 mx-1 truncate text-center">
             {goodHours.length > 0
-              ? `Best window: ${fmt(goodHours[0].time)} – ${fmt(goodHours[goodHours.length - 1].time)}`
-              : peakHour ? `Peak: ${Math.round(peakHour.wind)} kn at ${fmt(peakHour.time)}` : "No kite window"}
+              ? `Best: ${fmt(goodHours[0].time)}–${fmt(goodHours[goodHours.length - 1].time)}`
+              : peakHour ? `Peak ${Math.round(peakHour.wind)} kn @ ${fmt(peakHour.time)}` : "No kite window"}
           </span>
-          <span>🌇 {fmt(sunset)} sunset</span>
+          <span>🌇 {fmt(sunset)}</span>
         </div>
 
-        {/* Hourly wind chart */}
+        {/* 2-hour wind chart */}
         <div
           ref={scrollRef}
-          className="overflow-x-auto flex gap-1.5 px-3 py-3"
+          className="overflow-x-auto flex gap-1 px-2 py-2"
           style={{ scrollbarWidth: "none" }}
         >
           {dayHours.length === 0 ? (
@@ -769,19 +763,20 @@ function WeatherWidget({ stationName }: { stationName: string }) {
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-3 px-4 pb-3 flex-wrap">
+        <div className="flex items-center gap-2 px-3 pb-2 border-t border-border pt-1.5">
           {[
-            { color: "bg-slate-300 dark:bg-slate-600", label: "<8 kn" },
+            { color: "bg-slate-300 dark:bg-slate-600", label: "<8" },
             { color: "bg-yellow-400", label: "8–12" },
-            { color: "bg-emerald-500", label: "12–20 ✓" },
-            { color: "bg-blue-500", label: "20–28 ✓" },
-            { color: "bg-red-500", label: ">28 ⚠" },
+            { color: "bg-emerald-500", label: "12–20✓" },
+            { color: "bg-blue-500", label: "20–28✓" },
+            { color: "bg-red-500", label: ">28⚠" },
           ].map(({ color, label }) => (
-            <div key={label} className="flex items-center gap-1">
-              <div className={`w-2.5 h-2.5 rounded-sm ${color}`} />
-              <span className="text-[9px] text-muted-foreground">{label}</span>
+            <div key={label} className="flex items-center gap-0.5">
+              <div className={`w-2 h-2 rounded-sm ${color}`} />
+              <span className="text-[8px] text-muted-foreground">{label}</span>
             </div>
           ))}
+          <span className="text-[8px] text-muted-foreground ml-auto">kn</span>
         </div>
       </CardContent>
     </Card>
