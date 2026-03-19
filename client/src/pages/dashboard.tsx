@@ -779,7 +779,7 @@ function WeatherWidget({ stationName }: { stationName: string }) {
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-2 px-3 pb-2 border-t border-border pt-1.5">
+        <div className="flex items-center justify-center gap-2 px-3 pb-2 border-t border-border pt-1.5">
           {[
             { color: "bg-slate-300 dark:bg-slate-600", label: "<8" },
             { color: "bg-yellow-400", label: "8–12" },
@@ -792,7 +792,7 @@ function WeatherWidget({ stationName }: { stationName: string }) {
               <span className="text-[8px] text-muted-foreground">{label}</span>
             </div>
           ))}
-          <span className="text-[8px] text-muted-foreground ml-auto">kn</span>
+          <span className="text-[8px] text-muted-foreground">kn</span>
         </div>
       </CardContent>
     </Card>
