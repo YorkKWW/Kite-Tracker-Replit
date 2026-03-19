@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -25,9 +25,11 @@ import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPE_SPECIFIC_FIELDS } f
 export default function EquipmentDetailPage() {
   const [, params] = useRoute("/equipment/:id");
   const id = params?.id;
+  const [, setLocation] = useLocation();
   const { isHamburg, canEditEquipment, user } = useAuth();
   const { toast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const { data: item, isLoading } = useQuery<Equipment>({
     queryKey: ["/api/equipment", id],
@@ -74,6 +76,17 @@ export default function EquipmentDetailPage() {
   });
 
   const getStationName = (sid: number | null) => stationsList?.find((s) => s.id === sid)?.name || "Unknown";
+
+  const deleteEquipmentMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/equipment/${id}`),
+    onSuccess: () => {
+      toast({ title: "Equipment deleted" });
+      setLocation("/equipment");
+    },
+    onError: (err: Error) => {
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    },
+  });
 
   if (isLoading) {
     return (
@@ -127,10 +140,23 @@ export default function EquipmentDetailPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {canEditEquipment && (
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} data-testid="button-edit-equipment">
-              <Pencil className="h-4 w-4 mr-1.5" />
-              Edit
-            </Button>
+            <>
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} data-testid="button-edit-equipment">
+                <Pencil className="h-4 w-4 mr-1.5" />
+                Edit
+              </Button>
+              {user?.role === "admin" && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  className="text-destructive hover:text-destructive"
+                  data-testid="button-delete-equipment"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </>
           )}
           <div className="flex flex-col items-end gap-1">
             <ConditionBadge rating={item.conditionRating} />
@@ -145,6 +171,43 @@ export default function EquipmentDetailPage() {
           onOpenChange={setEditOpen}
           equipment={item}
         />
+      )}
+
+      {user?.role === "admin" && (
+        <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Equipment?</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                <p className="text-sm text-destructive">
+                  <strong>Warning:</strong> This action cannot be undone. The equipment record will be permanently deleted.
+                </p>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                <p><strong>{item.brand} {item.model}</strong></p>
+                {item.serialNumber && !item.serialNumber.startsWith("AUTO-") && (
+                  <p className="text-xs font-mono text-foreground mt-1">S/N: {item.serialNumber}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => deleteEquipmentMutation.mutate()}
+                disabled={deleteEquipmentMutation.isPending}
+                data-testid="button-confirm-delete-equipment"
+              >
+                {deleteEquipmentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Delete Equipment
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
