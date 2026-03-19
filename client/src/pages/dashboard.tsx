@@ -185,7 +185,7 @@ export default function DashboardPage() {
                   Guests on site
                 </span>
               </div>
-              {!customersSummary ? (
+              {!customersSummary || !Array.isArray(customersSummary) ? (
                 <div className="space-y-1.5">
                   {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}
                 </div>
