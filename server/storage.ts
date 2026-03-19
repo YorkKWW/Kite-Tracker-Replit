@@ -396,12 +396,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteEquipment(id: number): Promise<void> {
-    await db.delete(photos).where(eq(photos.equipmentId, id));
-    await db.delete(conditionRatings).where(eq(conditionRatings.equipmentId, id));
-    await db.delete(repairs).where(eq(repairs.equipmentId, id));
-    await db.delete(transfers).where(eq(transfers.equipmentId, id));
-    await db.delete(activityLog).where(eq(activityLog.equipmentId, id));
-    await db.delete(equipment).where(eq(equipment.id, id));
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`UPDATE sales_invoices SET damage_report_id = NULL WHERE damage_report_id IN (SELECT id FROM damage_reports WHERE equipment_id = ${id})`);
+      await tx.execute(sql`DELETE FROM damage_report_photos WHERE damage_report_id IN (SELECT id FROM damage_reports WHERE equipment_id = ${id})`);
+      await tx.execute(sql`DELETE FROM damage_reports WHERE equipment_id = ${id}`);
+      await tx.execute(sql`DELETE FROM sale_items WHERE equipment_id = ${id}`);
+      await tx.execute(sql`DELETE FROM inventory_check_items WHERE equipment_id = ${id}`);
+      await tx.delete(photos).where(eq(photos.equipmentId, id));
+      await tx.delete(conditionRatings).where(eq(conditionRatings.equipmentId, id));
+      await tx.delete(repairs).where(eq(repairs.equipmentId, id));
+      await tx.delete(transfers).where(eq(transfers.equipmentId, id));
+      await tx.delete(activityLog).where(eq(activityLog.equipmentId, id));
+      await tx.delete(equipment).where(eq(equipment.id, id));
+    });
   }
 
   async bulkDeleteEquipment(ids: number[]): Promise<{ deleted: number; errors: string[] }> {
