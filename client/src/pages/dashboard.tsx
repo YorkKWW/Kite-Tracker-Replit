@@ -741,20 +741,20 @@ function WeatherWidget({ stationName }: { stationName: string }) {
         </div>
 
         {/* Sunrise / sunset + best window */}
-        <div className="flex items-center justify-between px-3 py-1 text-[9px] text-muted-foreground bg-amber-50/40 dark:bg-amber-950/10 border-b border-border">
+        <div className="grid grid-cols-3 items-center px-3 py-1 text-[9px] text-muted-foreground bg-amber-50/40 dark:bg-amber-950/10 border-b border-border">
           <span>🌅 {fmt(sunrise)}</span>
-          <span className="font-medium text-amber-700 dark:text-amber-400 mx-1 truncate text-center">
+          <span className="font-medium text-amber-700 dark:text-amber-400 text-center leading-tight">
             {goodHours.length > 0
               ? `Best: ${fmt(goodHours[0].time)}–${fmt(goodHours[goodHours.length - 1].time)}`
               : peakHour ? `Peak ${Math.round(peakHour.wind)} kn @ ${fmt(peakHour.time)}` : "No kite window"}
           </span>
-          <span>🌇 {fmt(sunset)}</span>
+          <span className="text-right">🌇 {fmt(sunset)}</span>
         </div>
 
         {/* 2-hour wind chart */}
         <div
           ref={scrollRef}
-          className="overflow-x-auto flex gap-0.5 px-2 py-2"
+          className="overflow-x-auto flex gap-0.5 px-2 py-2 justify-center"
           style={{ scrollbarWidth: "none" }}
         >
           {dayHours.length === 0 ? (
