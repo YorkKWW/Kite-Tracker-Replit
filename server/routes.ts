@@ -3460,16 +3460,23 @@ export async function registerRoutes(
     const stationId = req.query.stationId ? parseInt(req.query.stationId as string) : undefined;
     if (!stationId) return res.status(400).json({ message: "stationId required" });
 
-    const today = new Date().toISOString().slice(0, 10);
-
-    const config = await storage.getSchoolConfigByStation(stationId);
-    let course = 0;
-    if (config) {
-      const schoolCustomers = await storage.getSchoolCustomers(config.id);
-      course = schoolCustomers.filter(c => c.arrivalDate <= today && c.departureDate >= today).length;
+    const days: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      days.push(d.toISOString().slice(0, 10));
     }
 
-    res.json({ total: course, course, rental: 0 });
+    const config = await storage.getSchoolConfigByStation(stationId);
+    const schoolCustomers = config ? await storage.getSchoolCustomers(config.id) : [];
+
+    const result = days.map(date => ({
+      date,
+      course: schoolCustomers.filter(c => c.arrivalDate <= date && c.departureDate >= date).length,
+      rental: 0,
+    }));
+
+    res.json(result);
   });
 
   app.post("/api/school-customers", requireAuth, async (req, res) => {

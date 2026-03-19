@@ -65,7 +65,7 @@ export default function DashboardPage() {
   const { data: stationsList } = useQuery<Station[]>({ queryKey: ["/api/stations"] });
 
   const activeStationId = isStationLeadView ? simStationId : (user as any)?.assignedStationId;
-  const { data: customersSummary } = useQuery<{ total: number; course: number; rental: number }>({
+  const { data: customersSummary } = useQuery<Array<{ date: string; course: number; rental: number }>>({
     queryKey: ["/api/dashboard/customers-summary", activeStationId],
     queryFn: async () => {
       const res = await fetch(`/api/dashboard/customers-summary?stationId=${activeStationId}`, { credentials: "include" });
@@ -175,39 +175,63 @@ export default function DashboardPage() {
             : stationsList?.find(s => s.id === (user as any)?.assignedStationId)?.name ?? ""
         } />
 
-        {/* Customer overview card */}
+        {/* Customer overview table */}
         <Link href="/customers">
           <Card className="cursor-pointer border-purple-200 dark:border-purple-800 hover:shadow-md transition-all">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-purple-500" />
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Guests on site today
-                  </span>
-                </div>
-                {customersSummary === undefined ? (
-                  <Skeleton className="h-4 w-8" />
-                ) : (
-                  <span className="text-2xl font-bold text-purple-600 dark:text-purple-400" data-testid="text-customers-total">
-                    {customersSummary.total}
-                  </span>
-                )}
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="h-4 w-4 text-purple-500 shrink-0" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Guests on site
+                </span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg bg-purple-50 dark:bg-purple-950/20 px-3 py-2 text-center">
-                  <p className="text-lg font-bold text-purple-600 dark:text-purple-400" data-testid="text-customers-course">
-                    {customersSummary?.course ?? "—"}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground font-medium">Course</p>
+              {!customersSummary ? (
+                <div className="space-y-1.5">
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}
                 </div>
-                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/30 px-3 py-2 text-center">
-                  <p className="text-lg font-bold text-slate-500 dark:text-slate-400" data-testid="text-customers-rental">
-                    {customersSummary?.rental ?? "—"}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground font-medium">Rental</p>
-                </div>
-              </div>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-muted-foreground">
+                      <th className="text-left font-medium pb-1 w-1/2">Date</th>
+                      <th className="text-center font-medium pb-1 text-purple-500">Course</th>
+                      <th className="text-center font-medium pb-1 text-slate-500">Rental</th>
+                      <th className="text-center font-medium pb-1">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customersSummary.map((row, i) => {
+                      const d = new Date(row.date + "T12:00:00");
+                      const isToday = i === 0;
+                      const isTomorrow = i === 1;
+                      const label = isToday
+                        ? "Today"
+                        : isTomorrow
+                        ? "Tomorrow"
+                        : d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+                      const total = row.course + row.rental;
+                      return (
+                        <tr key={row.date} className={isToday ? "font-semibold" : ""}>
+                          <td className={`py-1 ${isToday ? "text-foreground" : "text-muted-foreground"}`}>
+                            {label}
+                          </td>
+                          <td className="text-center py-1">
+                            <span className="text-purple-600 dark:text-purple-400" data-testid={`text-customers-course-${i}`}>
+                              {row.course}
+                            </span>
+                          </td>
+                          <td className="text-center py-1 text-muted-foreground" data-testid={`text-customers-rental-${i}`}>
+                            {row.rental}
+                          </td>
+                          <td className="text-center py-1 font-medium" data-testid={`text-customers-total-${i}`}>
+                            {total > 0 ? total : <span className="text-muted-foreground">—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
             </CardContent>
           </Card>
         </Link>
