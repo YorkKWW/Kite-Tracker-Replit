@@ -4,13 +4,14 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConditionBadge, StatusBadge } from "@/components/condition-badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp, Inbox, ArrowRightLeft, CheckSquare, Trash2, Send } from "lucide-react";
+import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp, Inbox, ArrowRightLeft, CheckSquare, Trash2, Send, List, X } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPES_WITHOUT_SERIAL } from "@shared/schema";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -52,6 +53,8 @@ export default function EquipmentListPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [transferStationId, setTransferStationId] = useState<string>("");
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSerials, setBulkSerials] = useState("");
   const { toast } = useToast();
 
   const bulkDeleteMutation = useMutation({
@@ -190,8 +193,19 @@ export default function EquipmentListPage() {
     else { setSortCol(col); setSortDir("asc"); }
   };
 
+  const bulkSerialList = useMemo(() => {
+    if (!bulkMode || !bulkSerials.trim()) return null;
+    return bulkSerials
+      .split(/[\n,;]+/)
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
+  }, [bulkMode, bulkSerials]);
+
   const sortedEquipment = useMemo(() => {
-    const list = [...(equipment || [])];
+    let list = [...(equipment || [])];
+    if (bulkSerialList && bulkSerialList.length > 0) {
+      list = list.filter((e) => bulkSerialList.includes((e.serialNumber || "").toUpperCase()));
+    }
     list.sort((a, b) => {
       let av: string | number = "";
       let bv: string | number = "";
@@ -212,7 +226,7 @@ export default function EquipmentListPage() {
       return 0;
     });
     return list;
-  }, [equipment, sortCol, sortDir, stationsList]);
+  }, [equipment, sortCol, sortDir, stationsList, bulkSerialList]);
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
@@ -253,22 +267,60 @@ export default function EquipmentListPage() {
 
       <div className="space-y-3">
         <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search brand, model, serial..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-              data-testid="input-search"
-            />
+          {bulkMode ? (
+            <div className="flex-1 space-y-1.5">
+              <Textarea
+                placeholder={"Paste serial numbers, comma- or line-separated:\nKNX415BBA4058192, RSE3WE60463K23\nKGS605WBA0064951"}
+                value={bulkSerials}
+                onChange={(e) => setBulkSerials(e.target.value)}
+                className="min-h-[80px] font-mono text-xs resize-none"
+                data-testid="textarea-bulk-serials"
+                autoFocus
+              />
+              {bulkSerialList && bulkSerialList.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {sortedEquipment.length} of {bulkSerialList.length} serial{bulkSerialList.length !== 1 ? "s" : ""} found
+                  {bulkSerialList.length - sortedEquipment.length > 0 && (
+                    <span className="text-amber-600 dark:text-amber-400 ml-1">
+                      ({bulkSerialList.length - sortedEquipment.length} not found)
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search brand, model, serial..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+                data-testid="input-search"
+              />
+            </div>
+          )}
+          <div className="flex gap-1 shrink-0">
+            {!bulkMode && (
+              <Button variant="secondary" size="icon" onClick={() => setScannerOpen(true)} title="Scan barcode" data-testid="button-scan-equipment">
+                <ScanLine className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              variant={bulkMode ? "default" : "secondary"}
+              size="icon"
+              onClick={() => { setBulkMode(!bulkMode); setBulkSerials(""); }}
+              title={bulkMode ? "Exit bulk serial search" : "Bulk serial search"}
+              data-testid="button-toggle-bulk-mode"
+            >
+              {bulkMode ? <X className="h-4 w-4" /> : <List className="h-4 w-4" />}
+            </Button>
+            {!bulkMode && (
+              <Button variant="secondary" size="icon" onClick={() => setShowFilters(!showFilters)} data-testid="button-toggle-filters">
+                <SlidersHorizontal className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-          <Button variant="secondary" size="icon" onClick={() => setScannerOpen(true)} title="Scan barcode" data-testid="button-scan-equipment">
-            <ScanLine className="h-4 w-4" />
-          </Button>
-          <Button variant="secondary" size="icon" onClick={() => setShowFilters(!showFilters)} data-testid="button-toggle-filters">
-            <SlidersHorizontal className="h-4 w-4" />
-          </Button>
         </div>
 
         {showFilters && (
