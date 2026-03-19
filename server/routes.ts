@@ -3456,6 +3456,22 @@ export async function registerRoutes(
     res.json(customer);
   });
 
+  app.get("/api/dashboard/customers-summary", requireAuth, async (req, res) => {
+    const stationId = req.query.stationId ? parseInt(req.query.stationId as string) : undefined;
+    if (!stationId) return res.status(400).json({ message: "stationId required" });
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    const config = await storage.getSchoolConfigByStation(stationId);
+    let course = 0;
+    if (config) {
+      const schoolCustomers = await storage.getSchoolCustomers(config.id);
+      course = schoolCustomers.filter(c => c.arrivalDate <= today && c.departureDate >= today).length;
+    }
+
+    res.json({ total: course, course, rental: 0 });
+  });
+
   app.post("/api/school-customers", requireAuth, async (req, res) => {
     const user = req.user as any;
     if (user.role !== "admin" && user.role !== "station_lead") {

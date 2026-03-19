@@ -63,6 +63,18 @@ export default function DashboardPage() {
   });
 
   const { data: stationsList } = useQuery<Station[]>({ queryKey: ["/api/stations"] });
+
+  const activeStationId = isStationLeadView ? simStationId : (user as any)?.assignedStationId;
+  const { data: customersSummary } = useQuery<{ total: number; course: number; rental: number }>({
+    queryKey: ["/api/dashboard/customers-summary", activeStationId],
+    queryFn: async () => {
+      const res = await fetch(`/api/dashboard/customers-summary?stationId=${activeStationId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: actualIsStationLead && !!activeStationId,
+    staleTime: 5 * 60 * 1000,
+  });
   const { data: allEquipment } = useQuery<Equipment[]>({
     queryKey: ["/api/equipment", isStationLeadView ? `?stationId=${simStationId}&includeTransfers=true` : ""],
     queryFn: async () => {
@@ -162,6 +174,43 @@ export default function DashboardPage() {
             ? stationsList?.find(s => s.id === simStationId)?.name ?? ""
             : stationsList?.find(s => s.id === (user as any)?.assignedStationId)?.name ?? ""
         } />
+
+        {/* Customer overview card */}
+        <Link href="/customers">
+          <Card className="cursor-pointer border-purple-200 dark:border-purple-800 hover:shadow-md transition-all">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-purple-500" />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Guests on site today
+                  </span>
+                </div>
+                {customersSummary === undefined ? (
+                  <Skeleton className="h-4 w-8" />
+                ) : (
+                  <span className="text-2xl font-bold text-purple-600 dark:text-purple-400" data-testid="text-customers-total">
+                    {customersSummary.total}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg bg-purple-50 dark:bg-purple-950/20 px-3 py-2 text-center">
+                  <p className="text-lg font-bold text-purple-600 dark:text-purple-400" data-testid="text-customers-course">
+                    {customersSummary?.course ?? "—"}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-medium">Course</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-slate-800/30 px-3 py-2 text-center">
+                  <p className="text-lg font-bold text-slate-500 dark:text-slate-400" data-testid="text-customers-rental">
+                    {customersSummary?.rental ?? "—"}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-medium">Rental</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* Large feature cards */}
         <div className="grid grid-cols-2 gap-3 md:gap-4">
