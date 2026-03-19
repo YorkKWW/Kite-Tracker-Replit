@@ -178,31 +178,6 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Quick stats */}
-        {stats && (
-          <div className="grid grid-cols-2 gap-3">
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">
-                  Equipment
-                </p>
-                <p className="text-2xl font-bold mt-1" data-testid="text-stat-equipment">
-                  {stats.totalEquipment}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">
-                  Attention
-                </p>
-                <p className="text-2xl font-bold mt-1 text-orange-600" data-testid="text-stat-attention">
-                  {stats.needsAttention}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
     );
   }
