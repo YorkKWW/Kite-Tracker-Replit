@@ -179,80 +179,60 @@ export default function DashboardPage() {
         <Link href="/customers">
           <Card className="cursor-pointer border-purple-200 dark:border-purple-800 hover:shadow-md transition-all">
             <CardContent className="p-4">
-              {/* Header */}
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-3">
                 <Users className="h-4 w-4 text-purple-500 shrink-0" />
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Guests on site</span>
               </div>
 
               {!customersSummary || !Array.isArray(customersSummary) ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
+                <div className="flex gap-2 overflow-hidden">
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-28 w-20 shrink-0 rounded-xl" />)}
                 </div>
-              ) : (() => {
-                const today = customersSummary[0];
-                const upcoming = customersSummary.slice(1);
-                const todayTotal = (today?.course ?? 0) + (today?.rental ?? 0);
-                return (
-                  <>
-                    {/* Today — big hero row */}
-                    <div className="rounded-xl bg-purple-50 dark:bg-purple-950/30 px-4 py-3 mb-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-semibold text-purple-500 uppercase tracking-wide mb-1">Today</p>
-                        <div className="flex items-baseline gap-3">
-                          <span className="text-3xl font-bold text-purple-700 dark:text-purple-300" data-testid="text-customers-total-0">{todayTotal}</span>
-                          <span className="text-sm text-muted-foreground">guests</span>
+              ) : (
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+                  {customersSummary.map((row, i) => {
+                    const d = new Date(row.date + "T12:00:00");
+                    const isToday = i === 0;
+                    const isTomorrow = i === 1;
+                    const dayName = isToday ? "Today" : isTomorrow ? "Tomorrow" : d.toLocaleDateString("en-GB", { weekday: "short" });
+                    const dateStr = isToday ? "" : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                    const total = row.course + row.rental;
+                    return (
+                      <div
+                        key={row.date}
+                        className={`shrink-0 rounded-xl flex flex-col items-center justify-center px-3 py-3 ${
+                          isToday
+                            ? "bg-purple-600 text-white min-w-[88px]"
+                            : "bg-slate-50 dark:bg-slate-800/50 min-w-[76px]"
+                        }`}
+                      >
+                        <p className={`text-[11px] font-semibold mb-0.5 ${isToday ? "text-purple-200" : "text-muted-foreground"}`}>
+                          {dayName}
+                        </p>
+                        {dateStr && (
+                          <p className={`text-[10px] mb-1 ${isToday ? "text-purple-300" : "text-muted-foreground/60"}`}>
+                            {dateStr}
+                          </p>
+                        )}
+                        <p className={`text-3xl font-bold leading-none my-1 ${isToday ? "text-white" : "text-foreground"}`} data-testid={`text-customers-total-${i}`}>
+                          {total}
+                        </p>
+                        <div className={`flex gap-2 mt-2 text-[11px] font-medium ${isToday ? "text-purple-200" : "text-muted-foreground"}`}>
+                          <span data-testid={`text-customers-course-${i}`}>{row.course}<span className="font-normal opacity-70">c</span></span>
+                          <span className="opacity-40">·</span>
+                          <span data-testid={`text-customers-rental-${i}`}>{row.rental}<span className="font-normal opacity-70">r</span></span>
                         </div>
                       </div>
-                      <div className="flex gap-3 text-right">
-                        <div>
-                          <p className="text-xl font-bold text-purple-600 dark:text-purple-400" data-testid="text-customers-course-0">{today?.course ?? 0}</p>
-                          <p className="text-[10px] text-muted-foreground font-medium">Course</p>
-                        </div>
-                        <div className="w-px bg-purple-200 dark:bg-purple-800" />
-                        <div>
-                          <p className="text-xl font-bold text-slate-500 dark:text-slate-400" data-testid="text-customers-rental-0">{today?.rental ?? 0}</p>
-                          <p className="text-[10px] text-muted-foreground font-medium">Rental</p>
-                        </div>
-                      </div>
-                    </div>
+                    );
+                  })}
+                </div>
+              )}
 
-                    {/* Next 4 days — compact rows */}
-                    <div className="space-y-0 divide-y divide-border">
-                      {upcoming.map((row, i) => {
-                        const d = new Date(row.date + "T12:00:00");
-                        const label = i === 0
-                          ? "Tomorrow"
-                          : d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
-                        const total = row.course + row.rental;
-                        return (
-                          <div key={row.date} className="flex items-center justify-between py-2">
-                            <span className="text-sm text-muted-foreground w-28">{label}</span>
-                            <div className="flex items-center gap-4">
-                              <span className="text-sm font-medium text-purple-600 dark:text-purple-400 w-8 text-center" data-testid={`text-customers-course-${i + 1}`}>{row.course}</span>
-                              <span className="text-sm text-muted-foreground w-8 text-center" data-testid={`text-customers-rental-${i + 1}`}>{row.rental}</span>
-                              <span className="text-sm font-semibold w-8 text-center" data-testid={`text-customers-total-${i + 1}`}>
-                                {total > 0 ? total : <span className="text-muted-foreground">—</span>}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {/* Column labels aligned to data */}
-                      <div className="flex items-center justify-between pt-1.5">
-                        <span className="text-[10px] text-transparent select-none w-28">·</span>
-                        <div className="flex items-center gap-4">
-                          <span className="text-[10px] text-purple-400 font-medium w-8 text-center">Course</span>
-                          <span className="text-[10px] text-muted-foreground w-8 text-center">Rental</span>
-                          <span className="text-[10px] text-muted-foreground w-8 text-center">Total</span>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                );
-              })()}
+              {/* Legend */}
+              <div className="flex gap-3 mt-2">
+                <span className="text-[10px] text-muted-foreground">c = Course</span>
+                <span className="text-[10px] text-muted-foreground">r = Rental</span>
+              </div>
             </CardContent>
           </Card>
         </Link>
