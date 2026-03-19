@@ -194,14 +194,6 @@ export default function DashboardPage() {
                   <div className="grid items-center px-3 mb-1" style={{ gridTemplateColumns: "1fr 2.2rem 2.2rem 2.2rem 2.2rem" }}>
                     <span />
                     <div className="flex flex-col items-center gap-0.5">
-                      <GraduationCap className="h-3 w-3 text-purple-400" />
-                      <span className="text-[9px] text-purple-400 leading-none">Crs</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <Tag className="h-3 w-3 text-slate-400" />
-                      <span className="text-[9px] text-slate-400 leading-none">Rnt</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-0.5">
                       <LogIn className="h-3 w-3 text-emerald-500" />
                       <span className="text-[9px] text-emerald-500 leading-none">Arr</span>
                     </div>
@@ -209,9 +201,17 @@ export default function DashboardPage() {
                       <LogOut className="h-3 w-3 text-amber-500" />
                       <span className="text-[9px] text-amber-500 leading-none">Dep</span>
                     </div>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <GraduationCap className="h-3 w-3 text-purple-400" />
+                      <span className="text-[9px] text-purple-400 leading-none">Crs</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <Tag className="h-3 w-3 text-slate-400" />
+                      <span className="text-[9px] text-slate-400 leading-none">Rnt</span>
+                    </div>
                   </div>
 
-                  <div className="space-y-0.5">
+                  <div className="space-y-px">
                     {customersSummary.map((row, i) => {
                       const d = new Date(row.date + "T12:00:00");
                       const isToday = i === 0;
@@ -225,7 +225,7 @@ export default function DashboardPage() {
                       return (
                         <div
                           key={row.date}
-                          className={`grid items-center px-3 py-1.5 rounded-lg ${
+                          className={`grid items-center px-3 py-1 rounded-lg ${
                             isToday ? "bg-purple-600" : "bg-slate-50 dark:bg-slate-800/40"
                           }`}
                           style={{ gridTemplateColumns: "1fr 2.2rem 2.2rem 2.2rem 2.2rem" }}
@@ -233,17 +233,17 @@ export default function DashboardPage() {
                           <span className={`text-sm font-semibold ${isToday ? "text-white" : "text-foreground"}`}>
                             {label}
                           </span>
-                          <span className={`text-base font-bold text-center ${isToday ? "text-white" : "text-purple-600 dark:text-purple-400"}`} data-testid={`text-customers-course-${i}`}>
-                            {row.course}
-                          </span>
-                          <span className={`text-base font-bold text-center ${isToday ? "text-purple-200" : "text-slate-400"}`} data-testid={`text-customers-rental-${i}`}>
-                            {row.rental}
-                          </span>
                           <span className={`text-base font-bold text-center ${isToday ? "text-emerald-200" : "text-emerald-600 dark:text-emerald-400"}`} data-testid={`text-customers-arrivals-${i}`}>
                             {row.arrivals}
                           </span>
                           <span className={`text-base font-bold text-center ${isToday ? "text-amber-200" : "text-amber-500 dark:text-amber-400"}`} data-testid={`text-customers-departures-${i}`}>
                             {row.departures}
+                          </span>
+                          <span className={`text-base font-bold text-center ${isToday ? "text-white" : "text-purple-600 dark:text-purple-400"}`} data-testid={`text-customers-course-${i}`}>
+                            {row.course}
+                          </span>
+                          <span className={`text-base font-bold text-center ${isToday ? "text-purple-200" : "text-slate-400"}`} data-testid={`text-customers-rental-${i}`}>
+                            {row.rental}
                           </span>
                         </div>
                       );
