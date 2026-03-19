@@ -29,7 +29,7 @@ export default function EquipmentFormPage() {
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [purchaseDate, setPurchaseDate] = useState("");
-  const [yearOfPurchase, setYearOfPurchase] = useState(new Date().getFullYear().toString());
+  const [yearOfPurchase, setYearOfPurchase] = useState("");
   const [currentStationId, setCurrentStationId] = useState("");
   const [status, setStatus] = useState("active");
   const [conditionRating, setConditionRating] = useState("5");
@@ -46,6 +46,12 @@ export default function EquipmentFormPage() {
   const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
   const [isCheckingSerial, setIsCheckingSerial] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (purchaseDate) {
+      setYearOfPurchase(new Date(purchaseDate).getFullYear().toString());
+    }
+  }, [purchaseDate]);
 
   useEffect(() => {
     if (serialOptional || !serialNumber || serialNumber.trim().length < 3) {
@@ -208,10 +214,22 @@ export default function EquipmentFormPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Date of Purchase</Label>
               <Input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} data-testid="input-purchase-date" />
+            </div>
+            <div className="space-y-2">
+              <Label>Year *</Label>
+              <Input
+                type="number"
+                min="1990"
+                max="2099"
+                placeholder="e.g. 2023"
+                value={yearOfPurchase}
+                onChange={(e) => setYearOfPurchase(e.target.value)}
+                data-testid="input-year-of-purchase"
+              />
             </div>
             <div className="space-y-2">
               <Label>Location</Label>
