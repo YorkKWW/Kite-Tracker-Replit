@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Package, AlertTriangle, ArrowLeftRight, MapPin, MessageSquarePlus, ClipboardCheck, ShoppingCart, Users, Calendar } from "lucide-react";
+import { Package, AlertTriangle, ArrowLeftRight, MapPin, MessageSquarePlus, ClipboardCheck, ShoppingCart, Users, Calendar, Wind, Thermometer, Navigation } from "lucide-react";
 import type { Transfer, Station, Equipment } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 
@@ -154,6 +154,13 @@ export default function DashboardPage() {
               : "Your station overview"}
           </p>
         </div>
+
+        {/* Weather widget */}
+        <WeatherWidget stationName={
+          isStationLeadView
+            ? stationsList?.find(s => s.id === simStationId)?.name ?? ""
+            : stationsList?.find(s => s.id === (user as any)?.assignedStationId)?.name ?? ""
+        } />
 
         {/* Large feature cards */}
         <div className="grid grid-cols-2 gap-3 md:gap-4">
@@ -462,3 +469,140 @@ function BoardIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+// Coordinates for known kite school stations
+const STATION_COORDS: Record<string, { lat: number; lon: number; label: string; timezone: string }> = {
+  dakhla:    { lat: 23.72,  lon: -15.93, label: "Dakhla",    timezone: "Africa/Casablanca" },
+  tatajuba:  { lat: -2.77,  lon: -40.39, label: "Tatajuba",  timezone: "America/Fortaleza" },
+  hamburg:   { lat: 53.55,  lon:   9.99, label: "Hamburg",   timezone: "Europe/Berlin" },
+  heidenau:  { lat: 53.47,  lon:  10.11, label: "Heidenau",  timezone: "Europe/Berlin" },
+};
+
+function getStationCoords(name: string) {
+  const lower = name.toLowerCase();
+  for (const [key, val] of Object.entries(STATION_COORDS)) {
+    if (lower.includes(key)) return val;
+  }
+  return null;
+}
+
+function degToCompass(deg: number): string {
+  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  return dirs[Math.round(deg / 45) % 8];
+}
+
+function wmoToDescription(code: number): string {
+  if (code === 0) return "Clear sky";
+  if (code <= 3) return "Partly cloudy";
+  if (code <= 48) return "Foggy";
+  if (code <= 57) return "Drizzle";
+  if (code <= 67) return "Rain";
+  if (code <= 77) return "Snow";
+  if (code <= 82) return "Rain showers";
+  if (code <= 99) return "Thunderstorm";
+  return "Unknown";
+}
+
+function kiteRating(knots: number): { label: string; color: string } {
+  if (knots < 8)  return { label: "Too light", color: "text-muted-foreground" };
+  if (knots < 12) return { label: "Light", color: "text-yellow-600 dark:text-yellow-400" };
+  if (knots < 20) return { label: "Good", color: "text-emerald-600 dark:text-emerald-400" };
+  if (knots < 30) return { label: "Strong", color: "text-blue-600 dark:text-blue-400" };
+  return { label: "Storm", color: "text-red-600 dark:text-red-400" };
+}
+
+type WeatherData = {
+  current: {
+    temperature_2m: number;
+    wind_speed_10m: number;
+    wind_direction_10m: number;
+    weather_code: number;
+  };
+};
+
+function WeatherWidget({ stationName }: { stationName: string }) {
+  const coords = getStationCoords(stationName);
+
+  const { data, isLoading, isError } = useQuery<WeatherData>({
+    queryKey: ["weather", coords?.lat, coords?.lon],
+    queryFn: async () => {
+      if (!coords) throw new Error("No coords");
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code&wind_speed_unit=kn&timezone=${encodeURIComponent(coords.timezone)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Weather fetch failed");
+      return res.json();
+    },
+    enabled: !!coords,
+    staleTime: 10 * 60 * 1000, // cache 10 min
+    retry: 1,
+  });
+
+  if (!coords) return null;
+
+  if (isLoading) {
+    return <Skeleton className="h-28 w-full rounded-xl" />;
+  }
+
+  if (isError || !data) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="p-4 text-center text-xs text-muted-foreground">
+          Weather data unavailable
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const wind = Math.round(data.current.wind_speed_10m);
+  const dir = degToCompass(data.current.wind_direction_10m);
+  const temp = Math.round(data.current.temperature_2m);
+  const rating = kiteRating(wind);
+  const desc = wmoToDescription(data.current.weather_code);
+
+  return (
+    <Card className="border-sky-200 dark:border-sky-800 bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-950/30 dark:to-blue-950/20">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Wind className="h-4 w-4 text-sky-500" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Wind & Weather · {coords.label}
+            </span>
+          </div>
+          <span className="text-xs text-muted-foreground">{desc}</span>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="text-center">
+            <p className="text-3xl font-bold text-sky-600 dark:text-sky-400 tabular-nums" data-testid="text-wind-speed">
+              {wind}
+            </p>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">knots</p>
+          </div>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1">
+              <Navigation
+                className="h-5 w-5 text-sky-500 shrink-0"
+                style={{ transform: `rotate(${data.current.wind_direction_10m}deg)` }}
+              />
+              <p className="text-xl font-bold text-sky-600 dark:text-sky-400">{dir}</p>
+            </div>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">direction</p>
+          </div>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-0.5">
+              <Thermometer className="h-4 w-4 text-orange-400" />
+              <p className="text-2xl font-bold tabular-nums">{temp}°</p>
+            </div>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">celsius</p>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-sky-200/70 dark:border-sky-700/40 text-center">
+          <span className={`text-sm font-semibold ${rating.color}`} data-testid="text-kite-rating">
+            {rating.label} — {wind < 8 ? "not suitable for kiting" : wind >= 30 ? "too strong, stay safe" : "suitable for kiting"}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
