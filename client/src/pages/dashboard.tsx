@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Package, AlertTriangle, ArrowLeftRight, MapPin, MessageSquarePlus } from "lucide-react";
+import { Package, AlertTriangle, ArrowLeftRight, MapPin, MessageSquarePlus, ClipboardCheck, ShoppingCart, Users, Calendar } from "lucide-react";
 import type { Transfer, Station, Equipment } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 
@@ -26,8 +26,9 @@ type DashboardStats = {
 };
 
 export default function DashboardPage() {
-  const { user, isAdmin, isSimulating, simStationId, viewMode } = useAuth();
+  const { user, isAdmin, isStationLead, isSimulating, simStationId, viewMode } = useAuth();
   const isStationLeadView = isSimulating && viewMode === "station_lead" && simStationId != null;
+  const actualIsStationLead = isStationLead || isStationLeadView;
   const dashboardQuery = isStationLeadView ? `/api/dashboard?stationId=${simStationId}` : "/api/dashboard";
 
   const { data: stats, isLoading } = useQuery<DashboardStats>({
@@ -84,10 +85,124 @@ export default function DashboardPage() {
     return (
       <div className="p-4 md:p-6 space-y-6">
         <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-48" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24" />)}
+        {actualIsStationLead ? (
+          <div className="grid grid-cols-2 gap-4">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-40" />)}
+          </div>
+        ) : (
+          <>
+            <Skeleton className="h-48" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24" />)}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Station Lead (Center Manager) Dashboard — Large feature cards
+  if (actualIsStationLead) {
+    const featureCards = [
+      {
+        label: "Quick Inventory",
+        href: "/quick-inventory",
+        icon: ClipboardCheck,
+        color: "text-blue-600 dark:text-blue-400",
+        bgColor: "bg-blue-50 dark:bg-blue-950/30",
+        borderColor: "border-blue-200 dark:border-blue-800",
+        description: "Count & check equipment",
+      },
+      {
+        label: "Equipment",
+        href: "/equipment",
+        icon: Package,
+        color: "text-primary",
+        bgColor: "bg-primary/10",
+        borderColor: "border-primary/20",
+        description: "Manage inventory",
+      },
+      {
+        label: "Sales",
+        href: "/sales",
+        icon: ShoppingCart,
+        color: "text-emerald-600 dark:text-emerald-400",
+        bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
+        borderColor: "border-emerald-200 dark:border-emerald-800",
+        description: "Process rentals & sales",
+      },
+      {
+        label: "Customers",
+        href: "/customers",
+        icon: Users,
+        color: "text-purple-600 dark:text-purple-400",
+        bgColor: "bg-purple-50 dark:bg-purple-950/30",
+        borderColor: "border-purple-200 dark:border-purple-800",
+        description: "Manage contacts",
+      },
+    ];
+
+    return (
+      <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight" data-testid="text-dashboard-title">
+            Welcome, {user?.name}
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {isStationLeadView
+              ? `${stationsList?.find(s => s.id === simStationId)?.name ?? "..."} · Station Overview`
+              : "Your station overview"}
+          </p>
         </div>
+
+        {/* Large feature cards */}
+        <div className="grid grid-cols-2 gap-3 md:gap-4">
+          {featureCards.map((card) => (
+            <Link key={card.href} href={card.href}>
+              <Card className={`cursor-pointer border-2 ${card.borderColor} transition-all hover:shadow-md`}>
+                <CardContent className="p-4 md:p-6 flex flex-col items-center justify-center gap-3 h-40 md:h-48">
+                  <div className={`p-3 md:p-4 rounded-lg ${card.bgColor}`}>
+                    <card.icon className={`h-8 w-8 md:h-10 md:w-10 ${card.color}`} />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-semibold text-sm md:text-base" data-testid={`text-feature-${card.label.toLowerCase().replace(/\s/g, "-")}`}>
+                      {card.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {card.description}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+
+        {/* Quick stats */}
+        {stats && (
+          <div className="grid grid-cols-2 gap-3">
+            <Card>
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">
+                  Equipment
+                </p>
+                <p className="text-2xl font-bold mt-1" data-testid="text-stat-equipment">
+                  {stats.totalEquipment}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">
+                  Attention
+                </p>
+                <p className="text-2xl font-bold mt-1 text-orange-600" data-testid="text-stat-attention">
+                  {stats.needsAttention}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     );
   }

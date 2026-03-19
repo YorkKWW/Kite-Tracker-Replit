@@ -145,12 +145,10 @@ export default function Layout({ children }: LayoutProps) {
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
+  // Station Lead on mobile: only Home button to return to dashboard
+  // On desktop: full sidebar navigation (md: breakpoint handles this)
   const stationLeadBottomTabs = [
-    { href: "/quick-inventory", label: "Inventory", icon: ClipboardCheck },
-    { href: "/equipment", label: "Equipment", icon: Package },
-    { href: "/accessories", label: "Accessories", icon: ShirtIcon },
-    { href: "/incidents", label: "Incidents", icon: AlertTriangle },
-    { href: "/repairs", label: "Repairs", icon: Wrench },
+    { href: "/", label: "Home", icon: LayoutDashboard },
   ];
 
   const defaultBottomTabs = [
