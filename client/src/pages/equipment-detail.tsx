@@ -30,6 +30,8 @@ export default function EquipmentDetailPage() {
   const { toast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [editingYear, setEditingYear] = useState(false);
+  const [yearDraft, setYearDraft] = useState("");
 
   const { data: item, isLoading } = useQuery<Equipment>({
     queryKey: ["/api/equipment", id],
@@ -85,6 +87,19 @@ export default function EquipmentDetailPage() {
     },
     onError: (err: Error) => {
       toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateYearMutation = useMutation({
+    mutationFn: (year: number) => apiRequest("PATCH", `/api/equipment/${id}`, { yearOfPurchase: year }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
+      toast({ title: "Year updated" });
+      setEditingYear(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -213,15 +228,74 @@ export default function EquipmentDetailPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <InfoCard icon={<Hash className="h-4 w-4" />} label="Type" value={EQUIPMENT_TYPE_LABELS[item.type] || item.type} />
         <InfoCard icon={<MapPin className="h-4 w-4" />} label="Location" value={getStationName(item.currentStationId)} />
-        <InfoCard
-          icon={<Calendar className="h-4 w-4" />}
-          label="Purchased"
-          value={
-            (item as any).purchaseDate
-              ? new Date((item as any).purchaseDate).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
-              : item.yearOfPurchase?.toString() || "N/A"
-          }
-        />
+        {user?.role === "admin" && !(item as any).invoiceId ? (
+          <Card>
+            <CardContent className="p-3 flex items-center gap-3">
+              <div className="text-muted-foreground"><Calendar className="h-4 w-4" /></div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Year</p>
+                {editingYear ? (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Input
+                      type="number"
+                      min="1990"
+                      max="2099"
+                      className="h-7 w-24 text-sm p-1"
+                      value={yearDraft}
+                      onChange={(e) => setYearDraft(e.target.value)}
+                      autoFocus
+                      data-testid="input-year-inline"
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      disabled={updateYearMutation.isPending || !yearDraft}
+                      onClick={() => updateYearMutation.mutate(parseInt(yearDraft))}
+                      data-testid="button-save-year"
+                    >
+                      {updateYearMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <span className="text-xs">✓</span>}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      onClick={() => setEditingYear(false)}
+                      data-testid="button-cancel-year"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium text-sm">
+                      {(item as any).purchaseDate
+                        ? new Date((item as any).purchaseDate).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+                        : item.yearOfPurchase?.toString() || "N/A"}
+                    </span>
+                    <button
+                      className="text-muted-foreground hover:text-foreground ml-1"
+                      onClick={() => { setYearDraft(item.yearOfPurchase?.toString() || ""); setEditingYear(true); }}
+                      data-testid="button-edit-year"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <InfoCard
+            icon={<Calendar className="h-4 w-4" />}
+            label={(item as any).invoiceId ? "Year (Invoice)" : "Purchased"}
+            value={
+              (item as any).purchaseDate
+                ? new Date((item as any).purchaseDate).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+                : item.yearOfPurchase?.toString() || "N/A"
+            }
+          />
+        )}
         <InfoCard icon={<Star className="h-4 w-4" />} label="Condition" value={`${item.conditionRating}/5`} />
       </div>
 
