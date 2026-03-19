@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Package, AlertTriangle, ArrowLeftRight, MapPin, MessageSquarePlus, ClipboardCheck, ShoppingCart, Users, Calendar, Wind, Thermometer, Navigation } from "lucide-react";
+import { Package, AlertTriangle, ArrowLeftRight, MapPin, MessageSquarePlus, ClipboardCheck, ShoppingCart, Users, Calendar, Wind, Thermometer, Navigation, GraduationCap, Tag, LogIn, LogOut } from "lucide-react";
 import type { Transfer, Station, Equipment } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 
@@ -65,7 +65,7 @@ export default function DashboardPage() {
   const { data: stationsList } = useQuery<Station[]>({ queryKey: ["/api/stations"] });
 
   const activeStationId = isStationLeadView ? simStationId : (user as any)?.assignedStationId;
-  const { data: customersSummary } = useQuery<Array<{ date: string; course: number; rental: number }>>({
+  const { data: customersSummary } = useQuery<Array<{ date: string; course: number; rental: number; arrivals: number; departures: number }>>({
     queryKey: ["/api/dashboard/customers-summary", activeStationId],
     queryFn: async () => {
       const res = await fetch(`/api/dashboard/customers-summary?stationId=${activeStationId}`, { credentials: "include" });
@@ -186,54 +186,70 @@ export default function DashboardPage() {
 
               {!customersSummary || !Array.isArray(customersSummary) ? (
                 <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-9 w-full rounded-lg" />)}
                 </div>
               ) : (
-                <div className="space-y-1">
-                  {/* Column headers */}
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-3 pb-1">
+                <div>
+                  {/* Column headers with icons */}
+                  <div className="grid items-center px-3 mb-1" style={{ gridTemplateColumns: "1fr 2.2rem 2.2rem 2.2rem 2.2rem" }}>
                     <span />
-                    <span className="text-xs font-semibold text-purple-500 w-14 text-center">Course</span>
-                    <span className="text-xs font-semibold text-slate-400 w-14 text-center">Rental</span>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <GraduationCap className="h-3 w-3 text-purple-400" />
+                      <span className="text-[9px] text-purple-400 leading-none">Crs</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <Tag className="h-3 w-3 text-slate-400" />
+                      <span className="text-[9px] text-slate-400 leading-none">Rnt</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <LogIn className="h-3 w-3 text-emerald-500" />
+                      <span className="text-[9px] text-emerald-500 leading-none">Arr</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <LogOut className="h-3 w-3 text-amber-500" />
+                      <span className="text-[9px] text-amber-500 leading-none">Dep</span>
+                    </div>
                   </div>
 
-                  {customersSummary.map((row, i) => {
-                    const d = new Date(row.date + "T12:00:00");
-                    const isToday = i === 0;
-                    const isTomorrow = i === 1;
-                    const label = isToday
-                      ? "Today"
-                      : isTomorrow
-                      ? "Tomorrow"
-                      : d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+                  <div className="space-y-1">
+                    {customersSummary.map((row, i) => {
+                      const d = new Date(row.date + "T12:00:00");
+                      const isToday = i === 0;
+                      const isTomorrow = i === 1;
+                      const label = isToday
+                        ? "Today"
+                        : isTomorrow
+                        ? "Tomorrow"
+                        : d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
-                    return (
-                      <div
-                        key={row.date}
-                        className={`grid grid-cols-[1fr_auto_auto] gap-x-4 items-center px-3 py-2.5 rounded-xl ${
-                          isToday
-                            ? "bg-purple-600"
-                            : "bg-slate-50 dark:bg-slate-800/40"
-                        }`}
-                      >
-                        <span className={`text-sm font-semibold ${isToday ? "text-white" : "text-foreground"}`}>
-                          {label}
-                        </span>
-                        <span
-                          className={`text-xl font-bold w-14 text-center ${isToday ? "text-white" : "text-purple-600 dark:text-purple-400"}`}
-                          data-testid={`text-customers-course-${i}`}
+                      return (
+                        <div
+                          key={row.date}
+                          className={`grid items-center px-3 py-2 rounded-xl ${
+                            isToday ? "bg-purple-600" : "bg-slate-50 dark:bg-slate-800/40"
+                          }`}
+                          style={{ gridTemplateColumns: "1fr 2.2rem 2.2rem 2.2rem 2.2rem" }}
                         >
-                          {row.course}
-                        </span>
-                        <span
-                          className={`text-xl font-bold w-14 text-center ${isToday ? "text-purple-200" : "text-slate-500 dark:text-slate-400"}`}
-                          data-testid={`text-customers-rental-${i}`}
-                        >
-                          {row.rental}
-                        </span>
-                      </div>
-                    );
-                  })}
+                          <span className={`text-sm font-semibold ${isToday ? "text-white" : "text-foreground"}`}>
+                            {label}
+                          </span>
+                          <span className={`text-base font-bold text-center ${isToday ? "text-white" : "text-purple-600 dark:text-purple-400"}`} data-testid={`text-customers-course-${i}`}>
+                            {row.course}
+                          </span>
+                          <span className={`text-base font-bold text-center ${isToday ? "text-purple-200" : "text-slate-400"}`} data-testid={`text-customers-rental-${i}`}>
+                            {row.rental}
+                          </span>
+                          <span className={`text-base font-bold text-center ${isToday ? "text-emerald-200" : "text-emerald-600 dark:text-emerald-400"}`} data-testid={`text-customers-arrivals-${i}`}>
+                            {row.arrivals}
+                          </span>
+                          <span className={`text-base font-bold text-center ${isToday ? "text-amber-200" : "text-amber-500 dark:text-amber-400"}`} data-testid={`text-customers-departures-${i}`}>
+                            {row.departures}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
                 </div>
               )}
             </CardContent>

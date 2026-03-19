@@ -3475,6 +3475,8 @@ export async function registerRoutes(
       date,
       course: schoolCustomers.filter(c => c.arrivalDate <= date && c.departureDate >= date).length,
       rental: 0,
+      arrivals: schoolCustomers.filter(c => c.arrivalDate === date).length,
+      departures: schoolCustomers.filter(c => c.departureDate === date).length,
     }));
 
     res.json(result);
