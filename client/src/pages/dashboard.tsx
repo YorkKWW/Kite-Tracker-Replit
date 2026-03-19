@@ -190,24 +190,21 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div>
-                  {/* Column headers with icons */}
-                  <div className="grid items-center px-3 mb-1" style={{ gridTemplateColumns: "1fr 2.2rem 2.2rem 2.2rem 2.2rem" }}>
-                    <span />
-                    <div className="flex flex-col items-center gap-0.5">
-                      <LogIn className="h-3 w-3 text-emerald-500" />
-                      <span className="text-[9px] text-emerald-500 leading-none">Arr</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <LogOut className="h-3 w-3 text-amber-500" />
-                      <span className="text-[9px] text-amber-500 leading-none">Dep</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <GraduationCap className="h-3 w-3 text-purple-400" />
-                      <span className="text-[9px] text-purple-400 leading-none">Crs</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <Tag className="h-3 w-3 text-slate-400" />
-                      <span className="text-[9px] text-slate-400 leading-none">Rnt</span>
+                  {/* Column headers */}
+                  <div className="flex items-center justify-between px-2 mb-0.5">
+                    <span className="text-[9px] text-muted-foreground w-20" />
+                    <div className="flex gap-3">
+                      {[
+                        { icon: <LogIn className="h-3 w-3" />, label: "Arr", cls: "text-emerald-500" },
+                        { icon: <LogOut className="h-3 w-3" />, label: "Dep", cls: "text-amber-500" },
+                        { icon: <GraduationCap className="h-3 w-3" />, label: "Crs", cls: "text-purple-400" },
+                        { icon: <Tag className="h-3 w-3" />, label: "Rnt", cls: "text-slate-400" },
+                      ].map(({ icon, label, cls }) => (
+                        <div key={label} className={`flex flex-col items-center w-7 ${cls}`}>
+                          {icon}
+                          <span className="text-[8px] leading-none mt-0.5">{label}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -225,26 +222,19 @@ export default function DashboardPage() {
                       return (
                         <div
                           key={row.date}
-                          className={`grid items-center px-3 py-1 rounded-lg ${
+                          className={`flex items-center justify-between px-2 py-1 rounded-md ${
                             isToday ? "bg-purple-600" : "bg-slate-50 dark:bg-slate-800/40"
                           }`}
-                          style={{ gridTemplateColumns: "1fr 2.2rem 2.2rem 2.2rem 2.2rem" }}
                         >
                           <span className={`text-sm font-semibold ${isToday ? "text-white" : "text-foreground"}`}>
                             {label}
                           </span>
-                          <span className={`text-base font-bold text-center ${isToday ? "text-emerald-200" : "text-emerald-600 dark:text-emerald-400"}`} data-testid={`text-customers-arrivals-${i}`}>
-                            {row.arrivals}
-                          </span>
-                          <span className={`text-base font-bold text-center ${isToday ? "text-amber-200" : "text-amber-500 dark:text-amber-400"}`} data-testid={`text-customers-departures-${i}`}>
-                            {row.departures}
-                          </span>
-                          <span className={`text-base font-bold text-center ${isToday ? "text-white" : "text-purple-600 dark:text-purple-400"}`} data-testid={`text-customers-course-${i}`}>
-                            {row.course}
-                          </span>
-                          <span className={`text-base font-bold text-center ${isToday ? "text-purple-200" : "text-slate-400"}`} data-testid={`text-customers-rental-${i}`}>
-                            {row.rental}
-                          </span>
+                          <div className="flex gap-3">
+                            <span className={`text-sm font-bold w-7 text-center ${isToday ? "text-emerald-200" : "text-emerald-600 dark:text-emerald-400"}`} data-testid={`text-customers-arrivals-${i}`}>{row.arrivals}</span>
+                            <span className={`text-sm font-bold w-7 text-center ${isToday ? "text-amber-200" : "text-amber-500 dark:text-amber-400"}`} data-testid={`text-customers-departures-${i}`}>{row.departures}</span>
+                            <span className={`text-sm font-bold w-7 text-center ${isToday ? "text-white" : "text-purple-600 dark:text-purple-400"}`} data-testid={`text-customers-course-${i}`}>{row.course}</span>
+                            <span className={`text-sm font-bold w-7 text-center ${isToday ? "text-purple-200" : "text-slate-400"}`} data-testid={`text-customers-rental-${i}`}>{row.rental}</span>
+                          </div>
                         </div>
                       );
                     })}
