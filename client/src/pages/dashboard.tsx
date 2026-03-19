@@ -664,8 +664,7 @@ function WeatherWidget({ stationName }: { stationName: string }) {
     .filter(({ time }) => {
       const d = new Date(time);
       return d >= sunriseDate && d <= sunsetDate;
-    })
-    .filter((_, idx) => idx % 2 === 0);
+    });
 
   const nowHourStr = nowTime.substring(0, 13);
   const nowHourNum = parseInt(nowHourStr.substring(11, 13), 10);
@@ -683,14 +682,14 @@ function WeatherWidget({ stationName }: { stationName: string }) {
   return (
     <Card className="border-sky-200 dark:border-sky-800 overflow-hidden">
       <CardContent className="p-0">
-        {/* Compact header row: station + current now + tabs */}
+        {/* Compact header row: station + conditions + tabs */}
         <div className="flex items-center border-b border-border px-3 py-2 gap-2">
           <Wind className="h-3 w-3 text-sky-500 shrink-0" />
           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide shrink-0">
             {coords.label}
           </span>
-          {activeDay === 0 && (
-            <div className="flex items-center gap-2 ml-1">
+          {activeDay === 0 ? (
+            <div className="flex items-center gap-1.5 ml-1 min-w-0">
               <span className={`text-xs font-bold tabular-nums ${windTextColor(currentWind)}`} data-testid="text-wind-speed">
                 {currentWind} kn
               </span>
@@ -705,7 +704,24 @@ function WeatherWidget({ stationName }: { stationName: string }) {
                 · {currentRating.label}
               </span>
             </div>
-          )}
+          ) : peakHour ? (
+            <div className="flex items-center gap-1.5 ml-1 min-w-0">
+              <span className="text-[9px] text-muted-foreground shrink-0">peak</span>
+              <span className={`text-xs font-bold tabular-nums ${windTextColor(Math.round(peakHour.wind))}`}>
+                {Math.round(peakHour.wind)} kn
+              </span>
+              <Navigation
+                className="h-3 w-3 text-sky-500 shrink-0"
+                style={{ transform: `rotate(${peakHour.direction}deg)` }}
+              />
+              <span className="text-[10px] font-semibold text-sky-600 dark:text-sky-400">{degToCompass(peakHour.direction)}</span>
+              <Thermometer className="h-3 w-3 text-orange-400" />
+              <span className="text-[10px] font-medium">{Math.round(peakHour.temp)}°</span>
+              <span className={`text-[10px] font-semibold ${kiteRating(Math.round(peakHour.wind)).color}`}>
+                · {kiteRating(Math.round(peakHour.wind)).label}
+              </span>
+            </div>
+          ) : null}
           <div className="flex ml-auto shrink-0">
             {(["Today", "Tomorrow"] as const).map((label, i) => (
               <button
