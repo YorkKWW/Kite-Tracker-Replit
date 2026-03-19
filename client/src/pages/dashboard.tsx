@@ -185,54 +185,57 @@ export default function DashboardPage() {
               </div>
 
               {!customersSummary || !Array.isArray(customersSummary) ? (
-                <div className="flex gap-2 overflow-hidden">
-                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-28 w-20 shrink-0 rounded-xl" />)}
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
                 </div>
               ) : (
-                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+                <div className="space-y-1">
+                  {/* Column headers */}
+                  <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-3 pb-1">
+                    <span />
+                    <span className="text-xs font-semibold text-purple-500 w-14 text-center">Course</span>
+                    <span className="text-xs font-semibold text-slate-400 w-14 text-center">Rental</span>
+                  </div>
+
                   {customersSummary.map((row, i) => {
                     const d = new Date(row.date + "T12:00:00");
                     const isToday = i === 0;
                     const isTomorrow = i === 1;
-                    const dayName = isToday ? "Today" : isTomorrow ? "Tomorrow" : d.toLocaleDateString("en-GB", { weekday: "short" });
-                    const dateStr = isToday ? "" : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-                    const total = row.course + row.rental;
+                    const label = isToday
+                      ? "Today"
+                      : isTomorrow
+                      ? "Tomorrow"
+                      : d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+
                     return (
                       <div
                         key={row.date}
-                        className={`shrink-0 rounded-xl flex flex-col items-center justify-center px-3 py-3 ${
+                        className={`grid grid-cols-[1fr_auto_auto] gap-x-4 items-center px-3 py-2.5 rounded-xl ${
                           isToday
-                            ? "bg-purple-600 text-white min-w-[88px]"
-                            : "bg-slate-50 dark:bg-slate-800/50 min-w-[76px]"
+                            ? "bg-purple-600"
+                            : "bg-slate-50 dark:bg-slate-800/40"
                         }`}
                       >
-                        <p className={`text-[11px] font-semibold mb-0.5 ${isToday ? "text-purple-200" : "text-muted-foreground"}`}>
-                          {dayName}
-                        </p>
-                        {dateStr && (
-                          <p className={`text-[10px] mb-1 ${isToday ? "text-purple-300" : "text-muted-foreground/60"}`}>
-                            {dateStr}
-                          </p>
-                        )}
-                        <p className={`text-3xl font-bold leading-none my-1 ${isToday ? "text-white" : "text-foreground"}`} data-testid={`text-customers-total-${i}`}>
-                          {total}
-                        </p>
-                        <div className={`flex gap-2 mt-2 text-[11px] font-medium ${isToday ? "text-purple-200" : "text-muted-foreground"}`}>
-                          <span data-testid={`text-customers-course-${i}`}>{row.course}<span className="font-normal opacity-70">c</span></span>
-                          <span className="opacity-40">·</span>
-                          <span data-testid={`text-customers-rental-${i}`}>{row.rental}<span className="font-normal opacity-70">r</span></span>
-                        </div>
+                        <span className={`text-sm font-semibold ${isToday ? "text-white" : "text-foreground"}`}>
+                          {label}
+                        </span>
+                        <span
+                          className={`text-xl font-bold w-14 text-center ${isToday ? "text-white" : "text-purple-600 dark:text-purple-400"}`}
+                          data-testid={`text-customers-course-${i}`}
+                        >
+                          {row.course}
+                        </span>
+                        <span
+                          className={`text-xl font-bold w-14 text-center ${isToday ? "text-purple-200" : "text-slate-500 dark:text-slate-400"}`}
+                          data-testid={`text-customers-rental-${i}`}
+                        >
+                          {row.rental}
+                        </span>
                       </div>
                     );
                   })}
                 </div>
               )}
-
-              {/* Legend */}
-              <div className="flex gap-3 mt-2">
-                <span className="text-[10px] text-muted-foreground">c = Course</span>
-                <span className="text-[10px] text-muted-foreground">r = Rental</span>
-              </div>
             </CardContent>
           </Card>
         </Link>
