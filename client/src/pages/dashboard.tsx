@@ -73,7 +73,7 @@ export default function DashboardPage() {
       return res.json();
     },
     enabled: actualIsStationLead && !!activeStationId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
   const { data: allEquipment } = useQuery<Equipment[]>({
     queryKey: ["/api/equipment", isStationLeadView ? `?stationId=${simStationId}&includeTransfers=true` : ""],

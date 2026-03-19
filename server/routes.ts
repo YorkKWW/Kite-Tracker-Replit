@@ -3457,6 +3457,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/dashboard/customers-summary", requireAuth, async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
     const stationId = req.query.stationId ? parseInt(req.query.stationId as string) : undefined;
     if (!stationId) return res.status(400).json({ message: "stationId required" });
 
