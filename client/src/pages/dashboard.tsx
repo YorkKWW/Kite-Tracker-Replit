@@ -211,7 +211,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {customersSummary.map((row, i) => {
                       const d = new Date(row.date + "T12:00:00");
                       const isToday = i === 0;
@@ -225,7 +225,7 @@ export default function DashboardPage() {
                       return (
                         <div
                           key={row.date}
-                          className={`grid items-center px-3 py-2 rounded-xl ${
+                          className={`grid items-center px-3 py-1.5 rounded-lg ${
                             isToday ? "bg-purple-600" : "bg-slate-50 dark:bg-slate-800/40"
                           }`}
                           style={{ gridTemplateColumns: "1fr 2.2rem 2.2rem 2.2rem 2.2rem" }}
