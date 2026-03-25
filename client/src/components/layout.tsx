@@ -125,18 +125,25 @@ export default function Layout({ children }: LayoutProps) {
     },
   });
 
-  const navItems = [
-    ...(isAdmin || isStationLead ? [
+  const navItems = isStationLead ? [
+    { href: "/center", label: "Center", icon: Store },
+    { href: "/", label: "Equipment", icon: Package },
+    { href: "/equipment", label: "Equipment List", icon: Package },
+    { href: "/quick-inventory", label: "Quick Inventory", icon: ClipboardCheck },
+    { href: "/accessories", label: "Accessories", icon: ShirtIcon },
+    { href: "/transfers", label: "Transfers", icon: ArrowLeftRight },
+    { href: "/repairs", label: "Repairs", icon: Wrench },
+    { href: "/settings", label: "Settings", icon: Settings },
+  ] : [
+    ...(isAdmin ? [
       { href: "/center", label: "Center", icon: Store },
     ] : []),
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/equipment", label: "Equipment", icon: Package },
     { href: "/accessories", label: "Accessories", icon: ShirtIcon },
     { href: "/transfers", label: "Transfers", icon: ArrowLeftRight },
-    ...(!isStationLead ? [
-      { href: "/sales", label: "Sales", icon: ShoppingCart },
-      { href: "/incidents", label: "Incidents", icon: AlertTriangle },
-    ] : []),
+    { href: "/sales", label: "Sales", icon: ShoppingCart },
+    { href: "/incidents", label: "Incidents", icon: AlertTriangle },
     { href: "/repairs", label: "Repairs", icon: Wrench },
     ...(isHamburg
       ? [
@@ -144,18 +151,14 @@ export default function Layout({ children }: LayoutProps) {
           { href: "/invoice-import", label: "Import Invoice", icon: FileUp },
         ]
       : []),
-    ...(isStationLead ? [
-      { href: "/quick-inventory", label: "Quick Inventory", icon: ClipboardCheck },
-    ] : []),
     ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
-  // Station Lead on mobile: only Home button to return to dashboard
-  // On desktop: full sidebar navigation (md: breakpoint handles this)
   const stationLeadBottomTabs = [
-    { href: "/", label: "Home", icon: LayoutDashboard },
     { href: "/center", label: "Center", icon: Store },
+    { href: "/", label: "Equipment", icon: Package },
+    { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   const defaultBottomTabs = [
