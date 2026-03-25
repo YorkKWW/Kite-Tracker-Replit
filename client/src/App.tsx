@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -35,8 +35,12 @@ import QuickInventoryPage from "@/pages/quick-inventory";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
+function RedirectToCenter() {
+  return <Redirect to="/center" />;
+}
+
 function AuthenticatedRouter() {
-  const { user, isLoading, isAdmin, isHamburg } = useAuth();
+  const { user, isLoading, isAdmin, isHamburg, isStationLead } = useAuth();
   const path = window.location.pathname;
 
   // Public routes — accessible without login
@@ -77,8 +81,8 @@ function AuthenticatedRouter() {
         {isHamburg && <Route path="/price-lists" component={PriceListsPage} />}
         {isAdmin && <Route path="/school-admin" component={SchoolAdminPage} />}
         <Route path="/center" component={CenterPage} />
-        <Route path="/customers" component={SchoolCustomersPage} />
-        <Route path="/bookings" component={BookingsPage} />
+        <Route path="/customers" component={isStationLead ? RedirectToCenter : SchoolCustomersPage} />
+        <Route path="/bookings" component={isStationLead ? RedirectToCenter : BookingsPage} />
         <Route path="/sales/new" component={SaleCreatePage} />
         <Route path="/sales" component={SalesPage} />
         <Route path="/settings" component={SettingsPage} />
