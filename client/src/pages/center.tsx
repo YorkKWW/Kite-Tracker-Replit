@@ -1961,11 +1961,11 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <Badge variant={c.guestType === "KiteWorldWide" ? "default" : "secondary"} className="text-[10px]">
+                  <div className="flex items-center shrink-0 gap-1">
+                    <Badge variant={c.guestType === "KiteWorldWide" ? "default" : "secondary"} className="text-[10px] min-w-[42px] justify-center">
                       {c.guestType === "KiteWorldWide" ? "KWW" : "Walk-in"}
                     </Badge>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${KITE_LEVEL_COLORS[c.kiteLevel]}`}>{c.kiteLevel}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium text-center w-[72px] truncate ${KITE_LEVEL_COLORS[c.kiteLevel]}`}>{c.kiteLevel}</span>
                     {here && <Badge variant="outline" className="text-[10px] text-green-700 border-green-300 bg-green-50 dark:bg-green-900/20 dark:text-green-400">Here</Badge>}
                   </div>
                 </div>
