@@ -95,6 +95,14 @@ const CATEGORY_ICON_COMPONENTS: Record<string, LucideIcon> = {
   Other: WrenchIcon,
 };
 
+const CATEGORY_TILE_BG: Record<string, string> = {
+  Course: "bg-blue-50 border-blue-200 hover:border-blue-400 dark:bg-blue-950/40 dark:border-blue-800",
+  Lesson: "bg-green-50 border-green-200 hover:border-green-400 dark:bg-green-950/40 dark:border-green-800",
+  Package: "bg-purple-50 border-purple-200 hover:border-purple-400 dark:bg-purple-950/40 dark:border-purple-800",
+  Rental: "bg-orange-50 border-orange-200 hover:border-orange-400 dark:bg-orange-950/40 dark:border-orange-800",
+  Other: "bg-gray-50 border-gray-200 hover:border-gray-400 dark:bg-gray-900/40 dark:border-gray-700",
+};
+
 const KITE_LEVEL_COLORS: Record<string, string> = {
   Beginner: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
   Intermediate: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
@@ -421,6 +429,7 @@ function CustomerAutocomplete({
       {showCreateDialog && (
         <CreateCustomerDialog
           schoolConfigId={schoolConfigId}
+          initialFirstName={query.trim()}
           onCreated={(c) => {
             onSelect(c.id, `${c.firstName} ${c.lastName}`, c.email);
             setShowCreateDialog(false);
@@ -434,14 +443,15 @@ function CustomerAutocomplete({
 }
 
 function CreateCustomerDialog({
-  schoolConfigId, onCreated, onClose,
+  schoolConfigId, onCreated, onClose, initialFirstName = "",
 }: {
   schoolConfigId: number;
   onCreated: (c: SchoolCustomer) => void;
   onClose: () => void;
+  initialFirstName?: string;
 }) {
   const { toast } = useToast();
-  const [firstName, setFirstName] = useState("");
+  const [firstName, setFirstName] = useState(initialFirstName);
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -600,6 +610,11 @@ function CreateCustomerDialog({
   );
 }
 
+type ProductGroup = {
+  header: string;
+  products: { product: SchoolProduct; variantLabel: string | null }[];
+};
+
 function ProductTiles({
   products, currency, selectedIds, onAdd,
 }: {
@@ -609,43 +624,104 @@ function ProductTiles({
   onAdd: (p: SchoolProduct) => void;
 }) {
   const grouped = useMemo(() => {
-    const map: Record<string, SchoolProduct[]> = {};
+    const byCategory: Record<string, SchoolProduct[]> = {};
     for (const p of products) {
       if (selectedIds.has(p.id)) continue;
-      if (!map[p.category]) map[p.category] = [];
-      map[p.category].push(p);
+      if (!byCategory[p.category]) byCategory[p.category] = [];
+      byCategory[p.category].push(p);
     }
-    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
+
+    const result: { category: string; groups: ProductGroup[] }[] = [];
+    for (const [category, catProducts] of Object.entries(byCategory).sort(([a], [b]) => a.localeCompare(b))) {
+      const groupMap: Record<string, { product: SchoolProduct; variantLabel: string | null }[]> = {};
+      const ungrouped: { product: SchoolProduct; variantLabel: string | null }[] = [];
+
+      for (const p of catProducts) {
+        const dashMatch = p.name.match(/^(.+?)\s[–\-]\s(.+)$/);
+        if (dashMatch) {
+          const base = dashMatch[1].trim();
+          const variant = dashMatch[2].trim();
+          if (!groupMap[base]) groupMap[base] = [];
+          groupMap[base].push({ product: p, variantLabel: variant });
+        } else {
+          ungrouped.push({ product: p, variantLabel: null });
+        }
+      }
+
+      const groups: ProductGroup[] = [];
+      for (const [header, items] of Object.entries(groupMap)) {
+        if (items.length >= 2) {
+          groups.push({ header, products: items });
+        } else {
+          ungrouped.push(...items.map(i => ({ product: i.product, variantLabel: null })));
+        }
+      }
+      if (ungrouped.length > 0) {
+        groups.push({ header: "", products: ungrouped });
+      }
+      result.push({ category, groups });
+    }
+    return result;
   }, [products, selectedIds]);
 
   if (grouped.length === 0) {
     return <p className="text-sm text-muted-foreground text-center py-6">Alle Produkte wurden hinzugefügt</p>;
   }
 
+  const tileBg = (cat: string) => CATEGORY_TILE_BG[cat] || CATEGORY_TILE_BG.Other;
+
   return (
-    <div className="space-y-4">
-      {grouped.map(([category, items]) => (
-        <div key={category}>
-          <div className="flex items-center gap-2 mb-2">
-            {(() => { const Icon = CATEGORY_ICON_COMPONENTS[category] || WrenchIcon; return <Icon className="h-4 w-4 text-muted-foreground" />; })()}
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{category}</p>
+    <div className="space-y-5">
+      {grouped.map(({ category, groups }) => {
+        const Icon = CATEGORY_ICON_COMPONENTS[category] || WrenchIcon;
+        return (
+          <div key={category}>
+            <div className="flex items-center gap-1.5 mb-2">
+              <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{category}</p>
+            </div>
+            <div className="space-y-3">
+              {groups.map((group) => {
+                if (group.header) {
+                  return (
+                    <div key={group.header}>
+                      <p className="text-xs font-semibold mb-1.5 pl-0.5">{group.header}</p>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {group.products.map(({ product, variantLabel }) => (
+                          <button
+                            key={product.id}
+                            data-testid={`product-tile-${product.id}`}
+                            onClick={() => onAdd(product)}
+                            className={`text-left border rounded-lg px-2 py-1.5 transition-all active:scale-[0.97] ${tileBg(category)}`}
+                          >
+                            <p className="text-[11px] font-medium leading-tight truncate">{variantLabel}</p>
+                            <p className="text-[11px] font-bold text-primary">{currency} {parseFloat(product.defaultPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div key="ungrouped" className="grid grid-cols-3 gap-1.5">
+                    {group.products.map(({ product }) => (
+                      <button
+                        key={product.id}
+                        data-testid={`product-tile-${product.id}`}
+                        onClick={() => onAdd(product)}
+                        className={`text-left border rounded-lg px-2 py-1.5 transition-all active:scale-[0.97] ${tileBg(category)}`}
+                      >
+                        <p className="text-[11px] font-medium leading-tight line-clamp-2">{product.name}</p>
+                        <p className="text-[11px] font-bold text-primary mt-0.5">{currency} {parseFloat(product.defaultPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}</p>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            {items.map(p => (
-              <button
-                key={p.id}
-                data-testid={`product-tile-${p.id}`}
-                onClick={() => onAdd(p)}
-                className="text-left border rounded-xl p-3 hover:border-primary hover:bg-primary/5 transition-all active:scale-[0.97]"
-              >
-                <p className="text-sm font-medium leading-tight">{p.name}</p>
-                {p.description && <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{p.description}</p>}
-                <p className="text-sm font-bold text-primary mt-1.5">{currency} {parseFloat(p.defaultPrice).toFixed(2)}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -753,7 +829,7 @@ function NewBookingView({
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
 
-  const canSubmit = customerName.trim() && items.length > 0 && items.every(i => parseFloat(i.unitPrice) > 0);
+  const canSubmit = selectedCustomerId && customerName.trim() && items.length > 0 && items.every(i => parseFloat(i.unitPrice) > 0);
 
   if (showProducts) {
     return (
@@ -840,21 +916,7 @@ function NewBookingView({
           }}
         />
         {!selectedCustomerId && (
-          <div className="space-y-2">
-            <Input
-              data-testid="input-manual-customer-name"
-              placeholder="Kundenname (manuell) *"
-              value={customerName}
-              onChange={e => setCustomerName(e.target.value)}
-            />
-            <Input
-              data-testid="input-manual-customer-email"
-              placeholder="E-Mail (optional)"
-              type="email"
-              value={customerEmail}
-              onChange={e => setCustomerEmail(e.target.value)}
-            />
-          </div>
+          <p className="text-xs text-muted-foreground">Suche einen bestehenden Kunden oder lege einen neuen an.</p>
         )}
       </div>
 
