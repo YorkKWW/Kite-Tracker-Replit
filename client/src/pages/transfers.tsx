@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { BarcodeScanner } from "@/components/barcode-scanner";
-import { ArrowLeftRight, Check, X, AlertTriangle, PackageCheck, ScanLine, Search } from "lucide-react";
+import { ArrowLeftRight, ArrowLeft, Check, X, AlertTriangle, PackageCheck, ScanLine, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Transfer, Station, Equipment } from "@shared/schema";
 
@@ -173,9 +173,16 @@ export default function TransfersPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold tracking-tight" data-testid="text-transfers-title">
-        Transfers
-      </h1>
+      <div className="flex items-center gap-2">
+        <Link href="/">
+          <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-transfers-title">
+          Transfers
+        </h1>
+      </div>
 
       <BarcodeScanner
         open={scannerOpen}

@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConditionBadge, StatusBadge } from "@/components/condition-badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp, Inbox, ArrowRightLeft, CheckSquare, Trash2, Send } from "lucide-react";
+import { Plus, Search, Package, SlidersHorizontal, ScanLine, FileUp, Inbox, ArrowRightLeft, CheckSquare, Trash2, Send, ArrowLeft } from "lucide-react";
 import type { Equipment, Station } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_OPTIONS, TYPES_WITHOUT_SERIAL } from "@shared/schema";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -243,7 +243,14 @@ export default function EquipmentListPage() {
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
       <div className="flex items-center justify-between gap-1 flex-wrap">
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-equipment-title">Equipment</h1>
+        <div className="flex items-center gap-2">
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-equipment-title">Equipment</h1>
+        </div>
         <div className="flex gap-2">
           {(isSuperAdmin || isHamburg) && (
             <Button

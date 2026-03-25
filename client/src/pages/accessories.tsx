@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Minus, ArrowRightLeft, Trash2, Loader2, HardHat, AlertTriangle, Check, X } from "lucide-react";
+import { Plus, Minus, ArrowRightLeft, Trash2, Loader2, HardHat, AlertTriangle, Check, X, ArrowLeft } from "lucide-react";
 import type { Station } from "@shared/schema";
 import { ACCESSORY_SIZES } from "@shared/schema";
 
@@ -243,7 +244,14 @@ export default function AccessoriesPage() {
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-accessories-title">Accessories</h1>
+        <div className="flex items-center gap-2">
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-accessories-title">Accessories</h1>
+        </div>
         <div className="flex gap-2">
           <Button
             variant="outline"

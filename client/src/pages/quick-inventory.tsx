@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Loader2, ScanLine, ClipboardCheck, ChevronDown, ChevronUp,
-  History, AlertTriangle, CheckCircle2, Minus, Plus, Circle, Package,
+  History, AlertTriangle, CheckCircle2, Minus, Plus, Circle, Package, ArrowLeft,
 } from "lucide-react";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 import type { AccessoryCategory, AccessoryInventory, InventoryCheck, InventoryCheckItem, Equipment } from "@shared/schema";
@@ -212,7 +212,14 @@ export default function QuickInventoryPage() {
   return (
     <div className="max-w-lg mx-auto p-4 space-y-6 pb-28">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-page-title">Quick Inventory</h1>
+        <div className="flex items-center gap-2">
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Quick Inventory</h1>
+        </div>
         <p className="text-muted-foreground text-sm" data-testid="text-station-date">
           {data.stationName} — {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
         </p>

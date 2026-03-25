@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
   Wrench, CheckCircle, AlertTriangle, MapPin, ExternalLink,
-  Info, ChevronDown, ChevronUp, User, Calendar, Package,
+  Info, ChevronDown, ChevronUp, User, Calendar, Package, ArrowLeft,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -394,12 +394,19 @@ export default function RepairsPage() {
   return (
     <div className="space-y-6 px-1">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Wrench className="h-6 w-6" />
-            Repairs
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Active repairs across all stations</p>
+        <div className="flex items-center gap-2">
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+              <Wrench className="h-6 w-6" />
+              Repairs
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Active repairs across all stations</p>
+          </div>
         </div>
         {!isLoading && items && total > 0 && (
           <Badge variant="secondary" className="text-sm px-3 py-1">
