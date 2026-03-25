@@ -2180,7 +2180,9 @@ function FinanceTab({ schoolConfigId, currency }: { schoolConfigId: number; curr
   }, [cashEntry]);
 
   const filteredBookings = useMemo(() => {
-    return bookings.filter(b => b.bookingDate >= startDate && b.bookingDate <= endDate);
+    return bookings
+      .filter(b => b.bookingDate >= startDate && b.bookingDate <= endDate)
+      .sort((a, b) => b.bookingDate.localeCompare(a.bookingDate) || b.id - a.id);
   }, [bookings, startDate, endDate]);
 
   const stats = useMemo(() => {
