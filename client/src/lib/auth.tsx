@@ -69,7 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const actualSuperAdmin = user?.role === "admin" && user?.isSuperAdmin === true;
-  const isSimulating = actualSuperAdmin && viewMode !== null && viewMode !== "super_admin";
+  const userRole = user?.role;
+  
+  // Determine if user can simulate: higher roles can simulate lower roles
+  const canSimulate = userRole === "admin" || userRole === "manager";
+  const isSimulating = canSimulate && viewMode !== null && viewMode !== userRole;
 
   let isSuperAdmin = actualSuperAdmin;
   let isAdmin = user?.role === "admin";
@@ -97,11 +101,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isHamburg,
         isStationLead,
         canEditEquipment,
-        viewMode: actualSuperAdmin ? viewMode : null,
-        setViewMode: actualSuperAdmin ? setViewMode : () => {},
+        viewMode: canSimulate ? viewMode : null,
+        setViewMode: canSimulate ? setViewMode : () => {},
         isSimulating,
         simStationId: isSimulating && viewMode === "station_lead" ? simStationId : null,
-        setSimStationId: actualSuperAdmin ? setSimStationId : () => {},
+        setSimStationId: canSimulate ? setSimStationId : () => {},
       }}
     >
       {children}
