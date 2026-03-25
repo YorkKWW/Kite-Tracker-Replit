@@ -1287,7 +1287,10 @@ function BookingTimeline({
   );
 }
 
+type ForecastDetail = "courses" | "rentals" | "guests" | "arrivals" | "departures" | "unpaid" | null;
+
 function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; currency: string }) {
+  const [detailView, setDetailView] = useState<ForecastDetail>(null);
   const { data: customers = [], isLoading: loadingCustomers } = useQuery<SchoolCustomer[]>({
     queryKey: ["/api/school-customers", schoolConfigId],
   });
@@ -1372,6 +1375,58 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
 
   const isLoading = loadingCustomers || loadingBookings;
 
+  const detailData = useMemo(() => {
+    if (!detailView) return null;
+    const todayStr = today;
+    const weekEnd = addDays(todayStr, 6);
+
+    if (detailView === "courses") {
+      return customers.filter(c => {
+        if (!c.arrivalDate || !c.departureDate) return false;
+        if (!(c.arrivalDate <= todayStr && todayStr <= c.departureDate)) return false;
+        const key = `${c.firstName} ${c.lastName}`.toLowerCase().trim();
+        const svc = customerServiceMap.get(key);
+        return svc ? svc.courseDays.has(todayStr) : false;
+      });
+    }
+    if (detailView === "rentals") {
+      return customers.filter(c => {
+        if (!c.arrivalDate || !c.departureDate) return false;
+        if (!(c.arrivalDate <= todayStr && todayStr <= c.departureDate)) return false;
+        const key = `${c.firstName} ${c.lastName}`.toLowerCase().trim();
+        const svc = customerServiceMap.get(key);
+        return svc ? svc.rentalDays.has(todayStr) : false;
+      });
+    }
+    if (detailView === "guests") {
+      return customers.filter(c => {
+        if (!c.arrivalDate || !c.departureDate) return false;
+        return c.arrivalDate <= todayStr && todayStr <= c.departureDate;
+      });
+    }
+    if (detailView === "arrivals") {
+      return customers.filter(c => c.arrivalDate && c.arrivalDate >= todayStr && c.arrivalDate <= weekEnd);
+    }
+    if (detailView === "departures") {
+      return customers.filter(c => c.departureDate && c.departureDate >= todayStr && c.departureDate <= weekEnd);
+    }
+    return null;
+  }, [detailView, customers, customerServiceMap, today]);
+
+  const unpaidBookings = useMemo(() => {
+    if (detailView !== "unpaid") return [];
+    return bookings.filter(b => b.paymentStatus === "unpaid");
+  }, [detailView, bookings]);
+
+  const detailLabels: Record<string, string> = {
+    courses: "Courses Today",
+    rentals: "Rentals Today",
+    guests: "Total Guests Today",
+    arrivals: "Arrivals (7d)",
+    departures: "Departures (7d)",
+    unpaid: "Open Payments",
+  };
+
   if (isLoading) {
     return (
       <div className="p-4 space-y-3">
@@ -1383,24 +1438,89 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
     );
   }
 
+  if (detailView) {
+    return (
+      <div className="p-4 space-y-3" data-testid="forecast-detail">
+        <Button variant="ghost" size="sm" onClick={() => setDetailView(null)} data-testid="btn-forecast-back">
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back
+        </Button>
+        <h3 className="text-sm font-semibold">{detailLabels[detailView]}</h3>
+        {detailView === "unpaid" ? (
+          unpaidBookings.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No open payments.</p>
+          ) : (
+            <div className="space-y-2">
+              {unpaidBookings.map(b => (
+                <Card key={b.id}>
+                  <CardContent className="p-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium text-sm">{b.customerName}</p>
+                        <p className="text-xs text-muted-foreground">{b.bookingNumber}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold">{Number(b.totalAmount).toFixed(2)} {currency}</p>
+                        <p className="text-xs text-red-500 flex items-center gap-1 justify-end">
+                          <CircleDot className="h-2.5 w-2.5" /> Unpaid
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )
+        ) : detailData && detailData.length > 0 ? (
+          <div className="space-y-2">
+            {detailData.map(c => (
+              <Card key={c.id}>
+                <CardContent className="p-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium text-sm">{c.firstName} {c.lastName}</p>
+                      <p className="text-xs text-muted-foreground">{c.email}</p>
+                    </div>
+                    <div className="text-right text-xs text-muted-foreground">
+                      {(detailView === "arrivals" && c.arrivalDate) && (
+                        <p>{new Date(c.arrivalDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })}</p>
+                      )}
+                      {(detailView === "departures" && c.departureDate) && (
+                        <p>{new Date(c.departureDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })}</p>
+                      )}
+                      {(detailView !== "arrivals" && detailView !== "departures" && c.arrivalDate && c.departureDate) && (
+                        <p>{new Date(c.arrivalDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })} – {new Date(c.departureDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })}</p>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No entries.</p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 space-y-4" data-testid="forecast-tab">
       <div className="grid grid-cols-3 gap-2">
-        <Card>
+        <Card className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setDetailView("courses")} data-testid="card-courses-today">
           <CardContent className="p-2 text-center">
             <GraduationCap className="h-4 w-4 mx-auto text-blue-600 mb-0.5" />
             <p className="text-xl font-bold" data-testid="text-courses-today">{todayData.courses}</p>
             <p className="text-[9px] text-muted-foreground">Courses Today</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setDetailView("rentals")} data-testid="card-rentals-today">
           <CardContent className="p-2 text-center">
             <Waves className="h-4 w-4 mx-auto text-amber-500 mb-0.5" />
             <p className="text-xl font-bold" data-testid="text-rentals-today">{todayData.rentals}</p>
             <p className="text-[9px] text-muted-foreground">Rentals Today</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setDetailView("guests")} data-testid="card-guests-today">
           <CardContent className="p-2 text-center">
             <Users className="h-4 w-4 mx-auto text-primary mb-0.5" />
             <p className="text-xl font-bold" data-testid="text-guests-today">{todayData.total}</p>
@@ -1409,21 +1529,21 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
         </Card>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <Card>
+        <Card className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setDetailView("arrivals")} data-testid="card-arrivals">
           <CardContent className="p-2 text-center">
             <ArrowDownRight className="h-4 w-4 mx-auto text-green-600 mb-0.5" />
             <p className="text-xl font-bold" data-testid="text-week-arrivals">{weekArrivals}</p>
             <p className="text-[9px] text-muted-foreground">Arrivals (7d)</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setDetailView("departures")} data-testid="card-departures">
           <CardContent className="p-2 text-center">
             <ArrowUpRight className="h-4 w-4 mx-auto text-red-500 mb-0.5" />
             <p className="text-xl font-bold" data-testid="text-week-departures">{weekDepartures}</p>
             <p className="text-[9px] text-muted-foreground">Departures (7d)</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setDetailView("unpaid")} data-testid="card-unpaid">
           <CardContent className="p-2 text-center">
             <XCircle className="h-4 w-4 mx-auto text-orange-500 mb-0.5" />
             <p className="text-xl font-bold" data-testid="text-unpaid-count">{unpaidCount}</p>
