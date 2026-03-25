@@ -1970,20 +1970,17 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
                   </div>
                 </div>
                 {custItems.length > 0 && (
-                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  <div className="flex flex-col gap-0.5 mt-1.5">
                     {custItems.map((item, idx) => {
                       const info = categoryIcons[item.category] || categoryIcons.Other;
                       const Icon = info.icon;
-                      const nameMatch = item.productName.match(/^(.+?)\s[–\-]\s(.+)$/);
-                      const shortName = nameMatch ? nameMatch[2] : item.productName;
                       return (
                         <span
                           key={idx}
-                          className={`inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted/60 ${info.color}`}
-                          title={item.productName}
+                          className={`inline-flex items-center gap-1 text-[10px] ${info.color}`}
                         >
                           <Icon className="h-3 w-3 shrink-0" />
-                          {item.quantity > 1 ? `${item.quantity}× ` : ""}{shortName}
+                          {item.quantity > 1 ? `${item.quantity}× ` : ""}{item.productName}
                         </span>
                       );
                     })}
