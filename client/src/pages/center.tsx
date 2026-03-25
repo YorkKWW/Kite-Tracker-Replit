@@ -357,6 +357,16 @@ function CustomerAutocomplete({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  useEffect(() => {
+    if (open && query.trim().length >= 2 && filtered.length === 0 && !showCreateDialog) {
+      const timeout = setTimeout(() => {
+        setShowCreateDialog(true);
+        setOpen(false);
+      }, 600);
+      return () => clearTimeout(timeout);
+    }
+  }, [open, query, filtered.length, showCreateDialog]);
+
   if (selectedCustomerId) {
     return (
       <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-muted/30">
