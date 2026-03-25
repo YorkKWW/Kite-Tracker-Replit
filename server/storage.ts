@@ -34,7 +34,7 @@ import {
   companySettings, customers, salesInvoices, saleItems, priceLists, priceListItems,
   damageReports, damageReportPhotos, feedback, feedbackAttachments, feedbackComments, notifications,
   accessoryCategories, accessoryInventory, accessoryTransfers, accessoryLossReports,
-  schoolConfigs, schoolProducts, schoolCustomers, passwordResetTokens,
+  schoolConfigs, schoolProducts, schoolCustomers, schoolBookings, schoolBookingItems, passwordResetTokens,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -69,6 +69,8 @@ import {
   type SchoolConfig, type InsertSchoolConfig,
   type SchoolProduct, type InsertSchoolProduct,
   type SchoolCustomer, type InsertSchoolCustomer,
+  type SchoolBooking, type InsertSchoolBooking,
+  type SchoolBookingItem, type InsertSchoolBookingItem,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -234,6 +236,12 @@ export interface IStorage {
   createSchoolProduct(product: InsertSchoolProduct): Promise<SchoolProduct>;
   updateSchoolProduct(id: number, data: Partial<InsertSchoolProduct>): Promise<SchoolProduct | undefined>;
   bulkImportSchoolProducts(schoolConfigId: number, products: Omit<InsertSchoolProduct, "schoolConfigId">[], replaceExisting: boolean): Promise<number>;
+
+  getSchoolBookings(schoolConfigId: number): Promise<(SchoolBooking & { items: SchoolBookingItem[]; createdByName: string | null })[]>;
+  getSchoolBooking(id: number): Promise<(SchoolBooking & { items: SchoolBookingItem[]; createdByName: string | null }) | undefined>;
+  createSchoolBooking(booking: InsertSchoolBooking, items: Omit<InsertSchoolBookingItem, "bookingId">[]): Promise<SchoolBooking>;
+  updateSchoolBookingPayment(id: number, paymentStatus: string): Promise<SchoolBooking | undefined>;
+  getNextBookingNumber(schoolConfigId: number, stationShortCode: string): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1669,6 +1677,106 @@ export class DatabaseStorage implements IStorage {
       .from(accessoryCheckItems)
       .innerJoin(accessoryCategories, eq(accessoryCheckItems.categoryId, accessoryCategories.id))
       .where(eq(accessoryCheckItems.checkId, checkId));
+  }
+  async getSchoolBookings(schoolConfigId: number): Promise<(SchoolBooking & { items: SchoolBookingItem[]; createdByName: string | null })[]> {
+    const rows = await db
+      .select({
+        id: schoolBookings.id,
+        schoolConfigId: schoolBookings.schoolConfigId,
+        bookingNumber: schoolBookings.bookingNumber,
+        customerId: schoolBookings.customerId,
+        customerName: schoolBookings.customerName,
+        customerEmail: schoolBookings.customerEmail,
+        paymentStatus: schoolBookings.paymentStatus,
+        totalAmount: schoolBookings.totalAmount,
+        currency: schoolBookings.currency,
+        notes: schoolBookings.notes,
+        createdAt: schoolBookings.createdAt,
+        createdBy: schoolBookings.createdBy,
+        createdByName: sql<string | null>`COALESCE(${users.name}, NULL)`,
+      })
+      .from(schoolBookings)
+      .leftJoin(users, eq(schoolBookings.createdBy, users.id))
+      .where(eq(schoolBookings.schoolConfigId, schoolConfigId))
+      .orderBy(desc(schoolBookings.createdAt));
+
+    const bookingIds = rows.map(r => r.id);
+    if (bookingIds.length === 0) return rows.map(r => ({ ...r, items: [] }));
+
+    const allItems = await db.select().from(schoolBookingItems)
+      .where(sql`${schoolBookingItems.bookingId} IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`);
+
+    const itemsByBooking = new Map<number, SchoolBookingItem[]>();
+    for (const item of allItems) {
+      const arr = itemsByBooking.get(item.bookingId) || [];
+      arr.push(item);
+      itemsByBooking.set(item.bookingId, arr);
+    }
+
+    return rows.map(r => ({ ...r, items: itemsByBooking.get(r.id) || [] }));
+  }
+
+  async getSchoolBooking(id: number): Promise<(SchoolBooking & { items: SchoolBookingItem[]; createdByName: string | null }) | undefined> {
+    const [row] = await db
+      .select({
+        id: schoolBookings.id,
+        schoolConfigId: schoolBookings.schoolConfigId,
+        bookingNumber: schoolBookings.bookingNumber,
+        customerId: schoolBookings.customerId,
+        customerName: schoolBookings.customerName,
+        customerEmail: schoolBookings.customerEmail,
+        paymentStatus: schoolBookings.paymentStatus,
+        totalAmount: schoolBookings.totalAmount,
+        currency: schoolBookings.currency,
+        notes: schoolBookings.notes,
+        createdAt: schoolBookings.createdAt,
+        createdBy: schoolBookings.createdBy,
+        createdByName: sql<string | null>`COALESCE(${users.name}, NULL)`,
+      })
+      .from(schoolBookings)
+      .leftJoin(users, eq(schoolBookings.createdBy, users.id))
+      .where(eq(schoolBookings.id, id));
+    if (!row) return undefined;
+
+    const items = await db.select().from(schoolBookingItems)
+      .where(eq(schoolBookingItems.bookingId, id));
+
+    return { ...row, items };
+  }
+
+  async createSchoolBooking(booking: InsertSchoolBooking, items: Omit<InsertSchoolBookingItem, "bookingId">[]): Promise<SchoolBooking> {
+    return await db.transaction(async (tx) => {
+      const [created] = await tx.insert(schoolBookings).values(booking).returning();
+      if (items.length > 0) {
+        await tx.insert(schoolBookingItems).values(
+          items.map(item => ({ ...item, bookingId: created.id }))
+        );
+      }
+      return created;
+    });
+  }
+
+  async updateSchoolBookingPayment(id: number, paymentStatus: string): Promise<SchoolBooking | undefined> {
+    const [updated] = await db.update(schoolBookings)
+      .set({ paymentStatus: paymentStatus as any })
+      .where(eq(schoolBookings.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getNextBookingNumber(schoolConfigId: number, stationShortCode: string): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `SCH-${stationShortCode}-${year}-`;
+    const [result] = await db
+      .select({ bookingNumber: schoolBookings.bookingNumber })
+      .from(schoolBookings)
+      .where(sql`${schoolBookings.bookingNumber} LIKE ${prefix + '%'} AND ${schoolBookings.schoolConfigId} = ${schoolConfigId}`)
+      .orderBy(desc(schoolBookings.bookingNumber))
+      .limit(1);
+
+    if (!result) return `${prefix}001`;
+    const lastNum = parseInt(result.bookingNumber.split("-").pop() || "0", 10);
+    return `${prefix}${String(lastNum + 1).padStart(3, "0")}`;
   }
 }
 

@@ -31,6 +31,7 @@ import {
   HelpCircle,
   MessageSquarePlus,
   ClipboardCheck,
+  Receipt,
   MoreHorizontal,
   Bell,
   Eye,
@@ -140,6 +141,7 @@ export default function Layout({ children }: LayoutProps) {
     ...(isStationLead ? [
       { href: "/quick-inventory", label: "Quick Inventory", icon: ClipboardCheck },
       { href: "/customers", label: "Customers", icon: Users },
+      { href: "/bookings", label: "Bookings", icon: Receipt },
     ] : []),
     ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
     { href: "/settings", label: "Settings", icon: Settings },

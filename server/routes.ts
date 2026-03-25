@@ -3759,5 +3759,306 @@ export async function registerRoutes(
     });
   });
 
+  // ─── School Bookings ──────────────────────────────────────────────────────
+
+  const STATION_SHORT_CODES: Record<string, string> = {
+    dakhla: "DK",
+    tatajuba: "TJ",
+    hamburg: "HH",
+    heidenau: "HD",
+  };
+
+  function getStationShortCode(stationName: string): string {
+    const lower = stationName.toLowerCase();
+    for (const [key, code] of Object.entries(STATION_SHORT_CODES)) {
+      if (lower.includes(key)) return code;
+    }
+    return stationName.substring(0, 2).toUpperCase();
+  }
+
+  app.get("/api/school-bookings/:schoolConfigId", requireAuth, async (req, res) => {
+    try {
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid school config ID" });
+      const user = req.user as any;
+      if (user.role === "station_lead") {
+        const config = await storage.getSchoolConfig(schoolConfigId);
+        if (!config || config.stationId !== user.assignedStationId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      const bookings = await storage.getSchoolBookings(schoolConfigId);
+      res.json(bookings);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/school-bookings/detail/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid booking ID" });
+      const booking = await storage.getSchoolBooking(id);
+      if (!booking) return res.status(404).json({ message: "Not found" });
+      const user = req.user as any;
+      if (user.role === "station_lead") {
+        const config = await storage.getSchoolConfig(booking.schoolConfigId);
+        if (!config || config.stationId !== user.assignedStationId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      res.json(booking);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/school-bookings/next-number/:schoolConfigId", requireAuth, async (req, res) => {
+    try {
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid school config ID" });
+      const config = await storage.getSchoolConfig(schoolConfigId);
+      if (!config) return res.status(404).json({ message: "School config not found" });
+      const user = req.user as any;
+      if (user.role === "station_lead" && config.stationId !== user.assignedStationId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const station = await storage.getStation(config.stationId);
+      const shortCode = getStationShortCode(station?.name || "XX");
+      const bookingNumber = await storage.getNextBookingNumber(schoolConfigId, shortCode);
+      res.json({ bookingNumber });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/school-bookings", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "manager" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Only admin or center manager can create bookings" });
+      }
+      const { schoolConfigId, customerId, customerName, customerEmail, paymentStatus, notes, items, currency } = req.body;
+      if (!schoolConfigId || !customerName || !items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "schoolConfigId, customerName, and items are required" });
+      }
+      for (const item of items) {
+        if (!item.productName || typeof item.productName !== "string") {
+          return res.status(400).json({ message: "Each item must have a productName" });
+        }
+        const qty = parseInt(item.quantity) || 0;
+        const price = parseFloat(item.unitPrice) || 0;
+        if (qty < 1) return res.status(400).json({ message: "Quantity must be at least 1" });
+        if (price < 0) return res.status(400).json({ message: "Price cannot be negative" });
+      }
+      const config = await storage.getSchoolConfig(schoolConfigId);
+      if (!config) return res.status(404).json({ message: "School config not found" });
+      if (user.role === "station_lead" && config.stationId !== user.assignedStationId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const station = await storage.getStation(config.stationId);
+      const shortCode = getStationShortCode(station?.name || "XX");
+      const bookingNumber = await storage.getNextBookingNumber(schoolConfigId, shortCode);
+      const totalAmount = items.reduce((sum: number, i: any) => sum + (parseFloat(i.lineTotal) || 0), 0).toFixed(2);
+
+      const booking = await storage.createSchoolBooking(
+        {
+          schoolConfigId,
+          bookingNumber,
+          customerId: customerId || null,
+          customerName,
+          customerEmail: customerEmail || null,
+          paymentStatus: paymentStatus || "unpaid",
+          totalAmount,
+          currency: currency || config.currency,
+          notes: notes || null,
+          createdBy: user.id,
+        },
+        items.map((i: any) => ({
+          productId: i.productId || null,
+          productName: i.productName,
+          category: i.category || "Other",
+          quantity: i.quantity || 1,
+          unitPrice: String(i.unitPrice),
+          lineTotal: String(i.lineTotal),
+        }))
+      );
+
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "school_booking_created",
+        details: `Booking ${bookingNumber} created for ${customerName} — ${config.currency} ${totalAmount}`,
+      });
+
+      const full = await storage.getSchoolBooking(booking.id);
+      res.json(full);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/school-bookings/:id/payment", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "manager" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const id = parseInt(req.params.id);
+      const { paymentStatus } = req.body;
+      if (!["unpaid", "cash", "credit_card"].includes(paymentStatus)) {
+        return res.status(400).json({ message: "Invalid payment status" });
+      }
+      const booking = await storage.getSchoolBooking(id);
+      if (!booking) return res.status(404).json({ message: "Not found" });
+      if (user.role === "station_lead") {
+        const config = await storage.getSchoolConfig(booking.schoolConfigId);
+        if (!config || config.stationId !== user.assignedStationId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      const updated = await storage.updateSchoolBookingPayment(id, paymentStatus);
+      await storage.createActivityLog({
+        userId: user.id,
+        action: "school_booking_payment_updated",
+        details: `Booking ${booking.bookingNumber} payment changed to ${paymentStatus}`,
+      });
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/school-bookings/:id/pdf", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const booking = await storage.getSchoolBooking(id);
+      if (!booking) return res.status(404).json({ message: "Not found" });
+      const user = req.user as any;
+      const config = await storage.getSchoolConfig(booking.schoolConfigId);
+      if (!config) return res.status(404).json({ message: "School config not found" });
+      if (user.role === "station_lead" && config.stationId !== user.assignedStationId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const PDFDocument = (await import("pdfkit")).default;
+      const doc = new PDFDocument({ size: "A4", margin: 50, info: { Title: `Receipt ${booking.bookingNumber}` } });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${booking.bookingNumber}.pdf"`);
+      doc.pipe(res);
+
+      const pageW = 595.28;
+      const margin = 50;
+      const contentW = pageW - margin * 2;
+      const navy = "#1e3a5f";
+      const grey = "#6b7280";
+      const lightGrey = "#f3f4f6";
+      const black = "#111827";
+
+      doc.fontSize(20).font("Helvetica-Bold").fillColor(navy).text(config.schoolName, margin, margin, { width: contentW });
+      doc.moveTo(margin, margin + 30).lineTo(pageW - margin, margin + 30).strokeColor(navy).lineWidth(1.5).stroke();
+
+      let y = margin + 45;
+      doc.fontSize(16).font("Helvetica-Bold").fillColor(navy).text("RECEIPT", margin, y);
+      y += 30;
+
+      const metaData: [string, string][] = [
+        ["Receipt No.:", booking.bookingNumber],
+        ["Date:", booking.createdAt ? new Date(booking.createdAt).toLocaleDateString("de-DE") : "—"],
+        ["Customer:", booking.customerName],
+        ...(booking.customerEmail ? [["Email:", booking.customerEmail] as [string, string]] : []),
+        ["Payment:", booking.paymentStatus === "unpaid" ? "Unpaid" : booking.paymentStatus === "cash" ? "Cash" : "Credit Card"],
+      ];
+
+      for (const [label, val] of metaData) {
+        doc.fontSize(9).font("Helvetica").fillColor(grey).text(label, margin, y, { width: 100 });
+        doc.fontSize(9).font("Helvetica-Bold").fillColor(black).text(val, margin + 105, y, { width: 300 });
+        y += 16;
+      }
+      y += 10;
+
+      const colPos = margin;
+      const colName = margin + 30;
+      const colCat = margin + 280;
+      const colQty = margin + 360;
+      const colPrice = margin + 400;
+      const colTotal = margin + 450;
+      const tableRight = pageW - margin;
+
+      doc.rect(margin, y, contentW, 18).fill(navy);
+      doc.fontSize(8).font("Helvetica-Bold").fillColor("#ffffff");
+      doc.text("#", colPos, y + 5, { width: 25 });
+      doc.text("Product", colName, y + 5, { width: 245 });
+      doc.text("Category", colCat, y + 5, { width: 75 });
+      doc.text("Qty", colQty, y + 5, { width: 35, align: "right" });
+      doc.text("Price", colPrice, y + 5, { width: 45, align: "right" });
+      doc.text("Total", colTotal, y + 5, { width: tableRight - colTotal, align: "right" });
+      y += 20;
+
+      booking.items.forEach((item, idx) => {
+        const rowH = 18;
+        if (idx % 2 === 0) doc.rect(margin, y, contentW, rowH).fill(lightGrey);
+        doc.fontSize(8).font("Helvetica").fillColor(black);
+        doc.text(String(idx + 1), colPos, y + 5, { width: 25 });
+        doc.text(item.productName, colName, y + 5, { width: 245 });
+        doc.text(item.category, colCat, y + 5, { width: 75 });
+        doc.text(String(item.quantity), colQty, y + 5, { width: 35, align: "right" });
+        doc.text(`${booking.currency} ${parseFloat(item.unitPrice).toFixed(2)}`, colPrice, y + 5, { width: 45, align: "right" });
+        doc.text(`${booking.currency} ${parseFloat(item.lineTotal).toFixed(2)}`, colTotal, y + 5, { width: tableRight - colTotal, align: "right" });
+        y += rowH;
+      });
+
+      y += 10;
+      doc.moveTo(margin + contentW * 0.6, y).lineTo(pageW - margin, y).strokeColor(grey).lineWidth(0.5).stroke();
+      y += 8;
+      doc.fontSize(12).font("Helvetica-Bold").fillColor(navy)
+        .text(`Total: ${booking.currency} ${parseFloat(booking.totalAmount).toFixed(2)}`, margin, y, { width: contentW, align: "right" });
+
+      doc.end();
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/school-bookings/:id/email", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "manager" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const id = parseInt(req.params.id);
+      const booking = await storage.getSchoolBooking(id);
+      if (!booking) return res.status(404).json({ message: "Not found" });
+      if (!booking.customerEmail) return res.status(400).json({ message: "No customer email" });
+      const config = await storage.getSchoolConfig(booking.schoolConfigId);
+      if (!config) return res.status(404).json({ message: "School config not found" });
+      if (user.role === "station_lead" && config.stationId !== user.assignedStationId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const itemsHtml = booking.items.map((i, idx) =>
+        `<tr><td>${idx + 1}</td><td>${i.productName}</td><td>${i.category}</td><td>${i.quantity}</td><td>${booking.currency} ${parseFloat(i.unitPrice).toFixed(2)}</td><td>${booking.currency} ${parseFloat(i.lineTotal).toFixed(2)}</td></tr>`
+      ).join("");
+
+      const body = `
+        <h2>Receipt — ${booking.bookingNumber}</h2>
+        <p>Dear ${booking.customerName},</p>
+        <p>Thank you for your booking at ${config.schoolName}.</p>
+        <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;">
+          <tr style="background:#1e3a5f;color:#fff;"><th>#</th><th>Product</th><th>Category</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+          ${itemsHtml}
+        </table>
+        <p style="font-size:18px;font-weight:bold;margin-top:12px;">Total: ${booking.currency} ${parseFloat(booking.totalAmount).toFixed(2)}</p>
+        <p>Payment: ${booking.paymentStatus === "unpaid" ? "Unpaid" : booking.paymentStatus === "cash" ? "Cash" : "Credit Card"}</p>
+        <p>Best regards,<br/>${config.schoolName}</p>
+      `;
+
+      await sendNotificationEmail(booking.customerEmail, `Receipt ${booking.bookingNumber} — ${config.schoolName}`, body);
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   return httpServer;
 }

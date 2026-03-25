@@ -638,9 +638,39 @@ export const schoolCustomers = pgTable("school_customers", {
   createdBy: integer("created_by").references(() => users.id),
 });
 
+export const bookingPaymentStatusEnum = pgEnum("booking_payment_status", ["unpaid", "cash", "credit_card"]);
+
+export const schoolBookings = pgTable("school_bookings", {
+  id: serial("id").primaryKey(),
+  schoolConfigId: integer("school_config_id").notNull().references(() => schoolConfigs.id),
+  bookingNumber: text("booking_number").notNull().unique(),
+  customerId: integer("customer_id").references(() => schoolCustomers.id),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email"),
+  paymentStatus: bookingPaymentStatusEnum("payment_status").notNull().default("unpaid"),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  currency: varchar("currency", { length: 3 }).notNull().default("MAD"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+export const schoolBookingItems = pgTable("school_booking_items", {
+  id: serial("id").primaryKey(),
+  bookingId: integer("booking_id").notNull().references(() => schoolBookings.id),
+  productId: integer("product_id").references(() => schoolProducts.id),
+  productName: text("product_name").notNull(),
+  category: text("category").notNull().default("Other"),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+});
+
 export const insertSchoolConfigSchema = createInsertSchema(schoolConfigs).omit({ id: true, createdAt: true });
 export const insertSchoolProductSchema = createInsertSchema(schoolProducts).omit({ id: true, createdAt: true });
 export const insertSchoolCustomerSchema = createInsertSchema(schoolCustomers).omit({ id: true, createdAt: true });
+export const insertSchoolBookingSchema = createInsertSchema(schoolBookings).omit({ id: true, createdAt: true, bookingNumber: true });
+export const insertSchoolBookingItemSchema = createInsertSchema(schoolBookingItems).omit({ id: true });
 
 export type InsertSchoolConfig = z.infer<typeof insertSchoolConfigSchema>;
 export type SchoolConfig = typeof schoolConfigs.$inferSelect;
@@ -648,6 +678,10 @@ export type InsertSchoolProduct = z.infer<typeof insertSchoolProductSchema>;
 export type SchoolProduct = typeof schoolProducts.$inferSelect;
 export type InsertSchoolCustomer = z.infer<typeof insertSchoolCustomerSchema>;
 export type SchoolCustomer = typeof schoolCustomers.$inferSelect;
+export type InsertSchoolBooking = z.infer<typeof insertSchoolBookingSchema>;
+export type SchoolBooking = typeof schoolBookings.$inferSelect;
+export type InsertSchoolBookingItem = z.infer<typeof insertSchoolBookingItemSchema>;
+export type SchoolBookingItem = typeof schoolBookingItems.$inferSelect;
 
 export const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   kite: "Kites",

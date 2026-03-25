@@ -185,6 +185,19 @@ Photos uploaded via Replit Object Storage presigned URL flow:
 Served via `/objects/{*objectPath}` route which redirects to a signed GET URL (not streamed).
 URLs stored in DB already include `/objects/` prefix — do NOT double-prefix in UI templates.
 
+## School Module
+Kite school management per station.
+- **DB Tables**: `school_configs`, `school_products`, `school_customers`, `school_bookings`, `school_booking_items`
+- **School Admin** (`/school-admin`): Enable/configure schools per station, manage product catalog, CSV import/export
+- **Customers** (`/customers`): Guest registration (KiteWorldWide/Walk-in), kite level, travel dates
+- **Bookings** (`/bookings`): Create bookings from school products, per-station access for Center Managers
+  - Booking number format: `SCH-{StationCode}-{Year}-{Seq}` (e.g. SCH-DK-2026-001)
+  - Station codes: DK=Dakhla, TJ=Tatajuba, HH=Hamburg, HD=Heidenau
+  - Payment statuses: unpaid, cash, credit_card
+  - PDF receipt generation (pdfkit), email receipt to customer
+  - Routes: `GET /api/school-bookings/:schoolConfigId`, `POST /api/school-bookings`, `PATCH /api/school-bookings/:id/payment`, `GET /api/school-bookings/:id/pdf`, `POST /api/school-bookings/:id/email`
+  - Access: admin + station_lead (scoped to their station)
+
 ## Inventory Check Flow
 POST /api/stations/:id/inventory-checks → creates check + items for all station equipment
 GET /api/inventory-checks/:id → returns {check, items, equipment}
