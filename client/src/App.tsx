@@ -75,7 +75,7 @@ function AuthenticatedRouter() {
         {isAdmin && <Route path="/users" component={UsersPage} />}
         <Route path="/feedback" component={FeedbackAdminPage} />
         <Route path="/activity" component={ActivityPage} />
-        <Route path="/incidents" component={IncidentsPage} />
+        <Route path="/incidents" component={isStationLead ? RedirectToCenter : IncidentsPage} />
         <Route path="/repairs" component={RepairsPage} />
         {isHamburg && <Route path="/invoice-import" component={InvoiceImportPage} />}
         {isHamburg && <Route path="/price-lists" component={PriceListsPage} />}
@@ -84,7 +84,7 @@ function AuthenticatedRouter() {
         <Route path="/customers" component={isStationLead ? RedirectToCenter : SchoolCustomersPage} />
         <Route path="/bookings" component={isStationLead ? RedirectToCenter : BookingsPage} />
         <Route path="/sales/new" component={SaleCreatePage} />
-        <Route path="/sales" component={SalesPage} />
+        <Route path="/sales" component={isStationLead ? RedirectToCenter : SalesPage} />
         <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />
       </Switch>

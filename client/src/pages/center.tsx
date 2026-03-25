@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import type { LucideIcon } from "lucide-react";
 import {
   Receipt, Plus, Trash2, Loader2, FileDown, Mail, Search,
   CheckCircle, CreditCard, Banknote, XCircle, ChevronDown, ChevronUp,
@@ -72,7 +73,7 @@ type Booking = {
   items: BookingItem[];
 };
 
-const PAYMENT_LABELS: Record<string, { label: string; color: string; icon: any }> = {
+const PAYMENT_LABELS: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   unpaid: { label: "Unpaid", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", icon: XCircle },
   cash: { label: "Cash", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200", icon: Banknote },
   credit_card: { label: "Credit Card", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200", icon: CreditCard },
@@ -86,7 +87,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Other: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
 };
 
-const CATEGORY_ICON_COMPONENTS: Record<string, any> = {
+const CATEGORY_ICON_COMPONENTS: Record<string, LucideIcon> = {
   Course: GraduationCap,
   Lesson: Waves,
   Package: PackageIcon,
@@ -155,7 +156,7 @@ export default function CenterPage() {
   useEffect(() => {
     if (schoolResolved || schoolConfigs.length === 0) return;
     if (isStationLead && user) {
-      const stationId = isSimulating && simStationId ? simStationId : (user as any).assignedStationId;
+      const stationId = isSimulating && simStationId ? simStationId : user?.assignedStationId;
       const match = schoolConfigs.find(c => c.stationId === stationId && c.isActive);
       if (match) {
         setSelectedSchoolId(match.id);
@@ -176,7 +177,7 @@ export default function CenterPage() {
     return <div className="p-8 text-center text-muted-foreground" data-testid="text-access-denied">Admin or Center Manager access required.</div>;
   }
 
-  const tabs: { id: TabId; label: string; icon: any }[] = [
+  const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
     { id: "bookings", label: "Buchungen", icon: Receipt },
     { id: "customers", label: "Kunden", icon: Users },
     { id: "sales", label: "Sales", icon: ShoppingCart },
@@ -461,7 +462,7 @@ function CreateCustomerDialog({
       toast({ title: "Kunde angelegt" });
       onCreated(created);
     },
-    onError: (e: any) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
 
   const isValid = firstName.trim() && lastName.trim() && email.trim() && phone.trim() &&
@@ -711,7 +712,7 @@ function NewBookingView({
     setItems(prev => prev.filter((_, i) => i !== idx));
   }
 
-  function updateItem(idx: number, field: string, value: any) {
+  function updateItem(idx: number, field: string, value: string | number) {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
   }
 
@@ -749,7 +750,7 @@ function NewBookingView({
       setItems([]);
       onCreated();
     },
-    onError: (e: any) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
 
   const canSubmit = customerName.trim() && items.length > 0 && items.every(i => parseFloat(i.unitPrice) > 0);
@@ -1029,13 +1030,13 @@ function BookingOverview({
       queryClient.invalidateQueries({ queryKey: ["/api/school-bookings", schoolConfigId] });
       toast({ title: "Zahlungsstatus aktualisiert" });
     },
-    onError: (e: any) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
 
   const emailMutation = useMutation({
     mutationFn: (id: number) => apiRequest("POST", `/api/school-bookings/${id}/email`),
     onSuccess: () => toast({ title: "Beleg per E-Mail versendet" }),
-    onError: (e: any) => toast({ title: "E-Mail fehlgeschlagen", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "E-Mail fehlgeschlagen", description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -1310,7 +1311,7 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
       resetForm();
       toast({ title: "Kunde registriert" });
     },
-    onError: (e: any) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
@@ -1322,7 +1323,7 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
       setEditMode(false);
       toast({ title: "Kunde aktualisiert" });
     },
-    onError: (e: any) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -1332,7 +1333,7 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
       setSelectedCustomer(null);
       toast({ title: "Kunde gelöscht" });
     },
-    onError: (e: any) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
 
   function resetForm() {
@@ -1349,7 +1350,7 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
 
   function startEdit() {
     if (!selectedCustomer) return;
-    setGuestType((selectedCustomer as any).guestType ?? "Walk-in");
+    setGuestType(selectedCustomer.guestType ?? "Walk-in");
     setFirstName(selectedCustomer.firstName);
     setLastName(selectedCustomer.lastName);
     setEmail(selectedCustomer.email);
@@ -1519,8 +1520,8 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
               <div>
                 <p className="text-lg font-bold" data-testid="text-customer-name">{c.firstName} {c.lastName}</p>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <Badge variant={(c as any).guestType === "KiteWorldWide" ? "default" : "secondary"} className="text-xs" data-testid="badge-guest-type">
-                    {(c as any).guestType === "KiteWorldWide" ? "KiteWorldWide" : "Walk-in"}
+                  <Badge variant={c.guestType === "KiteWorldWide" ? "default" : "secondary"} className="text-xs" data-testid="badge-guest-type">
+                    {c.guestType === "KiteWorldWide" ? "KiteWorldWide" : "Walk-in"}
                   </Badge>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${KITE_LEVEL_COLORS[c.kiteLevel]}`}>{c.kiteLevel}</span>
                   {here && <Badge variant="outline" className="text-xs text-green-700 border-green-300 bg-green-50 dark:bg-green-900/20 dark:text-green-400">Currently here</Badge>}
@@ -1623,8 +1624,8 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
                   <p className="text-xs text-muted-foreground truncate">{c.email}</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <Badge variant={(c as any).guestType === "KiteWorldWide" ? "default" : "secondary"} className="text-[10px]">
-                    {(c as any).guestType === "KiteWorldWide" ? "KWW" : "Walk-in"}
+                  <Badge variant={c.guestType === "KiteWorldWide" ? "default" : "secondary"} className="text-[10px]">
+                    {c.guestType === "KiteWorldWide" ? "KWW" : "Walk-in"}
                   </Badge>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${KITE_LEVEL_COLORS[c.kiteLevel]}`}>{c.kiteLevel}</span>
                   {here && <Badge variant="outline" className="text-[10px] text-green-700 border-green-300 bg-green-50 dark:bg-green-900/20 dark:text-green-400">Here</Badge>}
