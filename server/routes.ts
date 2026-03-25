@@ -3838,7 +3838,7 @@ export async function registerRoutes(
       if (user.role !== "admin" && user.role !== "manager" && user.role !== "station_lead") {
         return res.status(403).json({ message: "Only admin or center manager can create bookings" });
       }
-      const { schoolConfigId, customerId, customerName, customerEmail, paymentStatus, notes, items, currency } = req.body;
+      const { schoolConfigId, customerId, customerName, customerEmail, bookingDate, paymentStatus, notes, items, currency } = req.body;
       if (!schoolConfigId || !customerName || !items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "schoolConfigId, customerName, and items are required" });
       }
@@ -3868,6 +3868,7 @@ export async function registerRoutes(
           customerId: customerId || null,
           customerName,
           customerEmail: customerEmail || null,
+          bookingDate: bookingDate || new Date().toISOString().slice(0, 10),
           paymentStatus: paymentStatus || "unpaid",
           totalAmount,
           currency: currency || config.currency,
@@ -3964,7 +3965,7 @@ export async function registerRoutes(
 
       const metaData: [string, string][] = [
         ["Receipt No.:", booking.bookingNumber],
-        ["Date:", booking.createdAt ? new Date(booking.createdAt).toLocaleDateString("de-DE") : "—"],
+        ["Date:", booking.bookingDate || "—"],
         ["Customer:", booking.customerName],
         ...(booking.customerEmail ? [["Email:", booking.customerEmail] as [string, string]] : []),
         ["Payment:", booking.paymentStatus === "unpaid" ? "Unpaid" : booking.paymentStatus === "cash" ? "Cash" : "Credit Card"],
@@ -4036,11 +4037,87 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
 
+      const PDFDocument = (await import("pdfkit")).default;
+      const pdfChunks: Buffer[] = [];
+      const pdfDoc = new PDFDocument({ size: "A4", margin: 50 });
+      pdfDoc.on("data", (chunk: Buffer) => pdfChunks.push(chunk));
+      const pdfReady = new Promise<Buffer>((resolve) => {
+        pdfDoc.on("end", () => resolve(Buffer.concat(pdfChunks)));
+      });
+      const pageW = 595.28;
+      const margin = 50;
+      const contentW = pageW - margin * 2;
+      const navy = "#1e3a5f";
+      const grey = "#6b7280";
+      const lightGrey = "#f3f4f6";
+      const black = "#111827";
+      pdfDoc.fontSize(20).font("Helvetica-Bold").fillColor(navy).text(config.schoolName, margin, margin, { width: contentW });
+      pdfDoc.moveTo(margin, margin + 30).lineTo(pageW - margin, margin + 30).strokeColor(navy).lineWidth(1.5).stroke();
+      let y = margin + 45;
+      pdfDoc.fontSize(16).font("Helvetica-Bold").fillColor(navy).text("RECEIPT", margin, y);
+      y += 30;
+      const metaData: [string, string][] = [
+        ["Receipt No.:", booking.bookingNumber],
+        ["Date:", booking.bookingDate || "—"],
+        ["Customer:", booking.customerName],
+        ...(booking.customerEmail ? [["Email:", booking.customerEmail] as [string, string]] : []),
+        ["Payment:", booking.paymentStatus === "unpaid" ? "Unpaid" : booking.paymentStatus === "cash" ? "Cash" : "Credit Card"],
+      ];
+      for (const [label, val] of metaData) {
+        pdfDoc.fontSize(9).font("Helvetica").fillColor(grey).text(label, margin, y, { width: 100 });
+        pdfDoc.fontSize(9).font("Helvetica-Bold").fillColor(black).text(val, margin + 105, y, { width: 300 });
+        y += 16;
+      }
+      y += 10;
+      const colPos = margin;
+      const colName = margin + 30;
+      const colCat = margin + 280;
+      const colQty = margin + 360;
+      const colPrice = margin + 400;
+      const colTotal = margin + 450;
+      const tableRight = pageW - margin;
+      pdfDoc.rect(margin, y, contentW, 18).fill(navy);
+      pdfDoc.fontSize(8).font("Helvetica-Bold").fillColor("#ffffff");
+      pdfDoc.text("#", colPos, y + 5, { width: 25 });
+      pdfDoc.text("Product", colName, y + 5, { width: 245 });
+      pdfDoc.text("Category", colCat, y + 5, { width: 75 });
+      pdfDoc.text("Qty", colQty, y + 5, { width: 35, align: "right" });
+      pdfDoc.text("Price", colPrice, y + 5, { width: 45, align: "right" });
+      pdfDoc.text("Total", colTotal, y + 5, { width: tableRight - colTotal, align: "right" });
+      y += 20;
+      booking.items.forEach((item, idx) => {
+        const rowH = 18;
+        if (idx % 2 === 0) pdfDoc.rect(margin, y, contentW, rowH).fill(lightGrey);
+        pdfDoc.fontSize(8).font("Helvetica").fillColor(black);
+        pdfDoc.text(String(idx + 1), colPos, y + 5, { width: 25 });
+        pdfDoc.text(item.productName, colName, y + 5, { width: 245 });
+        pdfDoc.text(item.category, colCat, y + 5, { width: 75 });
+        pdfDoc.text(String(item.quantity), colQty, y + 5, { width: 35, align: "right" });
+        pdfDoc.text(`${booking.currency} ${parseFloat(item.unitPrice).toFixed(2)}`, colPrice, y + 5, { width: 45, align: "right" });
+        pdfDoc.text(`${booking.currency} ${parseFloat(item.lineTotal).toFixed(2)}`, colTotal, y + 5, { width: tableRight - colTotal, align: "right" });
+        y += rowH;
+      });
+      y += 10;
+      pdfDoc.fontSize(12).font("Helvetica-Bold").fillColor(navy)
+        .text(`Total: ${booking.currency} ${parseFloat(booking.totalAmount).toFixed(2)}`, margin, y, { width: contentW, align: "right" });
+      pdfDoc.end();
+      const pdfBuffer = await pdfReady;
+
+      const host = process.env.SMTP_HOST;
+      const smtpUser = process.env.SMTP_USER;
+      const pass = process.env.SMTP_PASS;
+      if (!host || !smtpUser || !pass) {
+        return res.status(400).json({ message: "SMTP not configured" });
+      }
+      const nodemailer = await import("nodemailer");
+      const port = parseInt(process.env.SMTP_PORT || "465");
+      const transporter = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user: smtpUser, pass } });
+
       const itemsHtml = booking.items.map((i, idx) =>
         `<tr><td>${idx + 1}</td><td>${i.productName}</td><td>${i.category}</td><td>${i.quantity}</td><td>${booking.currency} ${parseFloat(i.unitPrice).toFixed(2)}</td><td>${booking.currency} ${parseFloat(i.lineTotal).toFixed(2)}</td></tr>`
       ).join("");
 
-      const body = `
+      const html = `
         <h2>Receipt — ${booking.bookingNumber}</h2>
         <p>Dear ${booking.customerName},</p>
         <p>Thank you for your booking at ${config.schoolName}.</p>
@@ -4053,7 +4130,22 @@ export async function registerRoutes(
         <p>Best regards,<br/>${config.schoolName}</p>
       `;
 
-      await sendNotificationEmail(booking.customerEmail, `Receipt ${booking.bookingNumber} — ${config.schoolName}`, body);
+      await transporter.sendMail({
+        from: smtpUser,
+        to: booking.customerEmail,
+        subject: `Receipt ${booking.bookingNumber} — ${config.schoolName}`,
+        html,
+        attachments: [{
+          filename: `${booking.bookingNumber}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        }],
+      });
+
+      const { db: dbInstance } = await import("./db");
+      const { sql: sqlTag } = await import("drizzle-orm");
+      await dbInstance.execute(sqlTag`UPDATE school_bookings SET email_sent_at = NOW() WHERE id = ${id}`);
+
       res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ message: e.message });

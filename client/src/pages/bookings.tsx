@@ -63,10 +63,12 @@ type Booking = {
   customerId: number | null;
   customerName: string;
   customerEmail: string | null;
+  bookingDate: string;
   paymentStatus: "unpaid" | "cash" | "credit_card";
   totalAmount: string;
   currency: string;
   notes: string | null;
+  emailSentAt: string | null;
   createdAt: string;
   createdBy: number | null;
   createdByName: string | null;
@@ -97,6 +99,8 @@ export default function BookingsPage() {
   const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterPayment, setFilterPayment] = useState<string>("all");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
   const { data: schoolConfigs = [], isLoading: configsLoading } = useQuery<SchoolConfig[]>({
     queryKey: ["/api/school-configs"],
@@ -125,6 +129,12 @@ export default function BookingsPage() {
     if (filterPayment !== "all") {
       result = result.filter(b => b.paymentStatus === filterPayment);
     }
+    if (filterDateFrom) {
+      result = result.filter(b => b.bookingDate >= filterDateFrom);
+    }
+    if (filterDateTo) {
+      result = result.filter(b => b.bookingDate <= filterDateTo);
+    }
     if (searchTerm) {
       const s = searchTerm.toLowerCase();
       result = result.filter(b =>
@@ -134,7 +144,7 @@ export default function BookingsPage() {
       );
     }
     return result;
-  }, [bookings, filterPayment, searchTerm]);
+  }, [bookings, filterPayment, filterDateFrom, filterDateTo, searchTerm]);
 
   const paymentUpdateMutation = useMutation({
     mutationFn: ({ id, paymentStatus }: { id: number; paymentStatus: string }) =>
@@ -222,6 +232,22 @@ export default function BookingsPage() {
                 <SelectItem value="credit_card">Credit Card</SelectItem>
               </SelectContent>
             </Select>
+            <Input
+              type="date"
+              value={filterDateFrom}
+              onChange={e => setFilterDateFrom(e.target.value)}
+              className="w-36"
+              placeholder="From"
+              data-testid="input-filter-date-from"
+            />
+            <Input
+              type="date"
+              value={filterDateTo}
+              onChange={e => setFilterDateTo(e.target.value)}
+              className="w-36"
+              placeholder="To"
+              data-testid="input-filter-date-to"
+            />
           </>
         )}
       </div>
@@ -270,7 +296,7 @@ export default function BookingsPage() {
                       </div>
                       <p className="text-sm font-medium mt-1">{booking.customerName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {booking.items.length} item{booking.items.length !== 1 ? "s" : ""} · {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString("de-DE") : ""}
+                        {booking.items.length} item{booking.items.length !== 1 ? "s" : ""} · {booking.bookingDate || ""}
                         {booking.createdByName && ` · by ${booking.createdByName}`}
                       </p>
                     </div>
@@ -333,6 +359,7 @@ function CreateBookingDialog({
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("__none__");
+  const [bookingDate, setBookingDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentStatus, setPaymentStatus] = useState("unpaid");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<{ productId: number | null; productName: string; category: string; quantity: number; unitPrice: string }[]>([]);
@@ -394,6 +421,7 @@ function CreateBookingDialog({
         customerId: selectedCustomerId !== "__none__" ? parseInt(selectedCustomerId) : null,
         customerName,
         customerEmail: customerEmail || null,
+        bookingDate,
         paymentStatus,
         notes: notes || null,
         currency,
@@ -457,6 +485,16 @@ function CreateBookingDialog({
               onChange={e => setCustomerEmail(e.target.value)}
               data-testid="input-booking-customer-email"
             />
+            <div className="flex items-center gap-2">
+              <Label className="text-xs font-medium whitespace-nowrap">Booking Date</Label>
+              <Input
+                type="date"
+                value={bookingDate}
+                onChange={e => setBookingDate(e.target.value)}
+                className="flex-1"
+                data-testid="input-booking-date"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -633,9 +671,10 @@ function BookingDetailDialog({
               {booking.customerEmail && <p className="text-xs text-muted-foreground">{booking.customerEmail}</p>}
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Date</p>
-              <p className="font-medium">{booking.createdAt ? new Date(booking.createdAt).toLocaleDateString("de-DE") : "—"}</p>
+              <p className="text-xs text-muted-foreground">Booking Date</p>
+              <p className="font-medium">{booking.bookingDate || "—"}</p>
               {booking.createdByName && <p className="text-xs text-muted-foreground">by {booking.createdByName}</p>}
+              {booking.emailSentAt && <p className="text-xs text-green-600">Emailed {new Date(booking.emailSentAt).toLocaleDateString("de-DE")}</p>}
             </div>
           </div>
 

@@ -647,10 +647,12 @@ export const schoolBookings = pgTable("school_bookings", {
   customerId: integer("customer_id").references(() => schoolCustomers.id),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
+  bookingDate: text("booking_date").notNull(),
   paymentStatus: bookingPaymentStatusEnum("payment_status").notNull().default("unpaid"),
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull().default("0"),
   currency: varchar("currency", { length: 3 }).notNull().default("MAD"),
   notes: text("notes"),
+  emailSentAt: timestamp("email_sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
   createdBy: integer("created_by").references(() => users.id),
 });
