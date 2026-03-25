@@ -1411,14 +1411,14 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
       <div className="grid grid-cols-3 gap-2">
         <Card>
           <CardContent className="p-2 text-center">
-            <ArrowUpRight className="h-4 w-4 mx-auto text-green-600 mb-0.5" />
+            <ArrowDownRight className="h-4 w-4 mx-auto text-green-600 mb-0.5" />
             <p className="text-xl font-bold" data-testid="text-week-arrivals">{weekArrivals}</p>
             <p className="text-[9px] text-muted-foreground">Arrivals (7d)</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-2 text-center">
-            <ArrowDownRight className="h-4 w-4 mx-auto text-red-500 mb-0.5" />
+            <ArrowUpRight className="h-4 w-4 mx-auto text-red-500 mb-0.5" />
             <p className="text-xl font-bold" data-testid="text-week-departures">{weekDepartures}</p>
             <p className="text-[9px] text-muted-foreground">Departures (7d)</p>
           </CardContent>
@@ -1482,12 +1482,12 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
                     <div className="flex items-center gap-0.5 mt-0.5 h-3">
                       {d.arrivals > 0 && (
                         <span className="text-[8px] text-green-600 font-medium flex items-center">
-                          <ArrowUpRight className="h-2.5 w-2.5" />{d.arrivals}
+                          <ArrowDownRight className="h-2.5 w-2.5" />{d.arrivals}
                         </span>
                       )}
                       {d.departures > 0 && (
                         <span className="text-[8px] text-red-500 font-medium flex items-center">
-                          <ArrowDownRight className="h-2.5 w-2.5" />{d.departures}
+                          <ArrowUpRight className="h-2.5 w-2.5" />{d.departures}
                         </span>
                       )}
                     </div>
