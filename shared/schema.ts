@@ -74,6 +74,14 @@ export const users = pgTable("users", {
   canEditEquipment: boolean("can_edit_equipment").notNull().default(false),
 });
 
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+});
+
 export const equipment = pgTable("equipment", {
   id: serial("id").primaryKey(),
   serialNumber: text("serial_number").notNull().unique(),

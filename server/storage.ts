@@ -85,6 +85,11 @@ export interface IStorage {
   updateUser(id: number, data: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: number): Promise<void>;
 
+  createPasswordResetToken(userId: number, token: string, expiresAt: Date): Promise<void>;
+  getValidPasswordResetToken(token: string): Promise<{ id: number; userId: number } | undefined>;
+  markPasswordResetTokenUsed(id: number): Promise<void>;
+  updateUserPassword(userId: number, hashedPassword: string): Promise<void>;
+
   getEquipment(id: number): Promise<Equipment | undefined>;
   getEquipmentBySerial(serial: string): Promise<Equipment | undefined>;
   getEquipmentByCode(code: string): Promise<Equipment | undefined>;
