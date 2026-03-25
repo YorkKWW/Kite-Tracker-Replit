@@ -1521,16 +1521,27 @@ function CustomersTab({ schoolConfigId, currency }: { schoolConfigId: number; cu
     let list = customers;
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter(c =>
-        `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q)
-      );
+      const isBookingSearch = q.startsWith("sch-") || /^\d{3,}$/.test(q);
+      if (isBookingSearch) {
+        const matchingNames = new Set<string>();
+        for (const b of bookings) {
+          if (b.bookingNumber.toLowerCase().includes(q)) {
+            matchingNames.add(b.customerName.toLowerCase().trim());
+          }
+        }
+        list = list.filter(c => matchingNames.has(`${c.firstName} ${c.lastName}`.toLowerCase().trim()));
+      } else {
+        list = list.filter(c =>
+          `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
+          c.email.toLowerCase().includes(q)
+        );
+      }
     }
     if (activeOnly) {
       list = list.filter(c => isCurrentlyHere(c.arrivalDate, c.departureDate));
     }
     return list;
-  }, [customers, search, activeOnly]);
+  }, [customers, search, activeOnly, bookings]);
 
   const createMutation = useMutation({
     mutationFn: (data: object) => apiRequest("POST", "/api/school-customers", data),
@@ -1922,7 +1933,7 @@ function CustomersTab({ schoolConfigId, currency }: { schoolConfigId: number; cu
           <Input
             data-testid="input-search-customers"
             className="pl-9"
-            placeholder="Search name or email..."
+            placeholder="Search name, email, or booking #..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
