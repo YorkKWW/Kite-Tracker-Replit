@@ -31,6 +31,7 @@ import SchoolAdminPage from "@/pages/school-admin";
 import SchoolCustomersPage from "@/pages/school-customers";
 import BookingsPage from "@/pages/bookings";
 import CenterPage from "@/pages/center";
+import FinancePage from "@/pages/finance";
 import QuickInventoryPage from "@/pages/quick-inventory";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
@@ -81,6 +82,7 @@ function AuthenticatedRouter() {
         {isHamburg && <Route path="/price-lists" component={PriceListsPage} />}
         {isAdmin && <Route path="/school-admin" component={SchoolAdminPage} />}
         <Route path="/center" component={CenterPage} />
+        <Route path="/finance" component={FinancePage} />
         <Route path="/customers" component={isStationLead ? RedirectToCenter : SchoolCustomersPage} />
         <Route path="/bookings" component={isStationLead ? RedirectToCenter : BookingsPage} />
         <Route path="/sales/new" component={SaleCreatePage} />

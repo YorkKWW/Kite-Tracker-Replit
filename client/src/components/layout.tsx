@@ -41,6 +41,7 @@ import {
   Eye,
   EyeOff,
   Shirt as ShirtIcon,
+  Wallet,
 } from "lucide-react";
 import type { ViewMode } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -130,6 +131,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const navItems: NavItem[] = isStationLead ? [
     { href: "/center", label: "Center", icon: Store },
+    { href: "/finance", label: "Finance", icon: Wallet },
     { href: "/", label: "Equipment", icon: Package },
     { href: "/equipment", label: "Equipment List", icon: Package, indent: true },
     { href: "/quick-inventory", label: "Quick Inventory", icon: ClipboardCheck, indent: true },
@@ -140,6 +142,7 @@ export default function Layout({ children }: LayoutProps) {
   ] : [
     ...(isAdmin ? [
       { href: "/center", label: "Center", icon: Store },
+      { href: "/finance", label: "Finance", icon: Wallet },
     ] : []),
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/equipment", label: "Equipment", icon: Package },
@@ -160,6 +163,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const stationLeadBottomTabs = [
     { href: "/center", label: "Center", icon: Store },
+    { href: "/finance", label: "Finance", icon: Wallet },
     { href: "/", label: "Equipment", icon: Package },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
