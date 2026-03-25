@@ -142,7 +142,7 @@ const COUNTRIES = [
 ];
 
 type TabId = "bookings" | "customers" | "sales" | "incidents";
-type BookingSubTab = "new" | "overview";
+type BookingSubTab = "new" | "overview" | "timeline";
 
 function formatPrice(price: string, curr: string) {
   return `${curr} ${parseFloat(price).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -283,6 +283,7 @@ function BookingsTab({
         {([
           { id: "new" as const, label: "Neue Buchung" },
           { id: "overview" as const, label: "Übersicht" },
+          { id: "timeline" as const, label: "Zeitplan" },
         ]).map(t => (
           <button
             key={t.id}
@@ -308,6 +309,9 @@ function BookingsTab({
       )}
       {subTab === "overview" && (
         <BookingOverview schoolConfigId={schoolConfigId} currency={currency} />
+      )}
+      {subTab === "timeline" && (
+        <BookingTimeline schoolConfigId={schoolConfigId} currency={currency} />
       )}
     </div>
   );
@@ -1325,6 +1329,229 @@ function BookingDetailDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function parseDurationDays(productName: string): number {
+  const lower = productName.toLowerCase();
+  const weekMatch = lower.match(/(\d+)\s*week/);
+  if (weekMatch) return parseInt(weekMatch[1]) * 7;
+  const dayMatch = lower.match(/(\d+)\s*day/);
+  if (dayMatch) return parseInt(dayMatch[1]);
+  const hourMatch = lower.match(/(\d+)\s*hour/);
+  if (hourMatch) return 1;
+  if (lower.includes("additional day")) return 1;
+  return 1;
+}
+
+function addDays(date: string, days: number): string {
+  const d = new Date(date + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function BookingTimeline({
+  schoolConfigId, currency,
+}: {
+  schoolConfigId: number;
+  currency: string;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const { data: bookings = [], isLoading } = useQuery<Booking[]>({
+    queryKey: ["/api/school-bookings", schoolConfigId],
+    staleTime: 0,
+  });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const startDate = addDays(today, -3);
+  const endDate = addDays(today, 10);
+
+  const days = useMemo(() => {
+    const result: string[] = [];
+    let d = startDate;
+    while (d <= endDate) {
+      result.push(d);
+      d = addDays(d, 1);
+    }
+    return result;
+  }, [startDate, endDate]);
+
+  type TimelineItem = {
+    bookingId: number;
+    bookingNumber: string;
+    customerName: string;
+    productName: string;
+    category: string;
+    startDate: string;
+    endDate: string;
+    quantity: number;
+    unitPrice: string;
+  };
+
+  const { courseItems, rentalItems } = useMemo(() => {
+    const courses: TimelineItem[] = [];
+    const rentals: TimelineItem[] = [];
+
+    for (const b of bookings) {
+      for (const item of b.items) {
+        const cat = item.category;
+        if (cat !== "Course" && cat !== "Lesson" && cat !== "Rental") continue;
+
+        const durationDays = parseDurationDays(item.productName);
+        const itemStart = b.bookingDate;
+        const itemEnd = addDays(itemStart, durationDays - 1);
+
+        if (itemEnd < startDate || itemStart > endDate) continue;
+
+        const entry: TimelineItem = {
+          bookingId: b.id,
+          bookingNumber: b.bookingNumber,
+          customerName: b.customerName,
+          productName: item.productName,
+          category: cat,
+          startDate: itemStart,
+          endDate: itemEnd,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        };
+
+        if (cat === "Rental") {
+          rentals.push(entry);
+        } else {
+          courses.push(entry);
+        }
+      }
+    }
+
+    courses.sort((a, b) => a.startDate.localeCompare(b.startDate) || a.customerName.localeCompare(b.customerName));
+    rentals.sort((a, b) => a.startDate.localeCompare(b.startDate) || a.customerName.localeCompare(b.customerName));
+
+    return { courseItems: courses, rentalItems: rentals };
+  }, [bookings, startDate, endDate]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      const todayIdx = days.indexOf(today);
+      if (todayIdx >= 0) {
+        const colWidth = 80;
+        scrollRef.current.scrollLeft = Math.max(0, (todayIdx - 1) * colWidth);
+      }
+    }
+  }, [days, today]);
+
+  if (isLoading) {
+    return (
+      <div className="p-4 space-y-3">
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    );
+  }
+
+  const DAY_W = 80;
+  const LABEL_W = 160;
+
+  function formatDay(d: string) {
+    const date = new Date(d + "T00:00:00");
+    const dayNames = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+    return {
+      weekday: dayNames[date.getDay()],
+      day: date.getDate(),
+      month: date.getMonth() + 1,
+    };
+  }
+
+  function renderSection(title: string, items: TimelineItem[], barColor: string, bgColor: string) {
+    return (
+      <div className="mb-6" data-testid={`timeline-section-${title.toLowerCase()}`}>
+        <div className="flex items-center gap-2 px-4 mb-2">
+          {title === "Kurse" ? <GraduationCap className="h-4 w-4 text-blue-600" /> : <Wind className="h-4 w-4 text-orange-600" />}
+          <h3 className="text-sm font-semibold">{title}</h3>
+          <Badge variant="secondary" className="text-[10px]">{items.length}</Badge>
+        </div>
+
+        {items.length === 0 ? (
+          <p className="text-xs text-muted-foreground px-4 py-3">Keine Buchungen in diesem Zeitraum</p>
+        ) : (
+          <div className="border rounded-lg overflow-hidden mx-2">
+            <div className="overflow-x-auto" ref={title === "Kurse" ? scrollRef : undefined}>
+              <div style={{ minWidth: LABEL_W + days.length * DAY_W }}>
+                <div className="flex border-b bg-muted/50 sticky top-0 z-10">
+                  <div className="shrink-0 border-r bg-background sticky left-0 z-20 px-2 py-1.5 flex items-center" style={{ width: LABEL_W }}>
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase">Kunde / Produkt</span>
+                  </div>
+                  {days.map(d => {
+                    const { weekday, day, month } = formatDay(d);
+                    const isToday = d === today;
+                    const isWeekend = new Date(d + "T00:00:00").getDay() % 6 === 0;
+                    return (
+                      <div
+                        key={d}
+                        className={`shrink-0 text-center border-r py-1 ${isToday ? "bg-primary/10 font-bold" : isWeekend ? "bg-muted/60" : ""}`}
+                        style={{ width: DAY_W }}
+                      >
+                        <p className={`text-[10px] ${isToday ? "text-primary" : "text-muted-foreground"}`}>{weekday}</p>
+                        <p className={`text-xs font-medium ${isToday ? "text-primary" : ""}`}>{day}.{month}.</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {items.map((item, idx) => (
+                  <div key={`${item.bookingId}-${idx}`} className="flex border-b last:border-b-0 hover:bg-muted/20" data-testid={`timeline-row-${item.bookingId}-${idx}`}>
+                    <div className="shrink-0 border-r bg-background sticky left-0 z-10 px-2 py-1.5" style={{ width: LABEL_W }}>
+                      <p className="text-[11px] font-medium truncate">{item.customerName}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{item.productName}</p>
+                      {item.quantity > 1 && <span className="text-[9px] text-muted-foreground">×{item.quantity}</span>}
+                    </div>
+                    {days.map(d => {
+                      const inRange = d >= item.startDate && d <= item.endDate;
+                      const isStart = d === item.startDate;
+                      const isEnd = d === item.endDate;
+                      const isToday = d === today;
+                      const isWeekend = new Date(d + "T00:00:00").getDay() % 6 === 0;
+                      return (
+                        <div
+                          key={d}
+                          className={`shrink-0 border-r relative ${isToday && !inRange ? "bg-primary/5" : isWeekend && !inRange ? "bg-muted/30" : ""}`}
+                          style={{ width: DAY_W, height: 44 }}
+                        >
+                          {inRange && (
+                            <div
+                              className={`absolute top-1.5 bottom-1.5 ${barColor} ${isStart && isEnd ? "left-1 right-1 rounded" : isStart ? "left-1 right-0 rounded-l" : isEnd ? "left-0 right-1 rounded-r" : "left-0 right-0"}`}
+                            >
+                              {isStart && (
+                                <span className="text-[9px] text-white font-medium px-1.5 truncate block leading-[28px]">
+                                  {item.quantity > 1 ? `${item.quantity}×` : ""}{currency} {parseFloat(item.unitPrice).toFixed(0)}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="py-4" data-testid="booking-timeline">
+      <div className="px-4 mb-4">
+        <p className="text-xs text-muted-foreground">
+          {new Date(startDate + "T00:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" })} – {new Date(endDate + "T00:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" })}
+        </p>
+      </div>
+      {renderSection("Kurse", courseItems, "bg-blue-500", "bg-blue-50")}
+      {renderSection("Rental", rentalItems, "bg-orange-500", "bg-orange-50")}
+    </div>
   );
 }
 
