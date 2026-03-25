@@ -34,7 +34,7 @@ import {
   companySettings, customers, salesInvoices, saleItems, priceLists, priceListItems,
   damageReports, damageReportPhotos, feedback, feedbackAttachments, feedbackComments, notifications,
   accessoryCategories, accessoryInventory, accessoryTransfers, accessoryLossReports,
-  schoolConfigs, schoolProducts, schoolCustomers,
+  schoolConfigs, schoolProducts, schoolCustomers, passwordResetTokens,
   type Station, type InsertStation,
   type User, type InsertUser,
   type Equipment, type InsertEquipment,
@@ -305,6 +305,34 @@ export class DatabaseStorage implements IStorage {
       // Finally delete the user
       await tx.execute(sql`DELETE FROM users WHERE id = ${id}`);
     });
+  }
+
+  async createPasswordResetToken(userId: number, token: string, expiresAt: Date): Promise<void> {
+    // Invalidate old tokens for this user first
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+    await db.insert(passwordResetTokens).values({ userId, token, expiresAt });
+  }
+
+  async getValidPasswordResetToken(token: string): Promise<{ id: number; userId: number } | undefined> {
+    const [row] = await db
+      .select({ id: passwordResetTokens.id, userId: passwordResetTokens.userId })
+      .from(passwordResetTokens)
+      .where(
+        and(
+          eq(passwordResetTokens.token, token),
+          isNull(passwordResetTokens.usedAt),
+          sql`${passwordResetTokens.expiresAt} > NOW()`
+        )
+      );
+    return row;
+  }
+
+  async markPasswordResetTokenUsed(id: number): Promise<void> {
+    await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, id));
+  }
+
+  async updateUserPassword(userId: number, hashedPassword: string): Promise<void> {
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
   }
 
   async getEquipment(id: number): Promise<Equipment | undefined> {

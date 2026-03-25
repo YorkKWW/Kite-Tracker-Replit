@@ -701,6 +701,47 @@ export async function registerRoutes(
     res.json(safeUser);
   });
 
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ message: "Email required" });
+      const user = await storage.getUserByEmail(email.toLowerCase().trim());
+      // Always return success to prevent email enumeration
+      if (!user) return res.json({ message: "If that email exists, a reset link has been sent." });
+      const token = randomUUID();
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      await storage.createPasswordResetToken(user.id, token, expiresAt);
+      const appUrl = process.env.APP_URL || `https://${req.get("host")}`;
+      const resetLink = `${appUrl}/reset-password?token=${token}`;
+      await sendNotificationEmail(
+        user.email,
+        "Passwort zurücksetzen",
+        `Hallo ${user.name},\n\ndu hast eine Anfrage zum Zurücksetzen deines Passworts gestellt.\n\nKlicke auf den folgenden Link, um ein neues Passwort zu setzen:\n${resetLink}\n\nDer Link ist 1 Stunde gültig.\n\nFalls du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.\n\nDein KiteTracker-Team`
+      );
+      res.json({ message: "If that email exists, a reset link has been sent." });
+    } catch (err: any) {
+      console.error("Forgot password error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      if (!token || !password) return res.status(400).json({ message: "Token and password required" });
+      if (password.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters" });
+      const record = await storage.getValidPasswordResetToken(token);
+      if (!record) return res.status(400).json({ message: "Invalid or expired reset link" });
+      const hashed = await hashPassword(password);
+      await storage.updateUserPassword(record.userId, hashed);
+      await storage.markPasswordResetTokenUsed(record.id);
+      res.json({ message: "Password updated successfully" });
+    } catch (err: any) {
+      console.error("Reset password error:", err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.get("/api/stations", requireAuth, async (_req, res) => {
     const stationsList = await storage.getAllStations();
     res.json(stationsList);

@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import Layout from "@/components/layout";
 import LoginPage from "@/pages/login";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
 import DashboardPage from "@/pages/dashboard";
 import EquipmentListPage from "@/pages/equipment-list";
 import EquipmentDetailPage from "@/pages/equipment-detail";
@@ -33,6 +35,11 @@ import { Loader2 } from "lucide-react";
 
 function AuthenticatedRouter() {
   const { user, isLoading, isAdmin, isHamburg } = useAuth();
+  const path = window.location.pathname;
+
+  // Public routes — accessible without login
+  if (path === "/forgot-password") return <ForgotPasswordPage />;
+  if (path === "/reset-password") return <ResetPasswordPage />;
 
   if (isLoading) {
     return (
