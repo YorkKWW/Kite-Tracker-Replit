@@ -265,7 +265,7 @@ export default function CenterPage() {
           </div>
         )}
         {activeTab === "dashboard" && selectedSchoolId && selectedConfig && (
-          <ForecastTab schoolConfigId={selectedSchoolId} currency={selectedConfig.currency} />
+          <ForecastTab schoolConfigId={selectedSchoolId} currency={selectedConfig.currency} stationName={selectedConfig.stationName} />
         )}
         {activeTab === "dashboard" && !selectedSchoolId && (
           <div className="p-8 text-center text-muted-foreground">Select a school to view forecast.</div>
@@ -1289,7 +1289,121 @@ function BookingTimeline({
 
 type ForecastDetail = "courses" | "rentals" | "guests" | "arrivals" | "departures" | "unpaid" | null;
 
-function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; currency: string }) {
+const STATION_COORDS: Record<string, { lat: number; lon: number }> = {
+  dakhla: { lat: 23.7148, lon: -15.9328 },
+  tatajuba: { lat: -2.9377, lon: -40.0047 },
+  hamburg: { lat: 53.5511, lon: 9.9937 },
+  heidenau: { lat: 50.9831, lon: 13.8667 },
+};
+
+type WindData = {
+  hours: { time: string; speed: number; gust: number; direction: number }[];
+  currentSpeed: number;
+  currentGust: number;
+  currentDirection: number;
+  maxSpeed: number;
+  maxGust: number;
+};
+
+function windDirectionLabel(deg: number): string {
+  const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+  return dirs[Math.round(deg / 22.5) % 16];
+}
+
+function WindForecastWidget({ stationName }: { stationName: string }) {
+  const [windData, setWindData] = useState<WindData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const stationKey = stationName.toLowerCase().split(/\s+/)[0];
+  const coords = STATION_COORDS[stationKey];
+
+  useEffect(() => {
+    if (!coords) { setLoading(false); return; }
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m&timezone=auto&start_date=${todayStr}&end_date=${todayStr}`;
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.hourly) return;
+        const hours = data.hourly.time.map((t: string, i: number) => ({
+          time: t,
+          speed: data.hourly.wind_speed_10m[i],
+          gust: data.hourly.wind_gusts_10m[i],
+          direction: data.hourly.wind_direction_10m[i],
+        }));
+        const now = new Date();
+        const currentHour = now.getHours();
+        const current = hours[Math.min(currentHour, hours.length - 1)];
+        setWindData({
+          hours,
+          currentSpeed: current.speed,
+          currentGust: current.gust,
+          currentDirection: current.direction,
+          maxSpeed: Math.max(...hours.map((h: { speed: number }) => h.speed)),
+          maxGust: Math.max(...hours.map((h: { gust: number }) => h.gust)),
+        });
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [coords]);
+
+  if (!coords) return null;
+  if (loading) return <Card><CardContent className="p-3 flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /><span className="text-xs text-muted-foreground">Loading wind data...</span></CardContent></Card>;
+  if (!windData) return null;
+
+  const maxBarKnots = Math.max(windData.maxGust, 40);
+  const now = new Date();
+  const currentHour = now.getHours();
+
+  return (
+    <Card data-testid="wind-forecast-card">
+      <CardContent className="p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Wind className="h-4 w-4 text-sky-500" />
+            <p className="text-sm font-semibold">Wind Today</p>
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-bold" data-testid="text-current-wind">{Math.round(windData.currentSpeed)} km/h</p>
+            <p className="text-[9px] text-muted-foreground">
+              Gusts {Math.round(windData.currentGust)} km/h · {windDirectionLabel(windData.currentDirection)}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-end gap-px" style={{ height: 48 }}>
+          {windData.hours.map((h, i) => {
+            const speedH = Math.max(4, Math.round((h.speed / maxBarKnots) * 48));
+            const gustH = Math.max(0, Math.round(((h.gust - h.speed) / maxBarKnots) * 48));
+            const isPast = i < currentHour;
+            const isCurrent = i === currentHour;
+            return (
+              <div key={i} className="flex flex-col justify-end flex-1" style={{ height: 48 }} data-testid={`wind-hour-${i}`}>
+                <div
+                  className={`w-full rounded-t-sm ${isPast ? "bg-sky-200 dark:bg-sky-800" : isCurrent ? "bg-sky-500" : "bg-sky-400 dark:bg-sky-600"}`}
+                  style={{ height: gustH }}
+                  title={`Gust: ${Math.round(h.gust)} km/h`}
+                />
+                <div
+                  className={`w-full ${isPast ? "bg-sky-300 dark:bg-sky-700" : isCurrent ? "bg-sky-600" : "bg-sky-500 dark:bg-sky-500"}`}
+                  style={{ height: speedH }}
+                  title={`${Math.round(h.speed)} km/h`}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex justify-between text-[8px] text-muted-foreground">
+          <span>0h</span>
+          <span>6h</span>
+          <span>12h</span>
+          <span>18h</span>
+          <span>24h</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ForecastTab({ schoolConfigId, currency, stationName }: { schoolConfigId: number; currency: string; stationName: string }) {
   const [detailView, setDetailView] = useState<ForecastDetail>(null);
   const { data: customers = [], isLoading: loadingCustomers } = useQuery<SchoolCustomer[]>({
     queryKey: ["/api/school-customers", schoolConfigId],
@@ -1586,6 +1700,8 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
           </CardContent>
         </Card>
       </div>
+
+      <WindForecastWidget stationName={stationName} />
 
       <div>
         <p className="text-sm font-semibold mb-2 flex items-center gap-2">
