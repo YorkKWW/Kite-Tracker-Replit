@@ -308,15 +308,6 @@ export default function Layout({ children }: LayoutProps) {
                 </SelectContent>
               </Select>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setScannerOpen(true)}
-              title="Scan equipment"
-              data-testid="button-scan"
-            >
-              <ScanLine className="h-5 w-5" />
-            </Button>
             <div className="relative">
               <Button
                 variant="ghost"
