@@ -142,7 +142,7 @@ const COUNTRIES = [
   "Zambia","Zimbabwe",
 ];
 
-type TabId = "customers" | "bookings" | "forecast" | "sales" | "incidents";
+type TabId = "dashboard" | "bookings" | "customers" | "sales" | "incidents";
 type BookingSubTab = "new" | "timeline";
 
 function formatPrice(price: string, curr: string) {
@@ -152,7 +152,7 @@ function formatPrice(price: string, curr: string) {
 export default function CenterPage() {
   const { user, isAdmin, isStationLead, isSimulating, simStationId } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<TabId>("customers");
+  const [activeTab, setActiveTab] = useState<TabId>("dashboard");
   const [bookingSubTab, setBookingSubTab] = useState<BookingSubTab>("new");
   const [selectedSchoolId, setSelectedSchoolId] = useState<number | null>(null);
   const [schoolResolved, setSchoolResolved] = useState(false);
@@ -187,9 +187,9 @@ export default function CenterPage() {
   }
 
   const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
-    { id: "customers", label: "Customers", icon: Users },
+    { id: "dashboard", label: "Dashboard", icon: BarChart3 },
     { id: "bookings", label: "Bookings", icon: Receipt },
-    { id: "forecast", label: "Forecast", icon: BarChart3 },
+    { id: "customers", label: "Customers", icon: Users },
     { id: "sales", label: "Sales", icon: ShoppingCart },
     { id: "incidents", label: "Incidents", icon: AlertTriangle },
   ];
@@ -264,10 +264,10 @@ export default function CenterPage() {
             {configsLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto" /> : "Select a school to manage bookings."}
           </div>
         )}
-        {activeTab === "forecast" && selectedSchoolId && selectedConfig && (
+        {activeTab === "dashboard" && selectedSchoolId && selectedConfig && (
           <ForecastTab schoolConfigId={selectedSchoolId} currency={selectedConfig.currency} />
         )}
-        {activeTab === "forecast" && !selectedSchoolId && (
+        {activeTab === "dashboard" && !selectedSchoolId && (
           <div className="p-8 text-center text-muted-foreground">Select a school to view forecast.</div>
         )}
         {activeTab === "sales" && <SalesPage />}
