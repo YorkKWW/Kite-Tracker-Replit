@@ -2192,7 +2192,7 @@ function FinanceTab({ schoolConfigId, currency }: { schoolConfigId: number; curr
     const unpaidTotal = parseFloat(summary?.unpaidTotal || "0");
     const expenseTotal = parseFloat(summary?.expenseTotal || "0");
     const opening = parseFloat(cashBalance) || 0;
-    const currentCash = opening + cashTotal;
+    const currentCash = opening + cashTotal - expenseTotal;
     const netResult = parseFloat(summary?.netResult || "0");
     return { paidTotal, cashTotal, cardTotal, unpaidTotal, expenseTotal, opening, currentCash, netResult };
   }, [summary, cashBalance]);
@@ -2378,6 +2378,10 @@ function FinanceTab({ schoolConfigId, currency }: { schoolConfigId: number; curr
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">+ Cash income</span>
                 <span>{fmt(stats.cashTotal)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">− Expenses</span>
+                <span className="text-orange-600 dark:text-orange-400">-{fmt(stats.expenseTotal)}</span>
               </div>
               <div className="flex justify-between text-sm font-bold border-t pt-1">
                 <span>Current</span>
