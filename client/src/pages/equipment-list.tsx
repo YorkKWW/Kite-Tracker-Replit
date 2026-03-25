@@ -438,9 +438,9 @@ export default function EquipmentListPage() {
                 <SortTh col="brand"     label="Brand"   sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5" />
                 <SortTh col="model"     label="Model"   sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5" />
                 <SortTh col="size"      label="Size"    sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 w-16" />
-                <SortTh col="year"      label="Year"    sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 hidden md:table-cell w-16" />
-                <SortTh col="sku"       label="SKU"     sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 hidden md:table-cell" />
-                <th className="px-2 py-2.5 text-left font-medium text-muted-foreground hidden md:table-cell">Serial</th>
+                <SortTh col="year"      label="Year"    sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 hidden sm:table-cell w-16" />
+                <SortTh col="sku"       label="SKU"     sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 hidden sm:table-cell" />
+                <th className="px-2 py-2.5 text-left font-medium text-muted-foreground hidden sm:table-cell">Serial</th>
                 <SortTh col="station"   label="Location" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 hidden lg:table-cell" />
                 <SortTh col="condition" label="Cond"     sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 w-16" />
                 <SortTh col="status"    label="Status"   sortCol={sortCol} sortDir={sortDir} onSort={handleSort} className="px-2 py-2.5 pr-3 hidden sm:table-cell w-24" />
@@ -493,13 +493,13 @@ export default function EquipmentListPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-2.5 hidden md:table-cell w-16" data-testid={`text-year-${item.id}`}>
+                    <td className="px-2 py-2.5 hidden sm:table-cell w-16" data-testid={`text-year-${item.id}`}>
                       {item.yearOfPurchase ? <YearBadge year={item.yearOfPurchase} /> : ""}
                     </td>
-                    <td className="px-2 py-2.5 font-mono text-xs text-muted-foreground hidden md:table-cell whitespace-nowrap" data-testid={`text-sku-${item.id}`}>
+                    <td className="px-2 py-2.5 font-mono text-xs text-muted-foreground hidden sm:table-cell whitespace-nowrap" data-testid={`text-sku-${item.id}`}>
                       {item.sku || ""}
                     </td>
-                    <td className="px-2 py-2.5 font-mono text-xs text-muted-foreground hidden md:table-cell max-w-[160px] truncate" data-testid={`text-serial-${item.id}`}>
+                    <td className="px-2 py-2.5 font-mono text-xs text-muted-foreground hidden sm:table-cell max-w-[160px] truncate" data-testid={`text-serial-${item.id}`}>
                       {noSerial ? "" : (item.serialNumber || "")}
                     </td>
                     <td className="px-2 py-2.5 text-xs hidden lg:table-cell max-w-[140px] truncate">

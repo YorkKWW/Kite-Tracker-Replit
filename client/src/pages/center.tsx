@@ -851,7 +851,7 @@ function NewBookingView({
 
   if (showProducts) {
     return (
-      <div className="p-4 space-y-4">
+      <div className="p-4 md:p-6 space-y-4">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setShowProducts(false)} data-testid="btn-back-from-products">
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
@@ -907,7 +907,7 @@ function NewBookingView({
   }
 
   return (
-    <div className="p-4 space-y-5 max-w-2xl mx-auto pb-24">
+    <div className="p-4 md:p-6 space-y-5 max-w-2xl md:max-w-3xl mx-auto pb-24">
       {nextNum && (
         <div className="flex items-center gap-2">
           <Receipt className="h-4 w-4 text-muted-foreground" />
@@ -1174,7 +1174,7 @@ function BookingTimeline({
 
   if (isLoading) {
     return (
-      <div className="p-4 space-y-3">
+      <div className="p-4 md:p-6 space-y-3">
         <Skeleton className="h-6 w-40" />
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-32 w-full" />
@@ -1834,9 +1834,9 @@ function ForecastTab({ schoolConfigId, currency, stationName }: { schoolConfigId
 
   if (isLoading) {
     return (
-      <div className="p-4 space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}
+      <div className="p-4 md:p-6 space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}
         </div>
         <Skeleton className="h-64 w-full rounded-lg" />
       </div>
@@ -1845,7 +1845,7 @@ function ForecastTab({ schoolConfigId, currency, stationName }: { schoolConfigId
 
   if (detailView) {
     return (
-      <div className="p-4 space-y-3" data-testid="forecast-detail">
+      <div className="p-4 md:p-6 space-y-3" data-testid="forecast-detail">
         <Button variant="ghost" size="sm" onClick={() => setDetailView(null)} data-testid="btn-forecast-back">
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
@@ -1928,8 +1928,8 @@ function ForecastTab({ schoolConfigId, currency, stationName }: { schoolConfigId
   }
 
   return (
-    <div className="p-4 space-y-4" data-testid="forecast-tab">
-      <div className="grid grid-cols-3 gap-2">
+    <div className="p-4 md:p-6 space-y-4" data-testid="forecast-tab">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3">
         <Card className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setDetailView("courses")} data-testid="card-courses-today">
           <CardContent className="p-2 text-center">
             <GraduationCap className="h-4 w-4 mx-auto text-blue-600 mb-0.5" />
@@ -1951,8 +1951,6 @@ function ForecastTab({ schoolConfigId, currency, stationName }: { schoolConfigId
             <p className="text-[9px] text-muted-foreground">Total Guests</p>
           </CardContent>
         </Card>
-      </div>
-      <div className="grid grid-cols-3 gap-2">
         <Card className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setDetailView("arrivals")} data-testid="card-arrivals">
           <CardContent className="p-2 text-center">
             <ArrowDownRight className="h-4 w-4 mx-auto text-green-600 mb-0.5" />
@@ -2364,7 +2362,7 @@ function CustomersTab({ schoolConfigId, currency }: { schoolConfigId: number; cu
     const custKey = `${c.firstName} ${c.lastName}`.toLowerCase().trim();
     const custBookings = customerFullBookingsMap.get(custKey) || [];
     return (
-      <div className="p-4 max-w-2xl mx-auto space-y-4">
+      <div className="p-4 md:p-6 max-w-2xl md:max-w-3xl mx-auto space-y-4">
         <Button variant="ghost" size="sm" onClick={() => setSelectedCustomer(null)} data-testid="btn-back">
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
@@ -2510,7 +2508,7 @@ function CustomersTab({ schoolConfigId, currency }: { schoolConfigId: number; cu
 
   if (selectedCustomer && editMode) {
     return (
-      <div className="p-4 max-w-2xl mx-auto space-y-4">
+      <div className="p-4 md:p-6 max-w-2xl md:max-w-3xl mx-auto space-y-4">
         <Button variant="ghost" size="sm" onClick={() => setEditMode(false)} data-testid="btn-cancel-edit">
           <ArrowLeft className="h-4 w-4 mr-1" /> Cancel
         </Button>
@@ -2531,7 +2529,7 @@ function CustomersTab({ schoolConfigId, currency }: { schoolConfigId: number; cu
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">{filtered.length} Customers</p>
         <Button size="sm" onClick={openCreate} data-testid="btn-add-customer">

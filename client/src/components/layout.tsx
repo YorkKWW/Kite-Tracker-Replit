@@ -267,7 +267,7 @@ export default function Layout({ children }: LayoutProps) {
             <span className="font-bold text-lg hidden sm:inline" data-testid="text-logo">KiteTracker</span>
           </div>
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1">
             {navItems.filter((item) => !item.indent).map((item) => (
               <Link key={item.href} href={item.href}>
                 <Button
@@ -539,13 +539,13 @@ export default function Layout({ children }: LayoutProps) {
 
       <FeedbackButton />
 
-      <main className="pb-20 md:pb-6">{children}</main>
+      <main className="pb-20 lg:pb-6">{children}</main>
 
       {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/30" onClick={() => setMobileMenuOpen(false)} />
+        <div className="lg:hidden fixed inset-0 z-40 bg-black/30" onClick={() => setMobileMenuOpen(false)} />
       )}
       {mobileMenuOpen && (
-        <div className="md:hidden fixed bottom-16 left-0 right-0 z-40 bg-background border-t rounded-t-xl shadow-lg p-2 space-y-1 max-h-[60vh] overflow-y-auto safe-area-bottom">
+        <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 bg-background border-t rounded-t-xl shadow-lg p-2 space-y-1 max-h-[60vh] overflow-y-auto safe-area-bottom">
           {navItems
             .filter((item) => !bottomTabs.some((bt) => bt.href === item.href))
             .map((item) => (
@@ -574,7 +574,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       )}
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center justify-around h-16 px-2">
           {bottomTabs.map((item) => (
             <Link key={item.href} href={item.href}>

@@ -162,7 +162,7 @@ export default function TransfersPage() {
 
   if (isLoading) {
     return (
-      <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto">
+      <div className="p-4 md:p-6 space-y-4 max-w-5xl mx-auto">
         <Skeleton className="h-8 w-32" />
         {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24" />)}
       </div>
@@ -172,7 +172,7 @@ export default function TransfersPage() {
   const hasReceivable = pending.some(canReceive);
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 space-y-4 max-w-5xl mx-auto">
       <div className="flex items-center gap-2">
         <Link href="/">
           <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">

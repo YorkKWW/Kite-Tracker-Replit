@@ -177,20 +177,20 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Equipment sub-navigation cards */}
-        <div className="grid grid-cols-2 gap-3 md:gap-4">
+        {/* Equipment sub-navigation cards — 2 cols iPhone, 3 cols iPad, 5 cols desktop */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
           {featureCards.map((card) => (
             <Link key={card.href} href={card.href}>
-              <Card className={`cursor-pointer border-2 ${card.borderColor} transition-all hover:shadow-md`}>
-                <CardContent className="p-4 md:p-6 flex flex-col items-center justify-center gap-3 h-40 md:h-48">
-                  <div className={`p-3 md:p-4 rounded-lg ${card.bgColor}`}>
-                    <card.icon className={`h-8 w-8 md:h-10 md:w-10 ${card.color}`} />
+              <Card className={`cursor-pointer border-2 ${card.borderColor} transition-all hover:shadow-md h-full`}>
+                <CardContent className="p-4 md:p-5 flex flex-col items-center justify-center gap-2.5 h-36 sm:h-40">
+                  <div className={`p-3 rounded-lg ${card.bgColor}`}>
+                    <card.icon className={`h-7 w-7 sm:h-8 sm:w-8 ${card.color}`} />
                   </div>
                   <div className="text-center">
-                    <p className="font-semibold text-sm md:text-base" data-testid={`text-feature-${card.label.toLowerCase().replace(/\s/g, "-")}`}>
+                    <p className="font-semibold text-sm" data-testid={`text-feature-${card.label.toLowerCase().replace(/\s/g, "-")}`}>
                       {card.label}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="text-[11px] text-muted-foreground mt-0.5 hidden sm:block">
                       {card.description}
                     </p>
                   </div>

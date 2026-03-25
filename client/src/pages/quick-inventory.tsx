@@ -210,7 +210,7 @@ export default function QuickInventoryPage() {
   });
 
   return (
-    <div className="max-w-lg mx-auto p-4 space-y-6 pb-28">
+    <div className="max-w-lg md:max-w-2xl mx-auto p-4 md:p-6 space-y-6 pb-28">
       <div>
         <div className="flex items-center gap-2">
           <Link href="/">
