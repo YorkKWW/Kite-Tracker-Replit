@@ -1310,31 +1310,65 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
     return result;
   }, [today]);
 
+  const customerServiceMap = useMemo(() => {
+    const map = new Map<string, { courseDays: Set<string>; rentalDays: Set<string> }>();
+    for (const b of bookings) {
+      if (!b.bookingDate) continue;
+      const key = b.customerName.toLowerCase().trim();
+      if (!map.has(key)) map.set(key, { courseDays: new Set(), rentalDays: new Set() });
+      const entry = map.get(key)!;
+      for (const item of b.items) {
+        const cat = item.category;
+        if (cat !== "Course" && cat !== "Lesson" && cat !== "Rental") continue;
+        const dur = parseDurationDays(item.productName);
+        for (let i = 0; i < dur; i++) {
+          const d = addDays(b.bookingDate, i);
+          if (cat === "Rental") entry.rentalDays.add(d);
+          else entry.courseDays.add(d);
+        }
+      }
+    }
+    return map;
+  }, [bookings]);
+
   const dayData = useMemo(() => {
-    const data: { date: string; guests: number; arrivals: number; departures: number }[] = [];
+    const data: { date: string; courses: number; rentals: number; noService: number; total: number; arrivals: number; departures: number; courseOnly: number; rentalOnly: number; both: number }[] = [];
     for (const day of days) {
-      let guests = 0;
+      let courseOnly = 0;
+      let rentalOnly = 0;
+      let both = 0;
+      let noService = 0;
       let arrivals = 0;
       let departures = 0;
       for (const c of customers) {
         if (!c.arrivalDate || !c.departureDate) continue;
-        if (c.arrivalDate <= day && day <= c.departureDate) guests++;
+        if (c.arrivalDate <= day && day <= c.departureDate) {
+          const key = `${c.firstName} ${c.lastName}`.toLowerCase().trim();
+          const svc = customerServiceMap.get(key);
+          const hasCourse = svc ? svc.courseDays.has(day) : false;
+          const hasRental = svc ? svc.rentalDays.has(day) : false;
+          if (hasCourse && hasRental) both++;
+          else if (hasCourse) courseOnly++;
+          else if (hasRental) rentalOnly++;
+          else noService++;
+        }
         if (c.arrivalDate === day) arrivals++;
         if (c.departureDate === day) departures++;
       }
-      data.push({ date: day, guests, arrivals, departures });
+      const total = courseOnly + rentalOnly + both + noService;
+      data.push({ date: day, courses: courseOnly + both, rentals: rentalOnly + both, noService, total, arrivals, departures, courseOnly, rentalOnly, both });
     }
     return data;
-  }, [customers, days]);
+  }, [customers, days, customerServiceMap]);
 
   const unpaidCount = useMemo(() => {
     return bookings.filter(b => b.paymentStatus === "unpaid").length;
   }, [bookings]);
 
-  const todayData = dayData[0] || { guests: 0, arrivals: 0, departures: 0 };
+  const todayData = dayData[0] || { courses: 0, rentals: 0, noService: 0, total: 0, arrivals: 0, departures: 0, courseOnly: 0, rentalOnly: 0, both: 0 };
   const weekArrivals = dayData.slice(0, 7).reduce((s, d) => s + d.arrivals, 0);
   const weekDepartures = dayData.slice(0, 7).reduce((s, d) => s + d.departures, 0);
-  const maxGuests = Math.max(1, ...dayData.map(d => d.guests));
+  const maxTotal = Math.max(1, ...dayData.map(d => d.total));
 
   const isLoading = loadingCustomers || loadingBookings;
 
@@ -1354,23 +1388,23 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
       <div className="grid grid-cols-2 gap-3">
         <Card>
           <CardContent className="p-3 text-center">
+            <GraduationCap className="h-5 w-5 mx-auto text-blue-600 mb-1" />
+            <p className="text-2xl font-bold" data-testid="text-courses-today">{todayData.courses}</p>
+            <p className="text-[10px] text-muted-foreground">Courses Today</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 text-center">
+            <Waves className="h-5 w-5 mx-auto text-amber-500 mb-1" />
+            <p className="text-2xl font-bold" data-testid="text-rentals-today">{todayData.rentals}</p>
+            <p className="text-[10px] text-muted-foreground">Rentals Today</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 text-center">
             <Users className="h-5 w-5 mx-auto text-primary mb-1" />
-            <p className="text-2xl font-bold" data-testid="text-guests-today">{todayData.guests}</p>
-            <p className="text-[10px] text-muted-foreground">Guests Today</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <ArrowUpRight className="h-5 w-5 mx-auto text-green-600 mb-1" />
-            <p className="text-2xl font-bold" data-testid="text-week-arrivals">{weekArrivals}</p>
-            <p className="text-[10px] text-muted-foreground">Arrivals (7d)</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <ArrowDownRight className="h-5 w-5 mx-auto text-red-500 mb-1" />
-            <p className="text-2xl font-bold" data-testid="text-week-departures">{weekDepartures}</p>
-            <p className="text-[10px] text-muted-foreground">Departures (7d)</p>
+            <p className="text-2xl font-bold" data-testid="text-guests-today">{todayData.total}</p>
+            <p className="text-[10px] text-muted-foreground">Total Guests Today</p>
           </CardContent>
         </Card>
         <Card>
@@ -1385,17 +1419,20 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
       <div>
         <p className="text-sm font-semibold mb-2 flex items-center gap-2">
           <TrendingUp className="h-4 w-4" />
-          35-Day Occupancy
+          35-Day Service Overview
         </p>
         <div className="border rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <div className="flex" style={{ minWidth: days.length * 44 }}>
-              {dayData.map((d, idx) => {
+              {dayData.map((d) => {
                 const date = new Date(d.date + "T12:00:00Z");
                 const isToday = d.date === today;
                 const isWeekend = date.getUTCDay() % 6 === 0;
                 const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-                const barHeight = maxGuests > 0 ? Math.round((d.guests / maxGuests) * 100) : 0;
+                const courseOnlyPct = Math.round((d.courseOnly / maxTotal) * 100);
+                const bothPct = Math.round((d.both / maxTotal) * 100);
+                const rentalOnlyPct = Math.round((d.rentalOnly / maxTotal) * 100);
+                const noSvcPct = Math.round((d.noService / maxTotal) * 100);
                 return (
                   <div
                     key={d.date}
@@ -1409,13 +1446,23 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
                     <p className={`text-[10px] font-medium ${isToday ? "text-primary" : ""}`}>
                       {date.getUTCDate()}.{date.getUTCMonth() + 1}
                     </p>
-                    <div className="flex-1 flex flex-col justify-end mt-1" style={{ height: 80 }}>
-                      <div
-                        className={`w-6 mx-auto rounded-t transition-all ${isToday ? "bg-primary" : "bg-primary/60"}`}
-                        style={{ height: `${barHeight}%`, minHeight: d.guests > 0 ? 4 : 0 }}
-                      />
+                    <div className="flex-1 flex flex-col justify-end items-center mt-1" style={{ height: 80 }}>
+                      {(() => {
+                        const segments: { key: string; pct: number; cls: string; style?: Record<string, string | number> }[] = [];
+                        if (d.noService > 0) segments.push({ key: "ns", pct: noSvcPct, cls: isToday ? "bg-gray-400 dark:bg-gray-500" : "bg-gray-300 dark:bg-gray-600" });
+                        if (d.rentalOnly > 0) segments.push({ key: "ro", pct: rentalOnlyPct, cls: isToday ? "bg-amber-500" : "bg-amber-400" });
+                        if (d.both > 0) segments.push({ key: "bt", pct: bothPct, cls: "", style: { background: "linear-gradient(90deg, #3b82f6 50%, #f59e0b 50%)" } });
+                        if (d.courseOnly > 0) segments.push({ key: "co", pct: courseOnlyPct, cls: isToday ? "bg-blue-600" : "bg-blue-500" });
+                        return segments.map((seg, i) => (
+                          <div
+                            key={seg.key}
+                            className={`w-6 ${i === 0 ? "rounded-t" : ""} ${seg.cls}`}
+                            style={{ height: `${seg.pct}%`, minHeight: 3, ...seg.style }}
+                          />
+                        ));
+                      })()}
                     </div>
-                    <p className={`text-[10px] font-bold mt-0.5 ${isToday ? "text-primary" : ""}`}>{d.guests}</p>
+                    <p className={`text-[10px] font-bold mt-0.5 ${isToday ? "text-primary" : ""}`}>{d.total}</p>
                     <div className="flex items-center gap-0.5 mt-0.5 h-3">
                       {d.arrivals > 0 && (
                         <span className="text-[8px] text-green-600 font-medium flex items-center">
@@ -1434,10 +1481,11 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground">
-          <span className="flex items-center gap-1"><ArrowUpRight className="h-3 w-3 text-green-600" /> Arrival</span>
-          <span className="flex items-center gap-1"><ArrowDownRight className="h-3 w-3 text-red-500" /> Departure</span>
-          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded bg-primary/60" /> Guests</span>
+        <div className="flex flex-wrap items-center gap-3 mt-2 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded bg-blue-500" /> Courses</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded bg-amber-400" /> Rentals</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded" style={{ background: "linear-gradient(90deg, #3b82f6 50%, #f59e0b 50%)" }} /> Both</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded bg-gray-300 dark:bg-gray-600" /> No Service</span>
         </div>
       </div>
     </div>
