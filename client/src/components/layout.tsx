@@ -128,6 +128,11 @@ export default function Layout({ children }: LayoutProps) {
   const navItems = isStationLead ? [
     { href: "/center", label: "Center", icon: Store },
     { href: "/", label: "Equipment", icon: Package },
+    { href: "/equipment", label: "Equipment List", icon: Package, indent: true },
+    { href: "/quick-inventory", label: "Quick Inventory", icon: ClipboardCheck, indent: true },
+    { href: "/accessories", label: "Accessories", icon: ShirtIcon, indent: true },
+    { href: "/transfers", label: "Transfers", icon: ArrowLeftRight, indent: true },
+    { href: "/repairs", label: "Repairs", icon: Wrench, indent: true },
     { href: "/settings", label: "Settings", icon: Settings },
   ] : [
     ...(isAdmin ? [
@@ -260,7 +265,7 @@ export default function Layout({ children }: LayoutProps) {
           </div>
 
           <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => (
+            {navItems.filter((item) => !(item as any).indent).map((item) => (
               <Link key={item.href} href={item.href}>
                 <Button
                   variant={isActive(item.href) ? "secondary" : "ghost"}
