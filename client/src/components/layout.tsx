@@ -133,8 +133,8 @@ export default function Layout({ children }: LayoutProps) {
     ...(!isStationLead ? [
       { href: "/sales", label: "Sales", icon: ShoppingCart },
       { href: "/incidents", label: "Incidents", icon: AlertTriangle },
-      { href: "/repairs", label: "Repairs", icon: Wrench },
     ] : []),
+    { href: "/repairs", label: "Repairs", icon: Wrench },
     ...(isHamburg
       ? [
           { href: "/price-lists", label: "Price Lists", icon: Tag },
