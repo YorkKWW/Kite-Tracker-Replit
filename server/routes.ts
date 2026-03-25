@@ -4215,6 +4215,176 @@ export async function registerRoutes(
     }
   });
 
+  // ── Finance: P&L PDF ────────────────────────────────────────────────────
+  app.get("/api/finance-pnl/:schoolConfigId/pdf", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid school config ID" });
+      const config = await storage.getSchoolConfig(schoolConfigId);
+      if (!config) return res.status(404).json({ message: "School config not found" });
+      if (user.role === "station_lead" && config.stationId !== user.assignedStationId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { startDate, endDate } = req.query;
+      if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate required" });
+      const sd = startDate as string;
+      const ed = endDate as string;
+
+      const bookings = await storage.getSchoolBookings(schoolConfigId);
+      const filtered = bookings.filter(b => b.bookingDate >= sd && b.bookingDate <= ed);
+      const expenses = await storage.getSchoolExpenses(schoolConfigId, sd, ed);
+
+      let cashTotal = 0, cardTotal = 0, unpaidTotal = 0;
+      const revByCategory: Record<string, number> = {};
+      for (const b of filtered) {
+        const amt = parseFloat(b.totalAmount) || 0;
+        if (b.paymentStatus === "cash") cashTotal += amt;
+        else if (b.paymentStatus === "credit_card") cardTotal += amt;
+        else unpaidTotal += amt;
+        for (const item of b.items) {
+          const cat = item.category || "Other";
+          revByCategory[cat] = (revByCategory[cat] || 0) + (parseFloat(item.lineTotal) || 0);
+        }
+      }
+      const paidTotal = cashTotal + cardTotal;
+      const totalRevenue = paidTotal + unpaidTotal;
+
+      const expByCategory: Record<string, number> = {};
+      let expenseTotal = 0;
+      const categoryLabels: Record<string, string> = {
+        fuel_gas: "Fuel / Gas", food_drinks: "Food / Drinks", material_supplies: "Material / Supplies",
+        transport: "Transport", maintenance: "Maintenance", staff: "Staff", other: "Other",
+      };
+      for (const e of expenses) {
+        const amt = parseFloat(e.amount) || 0;
+        expenseTotal += amt;
+        const label = categoryLabels[e.category] || e.category;
+        expByCategory[label] = (expByCategory[label] || 0) + amt;
+      }
+
+      const netResult = paidTotal - expenseTotal;
+      const cur = config.currency || "MAD";
+
+      const station = await storage.getStation(config.stationId);
+      const stationName = station?.name || "Unknown";
+
+      const PDFDocument = (await import("pdfkit")).default;
+      const doc = new PDFDocument({ size: "A4", margin: 50, info: { Title: `P&L ${sd} to ${ed}` } });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="PnL_${sd}_${ed}.pdf"`);
+      doc.pipe(res);
+
+      const pageW = 595.28;
+      const margin = 50;
+      const contentW = pageW - margin * 2;
+      const navy = "#1e3a5f";
+      const grey = "#6b7280";
+      const lightGrey = "#f3f4f6";
+      const black = "#111827";
+      const green = "#047857";
+      const red = "#dc2626";
+      const orange = "#ea580c";
+
+      doc.fontSize(20).font("Helvetica-Bold").fillColor(navy).text(config.schoolName, margin, margin, { width: contentW });
+      doc.fontSize(9).font("Helvetica").fillColor(grey).text(stationName, margin, margin + 24, { width: contentW });
+      doc.moveTo(margin, margin + 38).lineTo(pageW - margin, margin + 38).strokeColor(navy).lineWidth(1.5).stroke();
+
+      let y = margin + 52;
+      doc.fontSize(16).font("Helvetica-Bold").fillColor(navy).text("PROFIT & LOSS STATEMENT", margin, y);
+      y += 24;
+      doc.fontSize(10).font("Helvetica").fillColor(grey).text(`Period: ${sd}  to  ${ed}`, margin, y);
+      y += 14;
+      doc.fontSize(10).font("Helvetica").fillColor(grey).text(`Generated: ${new Date().toISOString().slice(0, 10)}`, margin, y);
+      y += 28;
+
+      const fmtAmt = (n: number) => `${cur} ${n.toFixed(2)}`;
+      const colLabel = margin;
+      const colAmount = pageW - margin - 120;
+      const lineW = contentW;
+
+      const sectionHeader = (title: string) => {
+        doc.rect(margin, y, lineW, 22).fill(navy);
+        doc.fontSize(10).font("Helvetica-Bold").fillColor("#ffffff").text(title, colLabel + 8, y + 6, { width: lineW });
+        y += 24;
+      };
+
+      const row = (label: string, amount: number, bold = false, color = black) => {
+        const font = bold ? "Helvetica-Bold" : "Helvetica";
+        doc.fontSize(9).font(font).fillColor(color).text(label, colLabel + 8, y + 3, { width: 300 });
+        doc.fontSize(9).font(font).fillColor(color).text(fmtAmt(amount), colAmount, y + 3, { width: 120, align: "right" });
+        y += 18;
+      };
+
+      const divider = (thick = false) => {
+        doc.moveTo(margin, y).lineTo(pageW - margin, y).strokeColor(thick ? navy : grey).lineWidth(thick ? 1.5 : 0.5).stroke();
+        y += thick ? 8 : 4;
+      };
+
+      sectionHeader("REVENUE");
+      const sortedRevCats = Object.entries(revByCategory).sort((a, b) => b[1] - a[1]);
+      for (const [cat, amt] of sortedRevCats) {
+        row(cat, amt);
+      }
+      if (sortedRevCats.length === 0) {
+        doc.fontSize(9).font("Helvetica").fillColor(grey).text("No revenue in this period", colLabel + 8, y + 3);
+        y += 18;
+      }
+      divider();
+      row("Total Revenue (Paid)", paidTotal, true, green);
+      if (unpaidTotal > 0) {
+        row("Unpaid / Outstanding", unpaidTotal, false, orange);
+      }
+      row("Gross Revenue (incl. Unpaid)", totalRevenue, true, black);
+      y += 6;
+
+      doc.fontSize(8).font("Helvetica").fillColor(grey).text("Revenue breakdown by payment method:", colLabel + 8, y + 2);
+      y += 14;
+      row("  Cash", cashTotal, false, black);
+      row("  Credit Card", cardTotal, false, black);
+      y += 8;
+
+      sectionHeader("EXPENSES");
+      const sortedExpCats = Object.entries(expByCategory).sort((a, b) => b[1] - a[1]);
+      for (const [cat, amt] of sortedExpCats) {
+        row(cat, amt, false, orange);
+      }
+      if (sortedExpCats.length === 0) {
+        doc.fontSize(9).font("Helvetica").fillColor(grey).text("No expenses in this period", colLabel + 8, y + 3);
+        y += 18;
+      }
+      divider();
+      row("Total Expenses", expenseTotal, true, orange);
+      y += 12;
+
+      divider(true);
+      y += 4;
+      const resultColor = netResult >= 0 ? green : red;
+      doc.fontSize(14).font("Helvetica-Bold").fillColor(resultColor)
+        .text(`NET RESULT:  ${fmtAmt(netResult)}`, margin, y, { width: contentW, align: "center" });
+      y += 30;
+      divider(true);
+
+      y += 16;
+      sectionHeader("SUMMARY");
+      row("Total Bookings", filtered.length, false, black);
+      row("Total Expenses Entries", expenses.length, false, black);
+      row("Paid Revenue", paidTotal, false, green);
+      row("Total Expenses", expenseTotal, false, orange);
+      row("Net Result", netResult, true, resultColor);
+
+      doc.fontSize(7).font("Helvetica").fillColor(grey)
+        .text(`${config.schoolName} · ${stationName} · Profit & Loss · ${sd} to ${ed}`, margin, 780, { width: contentW, align: "center" });
+
+      doc.end();
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── Finance: Cash Register ─────────────────────────────────────────────
   app.get("/api/cash-register/:schoolConfigId", requireAuth, async (req, res) => {
     try {

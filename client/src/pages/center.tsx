@@ -2310,8 +2310,47 @@ function FinanceTab({ schoolConfigId, currency }: { schoolConfigId: number; curr
         </div>
       )}
 
-      <div className="text-xs text-muted-foreground">
-        {startDate === endDate ? startDate : `${startDate} — ${endDate}`}
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-muted-foreground">
+          {startDate === endDate ? startDate : `${startDate} — ${endDate}`}
+        </div>
+        <div className="flex gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            data-testid="btn-pnl-week"
+            onClick={() => {
+              const now = new Date();
+              const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+              const day = d.getUTCDay();
+              const diff = day === 0 ? 6 : day - 1;
+              d.setUTCDate(d.getUTCDate() - diff);
+              const ws = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+              const we = new Date(d);
+              we.setUTCDate(we.getUTCDate() + 6);
+              const weStr = `${we.getUTCFullYear()}-${String(we.getUTCMonth() + 1).padStart(2, "0")}-${String(we.getUTCDate()).padStart(2, "0")}`;
+              window.open(`/api/finance-pnl/${schoolConfigId}/pdf?startDate=${ws}&endDate=${weStr}`, "_blank");
+            }}
+          >
+            <FileDown className="h-3 w-3 mr-1" /> P&L Week
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            data-testid="btn-pnl-month"
+            onClick={() => {
+              const now = new Date();
+              const ms = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
+              const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+              const me = `${lastDay.getUTCFullYear()}-${String(lastDay.getUTCMonth() + 1).padStart(2, "0")}-${String(lastDay.getUTCDate()).padStart(2, "0")}`;
+              window.open(`/api/finance-pnl/${schoolConfigId}/pdf?startDate=${ms}&endDate=${me}`, "_blank");
+            }}
+          >
+            <FileDown className="h-3 w-3 mr-1" /> P&L Month
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
