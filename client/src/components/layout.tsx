@@ -130,9 +130,11 @@ export default function Layout({ children }: LayoutProps) {
     { href: "/equipment", label: "Equipment", icon: Package },
     { href: "/accessories", label: "Accessories", icon: ShirtIcon },
     { href: "/transfers", label: "Transfers", icon: ArrowLeftRight },
-    { href: "/sales", label: "Sales", icon: ShoppingCart },
-    { href: "/incidents", label: "Incidents", icon: AlertTriangle },
-    { href: "/repairs", label: "Repairs", icon: Wrench },
+    ...(!isStationLead ? [
+      { href: "/sales", label: "Sales", icon: ShoppingCart },
+      { href: "/incidents", label: "Incidents", icon: AlertTriangle },
+      { href: "/repairs", label: "Repairs", icon: Wrench },
+    ] : []),
     ...(isHamburg
       ? [
           { href: "/price-lists", label: "Price Lists", icon: Tag },
