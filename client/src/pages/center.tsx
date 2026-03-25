@@ -1367,7 +1367,7 @@ function CenterWindBarCard({
   const dir = degToCompass(direction);
 
   return (
-    <div className="flex flex-col items-center gap-0.5 min-w-[32px]">
+    <div className="flex flex-col items-center gap-0.5 min-w-[36px]">
       <span className={`text-[9px] font-medium leading-tight ${isNow ? "text-sky-600 dark:text-sky-400 font-bold" : "text-muted-foreground"}`}>
         {isNow ? "Now" : label}
       </span>
