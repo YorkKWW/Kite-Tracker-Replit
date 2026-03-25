@@ -686,6 +686,41 @@ export type SchoolBooking = typeof schoolBookings.$inferSelect;
 export type InsertSchoolBookingItem = z.infer<typeof insertSchoolBookingItemSchema>;
 export type SchoolBookingItem = typeof schoolBookingItems.$inferSelect;
 
+export const expenseCategoryEnum = pgEnum("expense_category", [
+  "fuel_gas", "food_drinks", "material_supplies", "transport", "maintenance", "staff", "other"
+]);
+
+export const cashRegisterEntries = pgTable("cash_register_entries", {
+  id: serial("id").primaryKey(),
+  schoolConfigId: integer("school_config_id").notNull().references(() => schoolConfigs.id),
+  date: text("date").notNull(),
+  openingBalance: decimal("opening_balance", { precision: 10, scale: 2 }).notNull().default("0"),
+  notes: text("notes"),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const schoolExpenses = pgTable("school_expenses", {
+  id: serial("id").primaryKey(),
+  schoolConfigId: integer("school_config_id").notNull().references(() => schoolConfigs.id),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("MAD"),
+  category: expenseCategoryEnum("category").notNull().default("other"),
+  description: text("description"),
+  expenseDate: text("expense_date").notNull(),
+  receiptUrl: text("receipt_url"),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCashRegisterEntrySchema = createInsertSchema(cashRegisterEntries).omit({ id: true, createdAt: true });
+export const insertSchoolExpenseSchema = createInsertSchema(schoolExpenses).omit({ id: true, createdAt: true });
+
+export type InsertCashRegisterEntry = z.infer<typeof insertCashRegisterEntrySchema>;
+export type CashRegisterEntry = typeof cashRegisterEntries.$inferSelect;
+export type InsertSchoolExpense = z.infer<typeof insertSchoolExpenseSchema>;
+export type SchoolExpense = typeof schoolExpenses.$inferSelect;
+
 export const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   kite: "Kites",
   board: "Kiteboards",

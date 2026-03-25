@@ -4164,5 +4164,140 @@ export async function registerRoutes(
     }
   });
 
+  // ── Finance: Cash Register ─────────────────────────────────────────────
+  app.get("/api/cash-register/:schoolConfigId/:date", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid school config ID" });
+      if (user.role === "station_lead") {
+        const config = await storage.getSchoolConfig(schoolConfigId);
+        if (!config || config.stationId !== user.assignedStationId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      const entry = await storage.getCashRegisterEntry(schoolConfigId, req.params.date);
+      res.json(entry || null);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/cash-register", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { schoolConfigId, date, openingBalance, notes } = req.body;
+      if (!schoolConfigId || !date) return res.status(400).json({ message: "schoolConfigId and date are required" });
+      const parsedBalance = parseFloat(openingBalance);
+      if (isNaN(parsedBalance)) return res.status(400).json({ message: "Invalid opening balance" });
+      if (user.role === "station_lead") {
+        const config = await storage.getSchoolConfig(schoolConfigId);
+        if (!config || config.stationId !== user.assignedStationId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      const entry = await storage.upsertCashRegisterEntry({
+        schoolConfigId,
+        date,
+        openingBalance: String(parsedBalance),
+        notes: notes || null,
+        createdBy: user.id,
+      });
+      res.json(entry);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // ── Finance: Expenses ────────────────────────────────────────────────
+  app.get("/api/school-expenses/:schoolConfigId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid school config ID" });
+      if (user.role === "station_lead") {
+        const config = await storage.getSchoolConfig(schoolConfigId);
+        if (!config || config.stationId !== user.assignedStationId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      const { startDate, endDate } = req.query;
+      const expenses = await storage.getSchoolExpenses(
+        schoolConfigId,
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+      res.json(expenses);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/school-expenses", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { schoolConfigId, amount, currency, category, description, expenseDate, receiptUrl } = req.body;
+      if (!schoolConfigId || !expenseDate) return res.status(400).json({ message: "schoolConfigId and expenseDate are required" });
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) return res.status(400).json({ message: "Invalid amount" });
+      const validCategories = ["fuel_gas", "food_drinks", "material_supplies", "transport", "maintenance", "staff", "other"];
+      if (category && !validCategories.includes(category)) return res.status(400).json({ message: "Invalid category" });
+      if (user.role === "station_lead") {
+        const config = await storage.getSchoolConfig(schoolConfigId);
+        if (!config || config.stationId !== user.assignedStationId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      const expense = await storage.createSchoolExpense({
+        schoolConfigId,
+        amount: String(parsedAmount),
+        currency: currency || "MAD",
+        category: category || "other",
+        description: description || null,
+        expenseDate,
+        receiptUrl: receiptUrl || null,
+        createdBy: user.id,
+      });
+      res.json(expense);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.delete("/api/school-expenses/:id", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid expense ID" });
+      const expense = await storage.getSchoolExpense(id);
+      if (!expense) return res.status(404).json({ message: "Expense not found" });
+      if (user.role === "station_lead") {
+        const config = await storage.getSchoolConfig(expense.schoolConfigId);
+        if (!config || config.stationId !== user.assignedStationId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      await storage.deleteSchoolExpense(id);
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   return httpServer;
 }

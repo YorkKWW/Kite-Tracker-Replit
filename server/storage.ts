@@ -71,6 +71,9 @@ import {
   type SchoolCustomer, type InsertSchoolCustomer,
   type SchoolBooking, type InsertSchoolBooking,
   type SchoolBookingItem, type InsertSchoolBookingItem,
+  cashRegisterEntries, schoolExpenses,
+  type CashRegisterEntry, type InsertCashRegisterEntry,
+  type SchoolExpense, type InsertSchoolExpense,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -242,6 +245,14 @@ export interface IStorage {
   createSchoolBooking(booking: InsertSchoolBooking, items: Omit<InsertSchoolBookingItem, "bookingId">[]): Promise<SchoolBooking>;
   updateSchoolBookingPayment(id: number, paymentStatus: "unpaid" | "cash" | "credit_card"): Promise<SchoolBooking | undefined>;
   getNextBookingNumber(schoolConfigId: number, stationShortCode: string): Promise<string>;
+
+  getCashRegisterEntry(schoolConfigId: number, date: string): Promise<CashRegisterEntry | undefined>;
+  upsertCashRegisterEntry(entry: InsertCashRegisterEntry): Promise<CashRegisterEntry>;
+
+  getSchoolExpenses(schoolConfigId: number, startDate?: string, endDate?: string): Promise<SchoolExpense[]>;
+  createSchoolExpense(expense: InsertSchoolExpense): Promise<SchoolExpense>;
+  getSchoolExpense(id: number): Promise<SchoolExpense | undefined>;
+  deleteSchoolExpense(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1781,6 +1792,48 @@ export class DatabaseStorage implements IStorage {
     if (!result) return `${prefix}001`;
     const lastNum = parseInt(result.bookingNumber.split("-").pop() || "0", 10);
     return `${prefix}${String(lastNum + 1).padStart(3, "0")}`;
+  }
+
+  async getCashRegisterEntry(schoolConfigId: number, date: string): Promise<CashRegisterEntry | undefined> {
+    const [entry] = await db.select().from(cashRegisterEntries)
+      .where(and(eq(cashRegisterEntries.schoolConfigId, schoolConfigId), eq(cashRegisterEntries.date, date)));
+    return entry;
+  }
+
+  async upsertCashRegisterEntry(entry: InsertCashRegisterEntry): Promise<CashRegisterEntry> {
+    const existing = await this.getCashRegisterEntry(entry.schoolConfigId, entry.date);
+    if (existing) {
+      const [updated] = await db.update(cashRegisterEntries)
+        .set({ openingBalance: entry.openingBalance, notes: entry.notes })
+        .where(eq(cashRegisterEntries.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(cashRegisterEntries).values(entry).returning();
+    return created;
+  }
+
+  async getSchoolExpenses(schoolConfigId: number, startDate?: string, endDate?: string): Promise<SchoolExpense[]> {
+    const conditions = [eq(schoolExpenses.schoolConfigId, schoolConfigId)];
+    if (startDate) conditions.push(sql`${schoolExpenses.expenseDate} >= ${startDate}`);
+    if (endDate) conditions.push(sql`${schoolExpenses.expenseDate} <= ${endDate}`);
+    return db.select().from(schoolExpenses)
+      .where(and(...conditions))
+      .orderBy(desc(schoolExpenses.expenseDate));
+  }
+
+  async createSchoolExpense(expense: InsertSchoolExpense): Promise<SchoolExpense> {
+    const [created] = await db.insert(schoolExpenses).values(expense).returning();
+    return created;
+  }
+
+  async getSchoolExpense(id: number): Promise<SchoolExpense | undefined> {
+    const [expense] = await db.select().from(schoolExpenses).where(eq(schoolExpenses.id, id));
+    return expense;
+  }
+
+  async deleteSchoolExpense(id: number): Promise<void> {
+    await db.delete(schoolExpenses).where(eq(schoolExpenses.id, id));
   }
 }
 
