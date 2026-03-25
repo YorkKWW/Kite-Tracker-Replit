@@ -2131,6 +2131,21 @@ function FinanceTab({ schoolConfigId, currency }: { schoolConfigId: number; curr
 
   const { startDate, endDate } = getDateRange(period, customStart, customEnd);
 
+  type FinanceSummary = {
+    paidTotal: string; cashTotal: string; cardTotal: string; unpaidTotal: string;
+    expenseTotal: string; netResult: string; bookingCount: number; expenseCount: number;
+  };
+
+  const { data: summary } = useQuery<FinanceSummary>({
+    queryKey: ["/api/finance-summary", schoolConfigId, startDate, endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/finance-summary/${schoolConfigId}?startDate=${startDate}&endDate=${endDate}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch finance summary");
+      return res.json();
+    },
+    staleTime: 0,
+  });
+
   const { data: bookings = [] } = useQuery<Booking[]>({
     queryKey: ["/api/school-bookings", schoolConfigId],
     staleTime: 0,
@@ -2169,20 +2184,16 @@ function FinanceTab({ schoolConfigId, currency }: { schoolConfigId: number; curr
   }, [bookings, startDate, endDate]);
 
   const stats = useMemo(() => {
-    let cashTotal = 0, cardTotal = 0, unpaidTotal = 0;
-    for (const b of filteredBookings) {
-      const amt = parseFloat(b.totalAmount) || 0;
-      if (b.paymentStatus === "cash") cashTotal += amt;
-      else if (b.paymentStatus === "credit_card") cardTotal += amt;
-      else unpaidTotal += amt;
-    }
-    const paidTotal = cashTotal + cardTotal;
-    const expenseTotal = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+    const paidTotal = parseFloat(summary?.paidTotal || "0");
+    const cashTotal = parseFloat(summary?.cashTotal || "0");
+    const cardTotal = parseFloat(summary?.cardTotal || "0");
+    const unpaidTotal = parseFloat(summary?.unpaidTotal || "0");
+    const expenseTotal = parseFloat(summary?.expenseTotal || "0");
     const opening = parseFloat(cashBalance) || 0;
     const currentCash = opening + cashTotal;
-    const netResult = paidTotal - expenseTotal;
+    const netResult = parseFloat(summary?.netResult || "0");
     return { paidTotal, cashTotal, cardTotal, unpaidTotal, expenseTotal, opening, currentCash, netResult };
-  }, [filteredBookings, expenses, cashBalance]);
+  }, [summary, cashBalance]);
 
   const createExpenseMutation = useMutation({
     mutationFn: () =>
@@ -2197,6 +2208,7 @@ function FinanceTab({ schoolConfigId, currency }: { schoolConfigId: number; curr
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/school-expenses", schoolConfigId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance-summary", schoolConfigId] });
       setShowExpenseForm(false);
       setExpAmount("");
       setExpCategory("other");
@@ -2211,6 +2223,7 @@ function FinanceTab({ schoolConfigId, currency }: { schoolConfigId: number; curr
     mutationFn: (id: number) => apiRequest("DELETE", `/api/school-expenses/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/school-expenses", schoolConfigId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance-summary", schoolConfigId] });
       toast({ title: "Expense deleted" });
     },
   });
