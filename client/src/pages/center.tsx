@@ -1506,7 +1506,13 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
                         )}
                       </div>
                       <div className="text-right text-[10px] text-muted-foreground shrink-0">
-                        {c.arrivalDate && c.departureDate && (
+                        {(detailView === "arrivals" && c.arrivalDate) && (
+                          <p>{new Date(c.arrivalDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })}</p>
+                        )}
+                        {(detailView === "departures" && c.departureDate) && (
+                          <p>{new Date(c.departureDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })}</p>
+                        )}
+                        {(detailView !== "arrivals" && detailView !== "departures" && c.arrivalDate && c.departureDate) && (
                           <p>{new Date(c.arrivalDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })} – {new Date(c.departureDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })}</p>
                         )}
                       </div>
