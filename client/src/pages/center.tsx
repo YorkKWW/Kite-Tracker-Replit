@@ -400,18 +400,20 @@ function CustomerAutocomplete({
               </button>
             ))
           ) : (
-            <p className="text-sm text-muted-foreground px-3 py-3 text-center">Kein Kunde gefunden</p>
+            <div>
+              <p className="text-sm text-muted-foreground px-3 py-3 text-center">Kein Kunde gefunden</p>
+              <div className="border-t">
+                <button
+                  data-testid="btn-create-new-customer"
+                  className="w-full text-left px-3 py-2.5 hover:bg-muted transition-colors flex items-center gap-2 text-primary font-medium"
+                  onClick={() => { setShowCreateDialog(true); setOpen(false); }}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  <span className="text-sm">Neuen Kunden anlegen</span>
+                </button>
+              </div>
+            </div>
           )}
-          <div className="border-t">
-            <button
-              data-testid="btn-create-new-customer"
-              className="w-full text-left px-3 py-2.5 hover:bg-muted transition-colors flex items-center gap-2 text-primary font-medium"
-              onClick={() => { setShowCreateDialog(true); setOpen(false); }}
-            >
-              <UserPlus className="h-4 w-4" />
-              <span className="text-sm">Neuen Kunden anlegen</span>
-            </button>
-          </div>
         </div>
       )}
 
