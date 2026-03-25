@@ -1,0 +1,30 @@
+Category,Name,Time Unit,Price_MAD
+Lessons,Private Lesson,1 Hour,950
+Lessons,Private Lesson,2 Hours,1800
+Lessons,Private Lesson,4 Hours,3400
+Lessons,Private Lesson,Additional Hour,750
+Lessons,Lesson Add-on,1 Hour,850
+Lessons,Lesson Add-on,2 Hours,1600
+Lessons,Lesson Add-on,4 Hours,3050
+Lessons,Lesson Add-on,Additional Hour,700
+Course,Beginner Course Private,9 Hours,7150
+Course,Beginner Course Private,12 Hours,8200
+Course,Beginner Course Semi-Private,9 Hours,6000
+Course,Beginner Course Semi-Private,12 Hours,6850
+Rental,Rental per Person,2 Hours,750
+Rental,Rental per Person,1 Day,1000
+Rental,Rental per Person,1 Week,4100
+Rental,Rental per Person,Additional Day,650
+Rental,Rental Board Only,2 Hours,400
+Rental,Rental Board Only,1 Day,550
+Rental,Rental Board Only,1 Week,2050
+Rental,Rental Board Only,Additional Day,350
+Rental,Rental Kite & Bar,2 Hours,550
+Rental,Rental Kite & Bar,1 Day,750
+Rental,Rental Kite & Bar,1 Week,2850
+Rental,Rental Kite & Bar,Additional Day,450
+Kite Service,Kite Service,1 Day,200
+Kite Service,Kite Service,1 Week,950
+Kite Service,Kite Service,Additional Day,150
+Licence,VDWS Licence,,500
+Licence,Licence Upgrade,,300
