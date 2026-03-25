@@ -1375,6 +1375,22 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
 
   const isLoading = loadingCustomers || loadingBookings;
 
+  const customerBookingInfo = useMemo(() => {
+    const map = new Map<string, { services: string[]; hasUnpaid: boolean }>();
+    for (const b of bookings) {
+      const key = b.customerName.toLowerCase().trim();
+      if (!map.has(key)) map.set(key, { services: [], hasUnpaid: false });
+      const entry = map.get(key)!;
+      if (b.paymentStatus === "unpaid") entry.hasUnpaid = true;
+      for (const item of b.items) {
+        if (!entry.services.includes(item.productName)) {
+          entry.services.push(item.productName);
+        }
+      }
+    }
+    return map;
+  }, [bookings]);
+
   const detailData = useMemo(() => {
     if (!detailView) return null;
     const todayStr = today;
@@ -1472,29 +1488,42 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
           )
         ) : detailData && detailData.length > 0 ? (
           <div className="space-y-2">
-            {detailData.map(c => (
-              <Card key={c.id}>
-                <CardContent className="p-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium text-sm">{c.firstName} {c.lastName}</p>
-                      <p className="text-xs text-muted-foreground">{c.email}</p>
+            {detailData.map(c => {
+              const key = `${c.firstName} ${c.lastName}`.toLowerCase().trim();
+              const info = customerBookingInfo.get(key);
+              const isKww = c.guestType === "KiteWorldWide";
+              return (
+                <Card key={c.id} data-testid={`detail-card-${c.id}`}>
+                  <CardContent className="p-3 space-y-1.5">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium text-sm">{c.firstName} {c.lastName}</p>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${isKww ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"}`}>
+                          {isKww ? "KWW" : "Walk-in"}
+                        </span>
+                        {info && (
+                          <span className={`inline-block h-2 w-2 rounded-full ${info.hasUnpaid ? "bg-red-500" : "bg-green-500"}`} />
+                        )}
+                      </div>
+                      <div className="text-right text-[10px] text-muted-foreground shrink-0">
+                        {c.arrivalDate && c.departureDate && (
+                          <p>{new Date(c.arrivalDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })} – {new Date(c.departureDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })}</p>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right text-xs text-muted-foreground">
-                      {(detailView === "arrivals" && c.arrivalDate) && (
-                        <p>{new Date(c.arrivalDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })}</p>
-                      )}
-                      {(detailView === "departures" && c.departureDate) && (
-                        <p>{new Date(c.departureDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })}</p>
-                      )}
-                      {(detailView !== "arrivals" && detailView !== "departures" && c.arrivalDate && c.departureDate) && (
-                        <p>{new Date(c.arrivalDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })} – {new Date(c.departureDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })}</p>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    {info && info.services.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {info.services.map((s, i) => (
+                          <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{s}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-muted-foreground italic">No services booked</p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No entries.</p>
