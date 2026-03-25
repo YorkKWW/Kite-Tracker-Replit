@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import type { LucideIcon } from "lucide-react";
 import {
-  Receipt, Plus, Trash2, Loader2, FileDown, Mail, Search,
+  Receipt, Plus, Trash2, Loader2, FileDown, Mail, Search, CalendarCheck,
   CheckCircle, CreditCard, Banknote, XCircle, ChevronDown, ChevronUp,
   Users, ShoppingCart, AlertTriangle, Store, UserPlus, X, Pencil, ArrowLeft,
   Calendar, GraduationCap, Waves, Package as PackageIcon, Wind, Wrench as WrenchIcon,
@@ -188,7 +188,7 @@ export default function CenterPage() {
 
   const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { id: "bookings", label: "Bookings", icon: Receipt },
+    { id: "bookings", label: "Bookings", icon: CalendarCheck },
     { id: "customers", label: "Customers", icon: Users },
 
     { id: "sales", label: "Sales", icon: ShoppingCart },
