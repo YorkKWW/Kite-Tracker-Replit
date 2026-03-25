@@ -32,6 +32,7 @@ import {
   MessageSquarePlus,
   ClipboardCheck,
   Receipt,
+  Store,
   MoreHorizontal,
   Bell,
   Eye,
@@ -140,8 +141,10 @@ export default function Layout({ children }: LayoutProps) {
       : []),
     ...(isStationLead ? [
       { href: "/quick-inventory", label: "Quick Inventory", icon: ClipboardCheck },
-      { href: "/customers", label: "Customers", icon: Users },
-      { href: "/bookings", label: "Bookings", icon: Receipt },
+      { href: "/center", label: "Center", icon: Store },
+    ] : []),
+    ...(isAdmin && !isStationLead ? [
+      { href: "/center", label: "Center", icon: Store },
     ] : []),
     ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
@@ -151,6 +154,7 @@ export default function Layout({ children }: LayoutProps) {
   // On desktop: full sidebar navigation (md: breakpoint handles this)
   const stationLeadBottomTabs = [
     { href: "/", label: "Home", icon: LayoutDashboard },
+    { href: "/center", label: "Center", icon: Store },
   ];
 
   const defaultBottomTabs = [
