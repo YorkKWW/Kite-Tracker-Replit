@@ -145,7 +145,7 @@ type TabId = "bookings" | "customers" | "sales" | "incidents";
 type BookingSubTab = "new" | "overview" | "timeline";
 
 function formatPrice(price: string, curr: string) {
-  return `${curr} ${parseFloat(price).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${curr} ${parseFloat(price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default function CenterPage() {
@@ -186,8 +186,8 @@ export default function CenterPage() {
   }
 
   const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
-    { id: "bookings", label: "Buchungen", icon: Receipt },
-    { id: "customers", label: "Kunden", icon: Users },
+    { id: "bookings", label: "Bookings", icon: Receipt },
+    { id: "customers", label: "Customers", icon: Users },
     { id: "sales", label: "Sales", icon: ShoppingCart },
     { id: "incidents", label: "Incidents", icon: AlertTriangle },
   ];
@@ -281,9 +281,9 @@ function BookingsTab({
     <div>
       <div className="flex gap-1 px-4 pt-3 pb-2 bg-muted/30 border-b">
         {([
-          { id: "new" as const, label: "Neue Buchung" },
-          { id: "overview" as const, label: "Übersicht" },
-          { id: "timeline" as const, label: "Zeitplan" },
+          { id: "new" as const, label: "New Booking" },
+          { id: "overview" as const, label: "Overview" },
+          { id: "timeline" as const, label: "Timeline" },
         ]).map(t => (
           <button
             key={t.id}
@@ -393,7 +393,7 @@ function CustomerAutocomplete({
         <Input
           data-testid="input-customer-search"
           className="pl-9"
-          placeholder="Kunde suchen..."
+          placeholder="Search customer..."
           value={query}
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
@@ -424,7 +424,7 @@ function CustomerAutocomplete({
             ))
           ) : (
             <div>
-              <p className="text-sm text-muted-foreground px-3 py-3 text-center">Kein Kunde gefunden</p>
+              <p className="text-sm text-muted-foreground px-3 py-3 text-center">No customer found</p>
               <div className="border-t">
                 <button
                   data-testid="btn-create-new-customer"
@@ -432,7 +432,7 @@ function CustomerAutocomplete({
                   onClick={() => { setShowCreateDialog(true); setOpen(false); }}
                 >
                   <UserPlus className="h-4 w-4" />
-                  <span className="text-sm">Neuen Kunden anlegen</span>
+                  <span className="text-sm">Create new customer</span>
                 </button>
               </div>
             </div>
@@ -483,10 +483,10 @@ function CreateCustomerDialog({
     mutationFn: (data: object) => apiRequest("POST", "/api/school-customers", data).then(r => r.json()),
     onSuccess: (created: SchoolCustomer) => {
       queryClient.invalidateQueries({ queryKey: ["/api/school-customers", schoolConfigId] });
-      toast({ title: "Kunde angelegt" });
+      toast({ title: "Customer created" });
       onCreated(created);
     },
-    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const isValid = firstName.trim() && lastName.trim() && email.trim() && phone.trim() &&
@@ -516,7 +516,7 @@ function CreateCustomerDialog({
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5" /> Neuen Kunden anlegen
+            <UserPlus className="h-5 w-5" /> Create New Customer
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
@@ -613,10 +613,10 @@ function CreateCustomerDialog({
           </div>
         </div>
         <DialogFooter className="pt-2">
-          <Button variant="outline" onClick={onClose}>Abbrechen</Button>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button data-testid="btn-submit-new-customer" disabled={!isValid || createMutation.isPending} onClick={handleSubmit}>
             {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Anlegen
+            Create
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -679,7 +679,7 @@ function ProductTiles({
   }, [products, selectedIds]);
 
   if (grouped.length === 0) {
-    return <p className="text-sm text-muted-foreground text-center py-6">Alle Produkte wurden hinzugefügt</p>;
+    return <p className="text-sm text-muted-foreground text-center py-6">All products have been added</p>;
   }
 
   const tileBg = (cat: string) => CATEGORY_TILE_BG[cat] || CATEGORY_TILE_BG.Other;
@@ -709,7 +709,7 @@ function ProductTiles({
                             className={`text-left border rounded-lg px-2 py-1.5 transition-all active:scale-[0.97] ${tileBg(category)}`}
                           >
                             <p className="text-[11px] font-medium leading-tight truncate">{variantLabel}</p>
-                            <p className="text-[11px] font-bold text-primary">{currency} {parseFloat(product.defaultPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}</p>
+                            <p className="text-[11px] font-bold text-primary">{currency} {parseFloat(product.defaultPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
                           </button>
                         ))}
                       </div>
@@ -726,7 +726,7 @@ function ProductTiles({
                         className={`text-left border rounded-lg px-2 py-1.5 transition-all active:scale-[0.97] ${tileBg(category)}`}
                       >
                         <p className="text-[11px] font-medium leading-tight line-clamp-2">{product.name}</p>
-                        <p className="text-[11px] font-bold text-primary mt-0.5">{currency} {parseFloat(product.defaultPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })}</p>
+                        <p className="text-[11px] font-bold text-primary mt-0.5">{currency} {parseFloat(product.defaultPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
                       </button>
                     ))}
                   </div>
@@ -829,7 +829,7 @@ function NewBookingView({
         })),
       }).then(r => r.json()),
     onSuccess: (booking: Booking) => {
-      toast({ title: `Buchung ${booking.bookingNumber} erstellt` });
+      toast({ title: `Booking ${booking.bookingNumber} created` });
       queryClient.invalidateQueries({ queryKey: ["/api/school-bookings", schoolConfigId] });
       setSelectedCustomerId(null);
       setCustomerName("");
@@ -840,7 +840,7 @@ function NewBookingView({
       setItems([]);
       onCreated();
     },
-    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const canSubmit = selectedCustomerId && customerName.trim() && items.length > 0 && items.every(i => parseFloat(i.unitPrice) > 0);
@@ -850,9 +850,9 @@ function NewBookingView({
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setShowProducts(false)} data-testid="btn-back-from-products">
-            <ArrowLeft className="h-4 w-4 mr-1" /> Zurück
+            <ArrowLeft className="h-4 w-4 mr-1" /> Back
           </Button>
-          <h2 className="text-base font-semibold">Produkt hinzufügen</h2>
+          <h2 className="text-base font-semibold">Add Product</h2>
         </div>
         <ProductTiles
           products={activeProducts}
@@ -863,14 +863,14 @@ function NewBookingView({
         <div className="border-t pt-4">
           {!showCustomItem ? (
             <Button variant="outline" className="w-full" onClick={() => setShowCustomItem(true)} data-testid="btn-show-custom-item">
-              <Plus className="h-4 w-4 mr-1" /> Eigenes Produkt
+              <Plus className="h-4 w-4 mr-1" /> Custom Item
             </Button>
           ) : (
             <div className="space-y-2 border rounded-lg p-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase">Eigenes Produkt</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase">Custom Item</p>
               <Input
                 data-testid="input-custom-name"
-                placeholder="Bezeichnung"
+                placeholder="Description"
                 value={customName}
                 onChange={e => setCustomName(e.target.value)}
               />
@@ -879,12 +879,12 @@ function NewBookingView({
                 type="number"
                 step="0.01"
                 min="0"
-                placeholder={`Preis (${currency})`}
+                placeholder={`Price (${currency})`}
                 value={customPrice}
                 onChange={e => setCustomPrice(e.target.value)}
               />
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowCustomItem(false)}>Abbrechen</Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowCustomItem(false)}>Cancel</Button>
                 <Button
                   size="sm"
                   className="flex-1"
@@ -892,7 +892,7 @@ function NewBookingView({
                   onClick={() => { addCustomItem(); setShowProducts(false); }}
                   data-testid="btn-add-custom-item"
                 >
-                  Hinzufügen
+                  Add
                 </Button>
               </div>
             </div>
@@ -912,7 +912,7 @@ function NewBookingView({
       )}
 
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Kunde</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Customer</p>
         <CustomerAutocomplete
           schoolConfigId={schoolConfigId}
           selectedCustomerId={selectedCustomerId}
@@ -930,15 +930,15 @@ function NewBookingView({
           }}
         />
         {!selectedCustomerId && (
-          <p className="text-xs text-muted-foreground">Suche einen bestehenden Kunden oder lege einen neuen an.</p>
+          <p className="text-xs text-muted-foreground">Search for an existing customer or create a new one.</p>
         )}
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Produkte</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Products</p>
           <Button variant="outline" size="sm" onClick={() => setShowProducts(true)} data-testid="btn-open-product-picker">
-            <Plus className="h-3 w-3 mr-1" /> Hinzufügen
+            <Plus className="h-3 w-3 mr-1" /> Add
           </Button>
         </div>
 
@@ -949,7 +949,7 @@ function NewBookingView({
             data-testid="empty-items-placeholder"
           >
             <Plus className="h-6 w-6 text-muted-foreground mx-auto mb-1" />
-            <p className="text-sm text-muted-foreground">Produkt hinzufügen</p>
+            <p className="text-sm text-muted-foreground">Add a product</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -966,7 +966,7 @@ function NewBookingView({
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <div className="space-y-0.5">
-                    <Label className="text-[10px]">Menge</Label>
+                    <Label className="text-[10px]">Qty</Label>
                     <Input
                       type="number"
                       min="1"
@@ -977,7 +977,7 @@ function NewBookingView({
                     />
                   </div>
                   <div className="space-y-0.5">
-                    <Label className="text-[10px]">Preis ({currency})</Label>
+                    <Label className="text-[10px]">Price ({currency})</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -999,7 +999,7 @@ function NewBookingView({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs">Datum</Label>
+          <Label className="text-xs">Date</Label>
           <Input
             type="date"
             value={bookingDate}
@@ -1008,24 +1008,24 @@ function NewBookingView({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Zahlung</Label>
+          <Label className="text-xs">Payment</Label>
           <Select value={paymentStatus} onValueChange={setPaymentStatus}>
             <SelectTrigger className="h-9" data-testid="select-payment-status">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="unpaid">Offen</SelectItem>
-              <SelectItem value="cash">Bar</SelectItem>
-              <SelectItem value="credit_card">Karte</SelectItem>
+              <SelectItem value="unpaid">Unpaid</SelectItem>
+              <SelectItem value="cash">Cash</SelectItem>
+              <SelectItem value="credit_card">Card</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs">Notizen</Label>
+        <Label className="text-xs">Notes</Label>
         <Textarea
-          placeholder="Optionale Notizen..."
+          placeholder="Optional notes..."
           value={notes}
           onChange={e => setNotes(e.target.value)}
           rows={2}
@@ -1036,7 +1036,7 @@ function NewBookingView({
       {items.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 md:static md:mt-4 bg-background border-t md:border md:rounded-xl p-4 z-40 shadow-lg md:shadow-none">
           <div className="flex justify-between items-center mb-3">
-            <span className="text-sm font-semibold">Gesamt</span>
+            <span className="text-sm font-semibold">Total</span>
             <span className="font-bold text-xl" data-testid="text-booking-total">
               {currency} {totalAmount.toFixed(2)}
             </span>
@@ -1048,7 +1048,7 @@ function NewBookingView({
             data-testid="btn-submit-booking"
           >
             {createMutation.isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-            Buchung erstellen
+            Create Booking
           </Button>
         </div>
       )}
@@ -1104,15 +1104,15 @@ function BookingOverview({
       apiRequest("PATCH", `/api/school-bookings/${id}/payment`, { paymentStatus }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/school-bookings", schoolConfigId] });
-      toast({ title: "Zahlungsstatus aktualisiert" });
+      toast({ title: "Payment status updated" });
     },
-    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const emailMutation = useMutation({
     mutationFn: (id: number) => apiRequest("POST", `/api/school-bookings/${id}/email`),
-    onSuccess: () => toast({ title: "Beleg per E-Mail versendet" }),
-    onError: (e: Error) => toast({ title: "E-Mail fehlgeschlagen", description: e.message, variant: "destructive" }),
+    onSuccess: () => toast({ title: "Receipt sent via email" }),
+    onError: (e: Error) => toast({ title: "Email failed", description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -1121,7 +1121,7 @@ function BookingOverview({
         <div className="relative flex-1 min-w-[160px]">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Suchen..."
+            placeholder="Search..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             className="pl-9"
@@ -1133,10 +1133,10 @@ function BookingOverview({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Alle</SelectItem>
-            <SelectItem value="unpaid">Offen</SelectItem>
-            <SelectItem value="cash">Bar</SelectItem>
-            <SelectItem value="credit_card">Karte</SelectItem>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="unpaid">Unpaid</SelectItem>
+            <SelectItem value="cash">Cash</SelectItem>
+            <SelectItem value="credit_card">Card</SelectItem>
           </SelectContent>
         </Select>
         <Input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="w-32" data-testid="input-filter-date-from" />
@@ -1148,7 +1148,7 @@ function BookingOverview({
       ) : filteredBookings.length === 0 ? (
         <div className="py-12 text-center text-muted-foreground">
           <Receipt className="h-8 w-8 mx-auto opacity-30 mb-2" />
-          <p className="text-sm">{bookings.length === 0 ? "Noch keine Buchungen vorhanden." : "Keine Buchungen gefunden."}</p>
+          <p className="text-sm">{bookings.length === 0 ? "No bookings yet." : "No bookings found."}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -1176,7 +1176,7 @@ function BookingOverview({
                       </div>
                       <p className="text-sm font-medium mt-0.5">{booking.customerName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {booking.items.length} Pos. · {booking.bookingDate || ""}
+                        {booking.items.length} items · {booking.bookingDate || ""}
                         {booking.createdByName && ` · ${booking.createdByName}`}
                       </p>
                     </div>
@@ -1236,20 +1236,20 @@ function BookingDetailDialog({
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-xs text-muted-foreground">Kunde</p>
+              <p className="text-xs text-muted-foreground">Customer</p>
               <p className="font-medium">{booking.customerName}</p>
               {booking.customerEmail && <p className="text-xs text-muted-foreground">{booking.customerEmail}</p>}
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Datum</p>
+              <p className="text-xs text-muted-foreground">Date</p>
               <p className="font-medium">{booking.bookingDate || "—"}</p>
-              {booking.createdByName && <p className="text-xs text-muted-foreground">von {booking.createdByName}</p>}
-              {booking.emailSentAt && <p className="text-xs text-green-600">Versendet {new Date(booking.emailSentAt).toLocaleDateString("de-DE")}</p>}
+              {booking.createdByName && <p className="text-xs text-muted-foreground">by {booking.createdByName}</p>}
+              {booking.emailSentAt && <p className="text-xs text-green-600">Sent {new Date(booking.emailSentAt).toLocaleDateString("en-US")}</p>}
             </div>
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground mb-1">Zahlungsstatus</p>
+            <p className="text-xs text-muted-foreground mb-1">Payment Status</p>
             <div className="flex items-center gap-2">
               <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium ${pay.color}`}>
                 <PayIcon className="h-3.5 w-3.5" />
@@ -1261,9 +1261,9 @@ function BookingDetailDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="unpaid">Offen</SelectItem>
-                    <SelectItem value="cash">Bar</SelectItem>
-                    <SelectItem value="credit_card">Karte</SelectItem>
+                    <SelectItem value="unpaid">Unpaid</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="credit_card">Card</SelectItem>
                   </SelectContent>
                 </Select>
               )}
@@ -1271,7 +1271,7 @@ function BookingDetailDialog({
           </div>
 
           <div>
-            <p className="text-xs text-muted-foreground mb-2">Positionen</p>
+            <p className="text-xs text-muted-foreground mb-2">Items</p>
             <div className="border rounded-lg overflow-hidden">
               {booking.items.map((item, idx) => (
                 <div key={item.id || idx} className={`flex items-center justify-between p-2.5 text-sm ${idx % 2 === 0 ? "bg-muted/30" : ""}`} data-testid={`detail-item-${idx}`}>
@@ -1288,7 +1288,7 @@ function BookingDetailDialog({
                 </div>
               ))}
               <div className="flex items-center justify-between p-3 border-t font-bold">
-                <span>Gesamt</span>
+                <span>Total</span>
                 <span className="text-lg" data-testid="text-detail-total">
                   {booking.currency} {parseFloat(booking.totalAmount).toFixed(2)}
                 </span>
@@ -1298,7 +1298,7 @@ function BookingDetailDialog({
 
           {booking.notes && (
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Notizen</p>
+              <p className="text-xs text-muted-foreground mb-1">Notes</p>
               <p className="text-sm bg-muted/30 rounded p-2">{booking.notes}</p>
             </div>
           )}
@@ -1322,7 +1322,7 @@ function BookingDetailDialog({
                 data-testid="btn-email-receipt"
               >
                 {emailPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Mail className="h-4 w-4 mr-1" />}
-                E-Mail senden
+                Send Email
               </Button>
             )}
           </div>
@@ -1459,7 +1459,7 @@ function BookingTimeline({
 
   function formatDay(d: string) {
     const date = new Date(d + "T12:00:00Z");
-    const dayNames = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     return {
       weekday: dayNames[date.getUTCDay()],
       day: date.getUTCDate(),
@@ -1471,20 +1471,20 @@ function BookingTimeline({
     return (
       <div className="mb-6" data-testid={`timeline-section-${title.toLowerCase()}`}>
         <div className="flex items-center gap-2 px-4 mb-2">
-          {title === "Kurse" ? <GraduationCap className="h-4 w-4 text-blue-600" /> : <Wind className="h-4 w-4 text-orange-600" />}
+          {title === "Courses" ? <GraduationCap className="h-4 w-4 text-blue-600" /> : <Wind className="h-4 w-4 text-orange-600" />}
           <h3 className="text-sm font-semibold">{title}</h3>
           <Badge variant="secondary" className="text-[10px]">{items.length}</Badge>
         </div>
 
         {items.length === 0 ? (
-          <p className="text-xs text-muted-foreground px-4 py-3">Keine Buchungen in diesem Zeitraum</p>
+          <p className="text-xs text-muted-foreground px-4 py-3">No bookings in this period</p>
         ) : (
           <div className="border rounded-lg overflow-hidden mx-2">
-            <div className="overflow-x-auto" ref={title === "Kurse" ? scrollRef : undefined}>
+            <div className="overflow-x-auto" ref={title === "Courses" ? scrollRef : undefined}>
               <div style={{ minWidth: LABEL_W + days.length * DAY_W }}>
                 <div className="flex border-b bg-muted/50 sticky top-0 z-10">
                   <div className="shrink-0 border-r bg-background sticky left-0 z-20 px-2 py-1.5 flex items-center" style={{ width: LABEL_W }}>
-                    <span className="text-[10px] font-semibold text-muted-foreground uppercase">Kunde / Produkt</span>
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase">Customer / Product</span>
                   </div>
                   {days.map(d => {
                     const { weekday, day, month } = formatDay(d);
@@ -1550,10 +1550,10 @@ function BookingTimeline({
     <div className="py-4" data-testid="booking-timeline">
       <div className="px-4 mb-4">
         <p className="text-xs text-muted-foreground">
-          {new Date(startDate + "T12:00:00Z").toLocaleDateString("de-DE", { day: "numeric", month: "short" })} – {new Date(endDate + "T12:00:00Z").toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" })}
+          {new Date(startDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" })} – {new Date(endDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
         </p>
       </div>
-      {renderSection("Kurse", courseItems, "bg-blue-500", "bg-blue-50")}
+      {renderSection("Courses", courseItems, "bg-blue-500", "bg-blue-50")}
       {renderSection("Rental", rentalItems, "bg-orange-500", "bg-orange-50")}
     </div>
   );
@@ -1626,9 +1626,9 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
       queryClient.invalidateQueries({ queryKey: ["/api/school-customers", schoolConfigId] });
       setShowForm(false);
       resetForm();
-      toast({ title: "Kunde registriert" });
+      toast({ title: "Customer registered" });
     },
-    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
@@ -1638,9 +1638,9 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
       queryClient.invalidateQueries({ queryKey: ["/api/school-customers", schoolConfigId] });
       setSelectedCustomer(updated);
       setEditMode(false);
-      toast({ title: "Kunde aktualisiert" });
+      toast({ title: "Customer updated" });
     },
-    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -1648,9 +1648,9 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/school-customers", schoolConfigId] });
       setSelectedCustomer(null);
-      toast({ title: "Kunde gelöscht" });
+      toast({ title: "Customer deleted" });
     },
-    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   function resetForm() {
@@ -1829,7 +1829,7 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
     return (
       <div className="p-4 max-w-2xl mx-auto space-y-4">
         <Button variant="ghost" size="sm" onClick={() => setSelectedCustomer(null)} data-testid="btn-back">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Zurück
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
         <Card>
           <CardContent className="p-4 space-y-4">
@@ -1877,16 +1877,16 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
     return (
       <div className="p-4 max-w-2xl mx-auto space-y-4">
         <Button variant="ghost" size="sm" onClick={() => setEditMode(false)} data-testid="btn-cancel-edit">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Abbrechen
+          <ArrowLeft className="h-4 w-4 mr-1" /> Cancel
         </Button>
         <Card>
           <CardContent className="p-4 space-y-4">
-            <p className="text-lg font-bold">Kunde bearbeiten</p>
+            <p className="text-lg font-bold">Edit Customer</p>
             {formFields}
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setEditMode(false)}>Abbrechen</Button>
+              <Button variant="outline" onClick={() => setEditMode(false)}>Cancel</Button>
               <Button data-testid="btn-save-customer" disabled={!isFormValid || updateMutation.isPending} onClick={handleSubmitEdit}>
-                Speichern
+                Save
               </Button>
             </div>
           </CardContent>
@@ -1898,9 +1898,9 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">{filtered.length} Kunden</p>
+        <p className="text-sm font-semibold">{filtered.length} Customers</p>
         <Button size="sm" onClick={openCreate} data-testid="btn-add-customer">
-          <Plus className="h-4 w-4 mr-1" /> Gast registrieren
+          <Plus className="h-4 w-4 mr-1" /> Register Guest
         </Button>
       </div>
 
@@ -1910,21 +1910,21 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
           <Input
             data-testid="input-search-customers"
             className="pl-9"
-            placeholder="Name oder E-Mail suchen..."
+            placeholder="Search name or email..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-2">
           <Switch checked={activeOnly} onCheckedChange={setActiveOnly} data-testid="toggle-active-only" />
-          <span className="text-xs text-muted-foreground whitespace-nowrap">Aktive</span>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Active</span>
         </div>
       </div>
 
       {isLoading ? (
         <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">{search || activeOnly ? "Keine passenden Kunden." : "Noch keine Kunden registriert."}</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">{search || activeOnly ? "No matching customers." : "No customers registered yet."}</p>
       ) : (
         <div className="space-y-1.5">
           {filtered.map(c => {
@@ -1932,7 +1932,7 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
             const custKey = `${c.firstName} ${c.lastName}`.toLowerCase().trim();
             const custItems = customerBookingsMap.get(custKey) || [];
             const categoryIcons: Record<string, { icon: LucideIcon; color: string; label: string }> = {
-              Course: { icon: GraduationCap, color: "text-blue-600 dark:text-blue-400", label: "Kurs" },
+              Course: { icon: GraduationCap, color: "text-blue-600 dark:text-blue-400", label: "Course" },
               Lesson: { icon: GraduationCap, color: "text-green-600 dark:text-green-400", label: "Lesson" },
               Rental: { icon: Wind, color: "text-orange-600 dark:text-orange-400", label: "Rental" },
               Other: { icon: WrenchIcon, color: "text-gray-600 dark:text-gray-400", label: "Service" },
@@ -1942,8 +1942,8 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
               const cat = item.category;
               categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + item.quantity);
             }
-            const arrFmt = c.arrivalDate ? new Date(c.arrivalDate + "T12:00:00Z").toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : "–";
-            const depFmt = c.departureDate ? new Date(c.departureDate + "T12:00:00Z").toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : "–";
+            const arrFmt = c.arrivalDate ? new Date(c.arrivalDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" }) : "–";
+            const depFmt = c.departureDate ? new Date(c.departureDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" }) : "–";
             return (
               <div
                 key={c.id}
@@ -1995,13 +1995,13 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Gast registrieren</DialogTitle>
+            <DialogTitle>Register Guest</DialogTitle>
           </DialogHeader>
           {formFields}
           <DialogFooter className="pt-2">
-            <Button variant="outline" onClick={() => setShowForm(false)}>Abbrechen</Button>
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
             <Button data-testid="btn-submit-customer" disabled={!isFormValid || createMutation.isPending} onClick={handleSubmitCreate}>
-              Registrieren
+              Register
             </Button>
           </DialogFooter>
         </DialogContent>

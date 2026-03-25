@@ -20,10 +20,10 @@ export default function ForgotPasswordPage() {
     try {
       await apiRequest("POST", "/api/auth/forgot-password", { email });
       setSent(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
-        title: "Fehler",
-        description: "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+        title: "Error",
+        description: "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -39,13 +39,13 @@ export default function ForgotPasswordPage() {
             <Wind className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">KiteTracker</h1>
-          <p className="text-muted-foreground">Passwort zurücksetzen</p>
+          <p className="text-muted-foreground">Reset password</p>
         </div>
 
         <Card>
           <CardHeader className="pb-4">
             <h2 className="text-lg font-semibold text-center">
-              {sent ? "E-Mail gesendet" : "Passwort vergessen?"}
+              {sent ? "Email sent" : "Forgot your password?"}
             </h2>
           </CardHeader>
           <CardContent>
@@ -55,23 +55,23 @@ export default function ForgotPasswordPage() {
                   <CheckCircle className="h-12 w-12 text-green-500" />
                 </div>
                 <p className="text-muted-foreground text-sm">
-                  Falls ein Account mit dieser E-Mail-Adresse existiert, haben wir dir einen Reset-Link geschickt. Bitte prüfe auch deinen Spam-Ordner.
+                  If an account with this email address exists, we have sent you a reset link. Please also check your spam folder.
                 </p>
                 <p className="text-muted-foreground text-sm">
-                  Der Link ist <strong>1 Stunde</strong> gültig.
+                  The link is valid for <strong>1 hour</strong>.
                 </p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Gib deine E-Mail-Adresse ein und wir schicken dir einen Link zum Zurücksetzen deines Passworts.
+                  Enter your email address and we will send you a link to reset your password.
                 </p>
                 <div className="space-y-2">
-                  <Label htmlFor="email">E-Mail</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="du@kitetracker.com"
+                    placeholder="you@kitetracker.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -86,7 +86,7 @@ export default function ForgotPasswordPage() {
                   data-testid="button-send-reset"
                 >
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Reset-Link senden
+                  Send Reset Link
                 </Button>
               </form>
             )}
@@ -96,7 +96,7 @@ export default function ForgotPasswordPage() {
         <div className="text-center">
           <Link href="/login" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" />
-            Zurück zum Login
+            Back to Login
           </Link>
         </div>
       </div>

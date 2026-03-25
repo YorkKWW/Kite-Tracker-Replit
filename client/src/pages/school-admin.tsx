@@ -273,7 +273,7 @@ export default function SchoolAdminPage() {
   }
 
   function formatPrice(price: string, curr: string) {
-    return `${curr} ${parseFloat(price).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+    return `${curr} ${parseFloat(price).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
 
   if (!isAdmin) {
@@ -604,7 +604,7 @@ export default function SchoolAdminPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {selectedConfig?.currency ?? "MAD"} {parseFloat(p.defaultPrice).toLocaleString("de-DE")}
+                          {selectedConfig?.currency ?? "MAD"} {parseFloat(p.defaultPrice).toLocaleString("en-US")}
                         </TableCell>
                       </TableRow>
                     ))}

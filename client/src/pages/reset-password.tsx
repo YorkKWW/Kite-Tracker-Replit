@@ -23,16 +23,16 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     if (password !== confirmPassword) {
       toast({
-        title: "Fehler",
-        description: "Die Passwörter stimmen nicht überein.",
+        title: "Error",
+        description: "Passwords do not match.",
         variant: "destructive",
       });
       return;
     }
     if (password.length < 8) {
       toast({
-        title: "Fehler",
-        description: "Das Passwort muss mindestens 8 Zeichen lang sein.",
+        title: "Error",
+        description: "Password must be at least 8 characters long.",
         variant: "destructive",
       });
       return;
@@ -41,13 +41,13 @@ export default function ResetPasswordPage() {
     try {
       await apiRequest("POST", "/api/auth/reset-password", { token, password });
       setDone(true);
-    } catch (err: any) {
-      const msg = err?.message || "";
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
       toast({
-        title: "Fehler",
+        title: "Error",
         description: msg.includes("Invalid") || msg.includes("expired")
-          ? "Dieser Link ist ungültig oder abgelaufen. Bitte fordere einen neuen an."
-          : "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+          ? "This link is invalid or has expired. Please request a new one."
+          : "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -59,9 +59,9 @@ export default function ResetPasswordPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md text-center space-y-4">
-          <p className="text-muted-foreground">Ungültiger Link. Bitte fordere einen neuen Reset-Link an.</p>
+          <p className="text-muted-foreground">Invalid link. Please request a new reset link.</p>
           <Link href="/forgot-password" className="text-primary hover:underline text-sm">
-            Neuen Link anfordern
+            Request new link
           </Link>
         </div>
       </div>
@@ -76,13 +76,13 @@ export default function ResetPasswordPage() {
             <Wind className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">KiteTracker</h1>
-          <p className="text-muted-foreground">Neues Passwort setzen</p>
+          <p className="text-muted-foreground">Set new password</p>
         </div>
 
         <Card>
           <CardHeader className="pb-4">
             <h2 className="text-lg font-semibold text-center">
-              {done ? "Passwort geändert" : "Neues Passwort eingeben"}
+              {done ? "Password changed" : "Enter new password"}
             </h2>
           </CardHeader>
           <CardContent>
@@ -92,25 +92,25 @@ export default function ResetPasswordPage() {
                   <CheckCircle className="h-12 w-12 text-green-500" />
                 </div>
                 <p className="text-muted-foreground text-sm">
-                  Dein Passwort wurde erfolgreich geändert.
+                  Your password has been changed successfully.
                 </p>
                 <Button
                   className="w-full h-11"
                   onClick={() => navigate("/login")}
                   data-testid="button-goto-login"
                 >
-                  Zum Login
+                  Go to Login
                 </Button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="password">Neues Passwort</Label>
+                  <Label htmlFor="password">New Password</Label>
                   <div className="relative">
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Mindestens 8 Zeichen"
+                      placeholder="At least 8 characters"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -127,11 +127,11 @@ export default function ResetPasswordPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Passwort bestätigen</Label>
+                  <Label htmlFor="confirm-password">Confirm Password</Label>
                   <Input
                     id="confirm-password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Passwort wiederholen"
+                    placeholder="Repeat password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
@@ -146,7 +146,7 @@ export default function ResetPasswordPage() {
                   data-testid="button-set-password"
                 >
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Passwort speichern
+                  Save Password
                 </Button>
               </form>
             )}
@@ -157,7 +157,7 @@ export default function ResetPasswordPage() {
           <div className="text-center">
             <Link href="/login" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-4 w-4" />
-              Zurück zum Login
+              Back to Login
             </Link>
           </div>
         )}

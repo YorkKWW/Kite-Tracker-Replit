@@ -93,7 +93,7 @@ function CommentThread({ feedbackId }: { feedbackId: number }) {
           <div className="flex items-center gap-1.5 mb-0.5">
             <span className="font-semibold">{c.userName}</span>
             <span className="text-muted-foreground">
-              {new Date(c.createdAt).toLocaleDateString("de-DE")} {new Date(c.createdAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+              {new Date(c.createdAt).toLocaleDateString("en-US")} {new Date(c.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
             </span>
           </div>
           <p className="whitespace-pre-wrap">{c.message}</p>
@@ -164,7 +164,7 @@ function FeedbackCard({ item }: { item: FeedbackWithUser }) {
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            {date.toLocaleDateString("de-DE")} {date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+            {date.toLocaleDateString("en-US")} {date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
           </span>
           <span className="flex items-center gap-1">
             <MapPin className="h-3 w-3" />

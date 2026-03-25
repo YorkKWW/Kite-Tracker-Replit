@@ -154,7 +154,7 @@ export default function AccessoriesPage() {
     mutationFn: () =>
       apiRequest("POST", "/api/accessory-transfers", {
         categoryId: parseInt(transferCatId),
-        size: transferSize || "Einheitsgröße",
+        size: transferSize || "One Size",
         quantity: parseInt(transferQty),
         fromStationId: parseInt(transferFrom),
         toStationId: parseInt(transferTo),
@@ -174,7 +174,7 @@ export default function AccessoriesPage() {
       apiRequest("POST", "/api/accessory-loss-reports", {
         categoryId: parseInt(lossCatId),
         stationId: parseInt(lossStationId),
-        size: lossSize || "Einheitsgröße",
+        size: lossSize || "One Size",
         quantity: parseInt(lossQty),
         reason: lossReason,
       }),
@@ -311,13 +311,13 @@ export default function AccessoriesPage() {
                 {transferHistory.map(t => (
                   <div key={t.id} className="flex items-center gap-2 text-sm border-b pb-2 last:border-0" data-testid={`row-transfer-${t.id}`}>
                     <Badge variant="outline" className="shrink-0">{t.categoryName}</Badge>
-                    {t.size !== "Einheitsgröße" && <span className="text-xs text-muted-foreground">{t.size}</span>}
+                    {t.size !== "One Size" && <span className="text-xs text-muted-foreground">{t.size}</span>}
                     <span className="font-medium">×{t.quantity}</span>
                     <span className="text-muted-foreground">{t.fromStationName}</span>
                     <ArrowRightLeft className="h-3 w-3 text-muted-foreground shrink-0" />
                     <span className="text-muted-foreground">{t.toStationName}</span>
                     <span className="text-xs text-muted-foreground ml-auto shrink-0">
-                      {new Date(t.transferredAt).toLocaleDateString("de-DE")}
+                      {new Date(t.transferredAt).toLocaleDateString("en-US")}
                       {t.transferredByName && ` · ${t.transferredByName}`}
                     </span>
                   </div>
@@ -347,12 +347,12 @@ export default function AccessoriesPage() {
                             {r.status === "pending" ? "Pending" : r.status === "approved" ? "Confirmed" : "Rejected"}
                           </Badge>
                           <span className="font-medium">{r.categoryName}</span>
-                          {r.size !== "Einheitsgröße" && <span className="text-muted-foreground">{r.size}</span>}
+                          {r.size !== "One Size" && <span className="text-muted-foreground">{r.size}</span>}
                           <span className="font-medium">×{r.quantity}</span>
                         </div>
                         <p className="text-muted-foreground">{r.stationName} · {r.reason}</p>
                         <p className="text-xs text-muted-foreground">
-                          Reported by {r.reportedByName} on {new Date(r.reportedAt).toLocaleDateString("de-DE")}
+                          Reported by {r.reportedByName} on {new Date(r.reportedAt).toLocaleDateString("en-US")}
                           {r.resolvedByName && ` · Resolved by ${r.resolvedByName}`}
                         </p>
                         {r.adminNote && <p className="text-xs italic">Admin: {r.adminNote}</p>}
@@ -444,7 +444,7 @@ export default function AccessoriesPage() {
                 if (cat.hasSizes) {
                   return sum + ACCESSORY_SIZES.reduce((s, sz) => s + getQty(cat.id, station.id, sz), 0);
                 }
-                return sum + getQty(cat.id, station.id, "Einheitsgröße");
+                return sum + getQty(cat.id, station.id, "One Size");
               }, 0);
 
               return (
@@ -507,7 +507,7 @@ export default function AccessoriesPage() {
                                 </tr>
                               );
                             } else {
-                              const qty = getQty(cat.id, station.id, "Einheitsgröße");
+                              const qty = getQty(cat.id, station.id, "One Size");
                               return (
                                 <tr key={cat.id} className="border-b last:border-0" data-testid={`row-category-${cat.id}-station-${station.id}`}>
                                   <td className="py-2 pr-2 font-medium">{cat.name}</td>
@@ -516,7 +516,7 @@ export default function AccessoriesPage() {
                                       <div className="flex items-center justify-center gap-1">
                                         <button
                                           className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                                          onClick={() => adjustQty(cat.id, station.id, "Einheitsgröße", -1)}
+                                          onClick={() => adjustQty(cat.id, station.id, "One Size", -1)}
                                           disabled={qty <= 0}
                                           data-testid={`button-minus-${cat.id}-${station.id}-one`}
                                         >
@@ -525,7 +525,7 @@ export default function AccessoriesPage() {
                                         <span className="w-8 text-center font-medium" data-testid={`text-qty-${cat.id}-${station.id}-one`}>{qty}</span>
                                         <button
                                           className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                                          onClick={() => adjustQty(cat.id, station.id, "Einheitsgröße", 1)}
+                                          onClick={() => adjustQty(cat.id, station.id, "One Size", 1)}
                                           data-testid={`button-plus-${cat.id}-${station.id}-one`}
                                         >
                                           <Plus className="h-3 w-3" />

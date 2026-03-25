@@ -53,8 +53,8 @@ type DamageReport = {
 
 function formatDate(ts: string | null) {
   if (!ts) return "–";
-  return new Date(ts).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) +
-    " " + new Date(ts).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return new Date(ts).toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+    " " + new Date(ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 }
 
 function StatusPill({ status }: { status: string }) {

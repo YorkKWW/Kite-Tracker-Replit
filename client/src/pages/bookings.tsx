@@ -163,7 +163,7 @@ export default function BookingsPage() {
   });
 
   function formatPrice(price: string, curr: string) {
-    return `${curr} ${parseFloat(price).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${curr} ${parseFloat(price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
   if (!isAdmin && !isStationLead) {
@@ -674,7 +674,7 @@ function BookingDetailDialog({
               <p className="text-xs text-muted-foreground">Booking Date</p>
               <p className="font-medium">{booking.bookingDate || "—"}</p>
               {booking.createdByName && <p className="text-xs text-muted-foreground">by {booking.createdByName}</p>}
-              {booking.emailSentAt && <p className="text-xs text-green-600">Emailed {new Date(booking.emailSentAt).toLocaleDateString("de-DE")}</p>}
+              {booking.emailSentAt && <p className="text-xs text-green-600">Emailed {new Date(booking.emailSentAt).toLocaleDateString("en-US")}</p>}
             </div>
           </div>
 
