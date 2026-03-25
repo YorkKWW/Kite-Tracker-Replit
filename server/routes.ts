@@ -3778,11 +3778,14 @@ export async function registerRoutes(
 
   app.get("/api/school-bookings/detail/:id", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid booking ID" });
       const booking = await storage.getSchoolBooking(id);
       if (!booking) return res.status(404).json({ message: "Not found" });
-      const user = req.user as any;
       if (user.role === "station_lead") {
         const config = await storage.getSchoolConfig(booking.schoolConfigId);
         if (!config || config.stationId !== user.assignedStationId) {
@@ -3797,11 +3800,14 @@ export async function registerRoutes(
 
   app.get("/api/school-bookings/next-number/:schoolConfigId", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const schoolConfigId = parseInt(req.params.schoolConfigId);
       if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid school config ID" });
       const config = await storage.getSchoolConfig(schoolConfigId);
       if (!config) return res.status(404).json({ message: "School config not found" });
-      const user = req.user as any;
       if (user.role === "station_lead" && config.stationId !== user.assignedStationId) {
         return res.status(403).json({ message: "Access denied" });
       }
@@ -3816,9 +3822,12 @@ export async function registerRoutes(
 
   app.get("/api/school-bookings/:schoolConfigId", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const schoolConfigId = parseInt(req.params.schoolConfigId);
       if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid school config ID" });
-      const user = req.user as any;
       if (user.role === "station_lead") {
         const config = await storage.getSchoolConfig(schoolConfigId);
         if (!config || config.stationId !== user.assignedStationId) {
@@ -3835,7 +3844,7 @@ export async function registerRoutes(
   app.post("/api/school-bookings", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
-      if (user.role !== "admin" && user.role !== "manager" && user.role !== "station_lead") {
+      if (user.role !== "admin" && user.role !== "station_lead") {
         return res.status(403).json({ message: "Only admin or center manager can create bookings" });
       }
       const { schoolConfigId, customerId, customerName, customerEmail, bookingDate, paymentStatus, notes, items, currency } = req.body;
@@ -3901,7 +3910,7 @@ export async function registerRoutes(
   app.patch("/api/school-bookings/:id/payment", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
-      if (user.role !== "admin" && user.role !== "manager" && user.role !== "station_lead") {
+      if (user.role !== "admin" && user.role !== "station_lead") {
         return res.status(403).json({ message: "Access denied" });
       }
       const id = parseInt(req.params.id);
@@ -3931,10 +3940,13 @@ export async function registerRoutes(
 
   app.get("/api/school-bookings/:id/pdf", requireAuth, async (req, res) => {
     try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const id = parseInt(req.params.id);
       const booking = await storage.getSchoolBooking(id);
       if (!booking) return res.status(404).json({ message: "Not found" });
-      const user = req.user as any;
       const config = await storage.getSchoolConfig(booking.schoolConfigId);
       if (!config) return res.status(404).json({ message: "School config not found" });
       if (user.role === "station_lead" && config.stationId !== user.assignedStationId) {
@@ -4024,7 +4036,7 @@ export async function registerRoutes(
   app.post("/api/school-bookings/:id/email", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
-      if (user.role !== "admin" && user.role !== "manager" && user.role !== "station_lead") {
+      if (user.role !== "admin" && user.role !== "station_lead") {
         return res.status(403).json({ message: "Access denied" });
       }
       const id = parseInt(req.params.id);
