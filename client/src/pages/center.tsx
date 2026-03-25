@@ -1586,6 +1586,20 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
     queryKey: ["/api/school-customers", schoolConfigId],
   });
 
+  const { data: bookings = [] } = useQuery<Booking[]>({
+    queryKey: ["/api/school-bookings", schoolConfigId],
+  });
+
+  const customerBookingsMap = useMemo(() => {
+    const map = new Map<string, BookingItem[]>();
+    for (const b of bookings) {
+      const key = b.customerName.toLowerCase().trim();
+      const existing = map.get(key) || [];
+      map.set(key, [...existing, ...b.items]);
+    }
+    return map;
+  }, [bookings]);
+
   function isCurrentlyHere(arrival: string, departure: string): boolean {
     const today = new Date().toISOString().slice(0, 10);
     return arrival <= today && today <= departure;
@@ -1912,27 +1926,64 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
       ) : filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">{search || activeOnly ? "Keine passenden Kunden." : "Noch keine Kunden registriert."}</p>
       ) : (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           {filtered.map(c => {
             const here = isCurrentlyHere(c.arrivalDate, c.departureDate);
+            const custKey = `${c.firstName} ${c.lastName}`.toLowerCase().trim();
+            const custItems = customerBookingsMap.get(custKey) || [];
+            const categoryIcons: Record<string, { icon: LucideIcon; color: string; label: string }> = {
+              Course: { icon: GraduationCap, color: "text-blue-600 dark:text-blue-400", label: "Kurs" },
+              Lesson: { icon: GraduationCap, color: "text-green-600 dark:text-green-400", label: "Lesson" },
+              Rental: { icon: Wind, color: "text-orange-600 dark:text-orange-400", label: "Rental" },
+              Other: { icon: WrenchIcon, color: "text-gray-600 dark:text-gray-400", label: "Service" },
+            };
+            const categoryCounts = new Map<string, number>();
+            for (const item of custItems) {
+              const cat = item.category;
+              categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + item.quantity);
+            }
+            const arrFmt = c.arrivalDate ? new Date(c.arrivalDate + "T12:00:00Z").toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : "–";
+            const depFmt = c.departureDate ? new Date(c.departureDate + "T12:00:00Z").toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : "–";
             return (
               <div
                 key={c.id}
                 data-testid={`row-customer-${c.id}`}
                 onClick={() => { setSelectedCustomer(c); setEditMode(false); }}
-                className="flex items-center gap-3 px-3 py-3 rounded-lg border bg-card hover:bg-accent/30 cursor-pointer transition-colors"
+                className="px-3 py-2.5 rounded-lg border bg-card hover:bg-accent/30 cursor-pointer transition-colors"
               >
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{c.firstName} {c.lastName}</p>
-                  <p className="text-xs text-muted-foreground truncate">{c.email}</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{c.firstName} {c.lastName}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                        <Calendar className="h-3 w-3" />
+                        {arrFmt} → {depFmt}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Badge variant={c.guestType === "KiteWorldWide" ? "default" : "secondary"} className="text-[10px]">
+                      {c.guestType === "KiteWorldWide" ? "KWW" : "Walk-in"}
+                    </Badge>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${KITE_LEVEL_COLORS[c.kiteLevel]}`}>{c.kiteLevel}</span>
+                    {here && <Badge variant="outline" className="text-[10px] text-green-700 border-green-300 bg-green-50 dark:bg-green-900/20 dark:text-green-400">Here</Badge>}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Badge variant={c.guestType === "KiteWorldWide" ? "default" : "secondary"} className="text-[10px]">
-                    {c.guestType === "KiteWorldWide" ? "KWW" : "Walk-in"}
-                  </Badge>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${KITE_LEVEL_COLORS[c.kiteLevel]}`}>{c.kiteLevel}</span>
-                  {here && <Badge variant="outline" className="text-[10px] text-green-700 border-green-300 bg-green-50 dark:bg-green-900/20 dark:text-green-400">Here</Badge>}
-                </div>
+                {categoryCounts.size > 0 && (
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    {Array.from(categoryCounts.entries()).map(([cat, count]) => {
+                      const info = categoryIcons[cat] || categoryIcons.Other;
+                      const Icon = info.icon;
+                      return (
+                        <span key={cat} className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${info.color}`} title={info.label}>
+                          <Icon className="h-3 w-3" />
+                          {count > 1 ? `×${count}` : ""}
+                          <span className="text-muted-foreground">{info.label}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
