@@ -233,6 +233,7 @@ export interface IStorage {
   getSchoolProducts(schoolConfigId: number): Promise<SchoolProduct[]>;
   createSchoolProduct(product: InsertSchoolProduct): Promise<SchoolProduct>;
   updateSchoolProduct(id: number, data: Partial<InsertSchoolProduct>): Promise<SchoolProduct | undefined>;
+  bulkImportSchoolProducts(schoolConfigId: number, products: Omit<InsertSchoolProduct, "schoolConfigId">[], replaceExisting: boolean): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1576,6 +1577,20 @@ export class DatabaseStorage implements IStorage {
   async updateSchoolProduct(id: number, data: Partial<InsertSchoolProduct>): Promise<SchoolProduct | undefined> {
     const [updated] = await db.update(schoolProducts).set(data).where(eq(schoolProducts.id, id)).returning();
     return updated;
+  }
+
+  async bulkImportSchoolProducts(schoolConfigId: number, products: Omit<InsertSchoolProduct, "schoolConfigId">[], replaceExisting: boolean): Promise<number> {
+    return db.transaction(async (tx) => {
+      if (replaceExisting) {
+        await tx.delete(schoolProducts).where(eq(schoolProducts.schoolConfigId, schoolConfigId));
+      }
+      let count = 0;
+      for (const p of products) {
+        await tx.insert(schoolProducts).values({ ...p, schoolConfigId });
+        count++;
+      }
+      return count;
+    });
   }
 
   // ─── School Customers ─────────────────────────────────────────────────────────

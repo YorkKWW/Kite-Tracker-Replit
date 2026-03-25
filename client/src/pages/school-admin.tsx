@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { GraduationCap, Plus, Pencil, Building2, BookOpen } from "lucide-react";
+import { GraduationCap, Plus, Pencil, Building2, BookOpen, Upload, Download } from "lucide-react";
 import type { Station } from "@shared/schema";
 
 const CURRENCIES = ["MAD", "EUR", "BRL"] as const;
@@ -59,6 +59,10 @@ export default function SchoolAdminPage() {
   const [editConfigId, setEditConfigId] = useState<number | null>(null);
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [editProduct, setEditProduct] = useState<SchoolProduct | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importPreview, setImportPreview] = useState<Array<{ name: string; category: string; defaultPrice: string; sortOrder: number }>>([]);
+  const [importReplace, setImportReplace] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   // School config form state
   const [schoolName, setSchoolName] = useState("");
@@ -125,6 +129,115 @@ export default function SchoolAdminPage() {
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
+
+  const importProductsMutation = useMutation({
+    mutationFn: (data: object) => apiRequest("POST", "/api/school-products/import", data),
+    onSuccess: (_, variables: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/school-products", selectedSchoolId] });
+      setShowImportDialog(false);
+      setImportPreview([]);
+      setImportReplace(false);
+      toast({ title: `${(variables as any).products?.length ?? 0} products imported` });
+    },
+    onError: (e: any) => toast({ title: "Import failed", description: e.message, variant: "destructive" }),
+  });
+
+  const CATEGORY_MAP: Record<string, string> = {
+    course: "Course", lesson: "Lesson", package: "Package", rental: "Rental",
+    other: "Other", "kite service": "Other", licence: "Other", license: "Other",
+  };
+
+  function parseCSVLine(line: string): string[] {
+    const fields: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (i + 1 < line.length && line[i + 1] === '"') { current += '"'; i++; }
+          else { inQuotes = false; }
+        } else { current += ch; }
+      } else {
+        if (ch === '"') { inQuotes = true; }
+        else if (ch === ",") { fields.push(current.trim()); current = ""; }
+        else { current += ch; }
+      }
+    }
+    fields.push(current.trim());
+    return fields;
+  }
+
+  function parseCSV(text: string) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) { setImportError("CSV must have a header row and at least one data row."); return; }
+    const headerCols = parseCSVLine(lines[0]).map(h => h.toLowerCase());
+    const hasCategory = headerCols.some(h => h.includes("category"));
+    const hasName = headerCols.some(h => h.includes("name"));
+    if (!hasName) { setImportError("CSV must have a 'Name' column."); return; }
+
+    const rows: typeof importPreview = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i]);
+      if (cols.length < 2 || !cols[0]) continue;
+
+      let name: string, category: string, price: string;
+      if (hasCategory) {
+        category = CATEGORY_MAP[(cols[0] || "").toLowerCase()] || "Other";
+        name = cols[1] || "";
+        price = (cols.find((_, idx) => idx >= 2 && !isNaN(parseFloat(cols[idx]))) || "0").replace(/[^\d.]/g, "");
+      } else {
+        name = cols[0] || "";
+        category = "Other";
+        price = (cols.find((_, idx) => idx >= 1 && !isNaN(parseFloat(cols[idx]))) || "0").replace(/[^\d.]/g, "");
+      }
+
+      if (name) {
+        rows.push({ name, category, defaultPrice: price || "0", sortOrder: i });
+      }
+    }
+    if (rows.length === 0) { setImportError("No valid rows found in CSV."); return; }
+    setImportError(null);
+    setImportPreview(rows);
+    setShowImportDialog(true);
+  }
+
+  function handleCSVFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => parseCSV(reader.result as string);
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  function downloadCSVTemplate() {
+    const header = "Category,Name,Time Unit,Price\n";
+    const example = "Course,Beginner Course – 9 Hours,9h,7150\nLesson,Private Lesson – 1 Hour,1h,950\nRental,Full Set – 1 Day,1 day,1000\n";
+    const blob = new Blob([header + example], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "school-products-template.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function csvEscape(val: string) {
+    if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+      return `"${val.replace(/"/g, '""')}"`;
+    }
+    return val;
+  }
+
+  function exportProductsCSV() {
+    if (!products.length || !selectedConfig) return;
+    const header = "Category,Name,Price\n";
+    const rows = products.map(p => `${csvEscape(p.category)},${csvEscape(p.name)},${p.defaultPrice}`).join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${selectedConfig.schoolName.replace(/\s+/g, "-")}-products.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function resetProductForm() {
     setProdName(""); setProdDesc(""); setProdCategory("Course");
@@ -265,9 +378,23 @@ export default function SchoolAdminPage() {
               Product Catalog
             </CardTitle>
             {selectedSchoolId && isAdmin && (
-              <Button size="sm" data-testid="btn-add-product" onClick={openAddProduct}>
-                <Plus className="h-3 w-3 mr-1" /> Add Product
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" data-testid="btn-export-csv" onClick={exportProductsCSV} disabled={!products.length}>
+                  <Download className="h-3 w-3 mr-1" /> Export
+                </Button>
+                <Button variant="outline" size="sm" data-testid="btn-download-template" onClick={downloadCSVTemplate}>
+                  <Download className="h-3 w-3 mr-1" /> Template
+                </Button>
+                <label>
+                  <input type="file" accept=".csv" className="hidden" onChange={handleCSVFile} data-testid="input-csv-import" />
+                  <Button variant="outline" size="sm" asChild data-testid="btn-import-csv">
+                    <span><Upload className="h-3 w-3 mr-1" /> Import CSV</span>
+                  </Button>
+                </label>
+                <Button size="sm" data-testid="btn-add-product" onClick={openAddProduct}>
+                  <Plus className="h-3 w-3 mr-1" /> Add
+                </Button>
+              </div>
             )}
           </div>
         </CardHeader>
@@ -440,6 +567,68 @@ export default function SchoolAdminPage() {
               })}
             >
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CSV Import Preview Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={open => { if (!open) { setShowImportDialog(false); setImportPreview([]); setImportError(null); } }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Preview — {importPreview.length} products</DialogTitle>
+          </DialogHeader>
+          {importError && (
+            <p className="text-sm text-destructive py-2">{importError}</p>
+          )}
+          {importPreview.length > 0 && (
+            <>
+              <div className="rounded-md border overflow-hidden max-h-60 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>#</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Price</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importPreview.map((p, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell className="font-medium text-sm">{p.name}</TableCell>
+                        <TableCell>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[p.category] ?? ""}`}>
+                            {p.category}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {selectedConfig?.currency ?? "MAD"} {parseFloat(p.defaultPrice).toLocaleString("de-DE")}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex items-center gap-2 py-2">
+                <Switch checked={importReplace} onCheckedChange={setImportReplace} data-testid="toggle-import-replace" />
+                <Label className="text-sm">Replace all existing products (delete current list first)</Label>
+              </div>
+            </>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowImportDialog(false); setImportPreview([]); }}>Cancel</Button>
+            <Button
+              data-testid="btn-confirm-import"
+              disabled={!importPreview.length || importProductsMutation.isPending}
+              onClick={() => importProductsMutation.mutate({
+                schoolConfigId: selectedSchoolId!,
+                replaceExisting: importReplace,
+                products: importPreview,
+              })}
+            >
+              {importProductsMutation.isPending ? "Importing..." : `Import ${importPreview.length} Products`}
             </Button>
           </DialogFooter>
         </DialogContent>

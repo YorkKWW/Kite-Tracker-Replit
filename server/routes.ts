@@ -3433,9 +3433,9 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.get("/api/school-products", requireAuth, async (req, res) => {
-    const schoolConfigId = req.query.schoolConfigId ? parseInt(req.query.schoolConfigId as string) : undefined;
-    if (!schoolConfigId) return res.status(400).json({ message: "schoolConfigId required" });
+  app.get("/api/school-products/:schoolConfigId", requireAuth, async (req, res) => {
+    const schoolConfigId = parseInt(req.params.schoolConfigId);
+    if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid schoolConfigId" });
     const products = await storage.getSchoolProducts(schoolConfigId);
     res.json(products);
   });
@@ -3455,6 +3455,33 @@ export async function registerRoutes(
     try {
       const product = await storage.createSchoolProduct(parsed.data);
       res.json(product);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/school-products/import", requireAdmin, async (req, res) => {
+    const schema = z.object({
+      schoolConfigId: z.number().int().positive(),
+      replaceExisting: z.boolean().default(false),
+      products: z.array(z.object({
+        name: z.string().min(1),
+        description: z.string().nullable().optional(),
+        category: z.enum(["Course", "Lesson", "Package", "Rental", "Other"]),
+        defaultPrice: z.union([z.string(), z.number()]).transform(v => String(v)),
+        isActive: z.boolean().default(true),
+        sortOrder: z.number().int().default(0),
+      })),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
+    try {
+      const count = await storage.bulkImportSchoolProducts(
+        parsed.data.schoolConfigId,
+        parsed.data.products,
+        parsed.data.replaceExisting,
+      );
+      res.json({ imported: count });
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }

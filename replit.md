@@ -158,6 +158,16 @@ Quantity-based inventory managed per station (not individual items like equipmen
 - Activity logging
 - Role-based access control (financial data hidden from managers)
 
+## School Module
+- **School Configs**: Per-station school setup with name, currency (MAD/EUR/BRL), active flag
+- **Product Catalog**: Course, Lesson, Package, Rental, Other categories with per-school pricing
+- **CSV Import/Export**: RFC4180-compliant parser supporting quoted fields, embedded commas. Import preview with category auto-mapping (Kite Service/Licence → Other). Option to replace or append. Export current products. Download CSV template.
+- **Bulk Import Endpoint**: `POST /api/school-products/import` — accepts array of products + replaceExisting flag, atomic transaction
+- **DB Tables**: `school_configs`, `school_products`
+- **Routes**: `GET /api/school-configs`, `POST /api/school-configs`, `PATCH /api/school-configs/:id`, `GET /api/school-products/:schoolConfigId`, `POST /api/school-products`, `POST /api/school-products/import`, `PATCH /api/school-products/:id`
+- **UI**: `/school-admin` page (admin only)
+- **Current Data**: Dakhla = schoolConfigId 1, 29 products in MAD
+
 ## Customer Management
 - **DB Table**: `school_customers` with `guest_type` enum (`KiteWorldWide` | `Walk-in`)
 - **Guest Types**: KiteWorldWide = pre-booked via ERP (future auto-import), Walk-in = direct booking billed on-site
