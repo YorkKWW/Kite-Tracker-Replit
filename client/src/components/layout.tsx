@@ -552,7 +552,7 @@ export default function Layout({ children }: LayoutProps) {
             <Link key={item.href} href={item.href}>
               <Button
                 variant={isActive(item.href) ? "secondary" : "ghost"}
-                className="w-full justify-start gap-3 relative"
+                className={cn("w-full justify-start gap-3 relative", item.indent && "pl-8 text-muted-foreground")}
                 onClick={() => setMobileMenuOpen(false)}
                 data-testid={`link-mobile-nav-${item.label.toLowerCase()}`}
               >
