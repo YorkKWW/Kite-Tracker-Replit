@@ -88,9 +88,7 @@ export default function LoginPage() {
                 Sign in
               </Button>
               <div className="text-center">
-                <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-forgot-password">
-                  Passwort vergessen?
-                </Link>
+                <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-forgot-password">Forgot your Password?</Link>
               </div>
             </form>
           </CardContent>
