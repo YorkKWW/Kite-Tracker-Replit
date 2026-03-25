@@ -19,6 +19,7 @@ import {
   CheckCircle, CreditCard, Banknote, XCircle, ChevronDown, ChevronUp,
   Users, ShoppingCart, AlertTriangle, Store, UserPlus, X, Pencil, ArrowLeft,
   Calendar, GraduationCap, Waves, Package as PackageIcon, Wind, Wrench as WrenchIcon,
+  BarChart3, ArrowUpRight, ArrowDownRight, TrendingUp, CircleDot,
 } from "lucide-react";
 import type { SchoolCustomer } from "@shared/schema";
 import SalesPage from "./sales";
@@ -141,8 +142,8 @@ const COUNTRIES = [
   "Zambia","Zimbabwe",
 ];
 
-type TabId = "bookings" | "customers" | "sales" | "incidents";
-type BookingSubTab = "new" | "overview" | "timeline";
+type TabId = "customers" | "bookings" | "forecast" | "sales" | "incidents";
+type BookingSubTab = "new" | "timeline";
 
 function formatPrice(price: string, curr: string) {
   return `${curr} ${parseFloat(price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -151,7 +152,7 @@ function formatPrice(price: string, curr: string) {
 export default function CenterPage() {
   const { user, isAdmin, isStationLead, isSimulating, simStationId } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<TabId>("bookings");
+  const [activeTab, setActiveTab] = useState<TabId>("customers");
   const [bookingSubTab, setBookingSubTab] = useState<BookingSubTab>("new");
   const [selectedSchoolId, setSelectedSchoolId] = useState<number | null>(null);
   const [schoolResolved, setSchoolResolved] = useState(false);
@@ -186,8 +187,9 @@ export default function CenterPage() {
   }
 
   const tabs: { id: TabId; label: string; icon: LucideIcon }[] = [
-    { id: "bookings", label: "Bookings", icon: Receipt },
     { id: "customers", label: "Customers", icon: Users },
+    { id: "bookings", label: "Bookings", icon: Receipt },
+    { id: "forecast", label: "Forecast", icon: BarChart3 },
     { id: "sales", label: "Sales", icon: ShoppingCart },
     { id: "incidents", label: "Incidents", icon: AlertTriangle },
   ];
@@ -243,6 +245,12 @@ export default function CenterPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {activeTab === "customers" && selectedSchoolId && selectedConfig && (
+          <CustomersTab schoolConfigId={selectedSchoolId} currency={selectedConfig.currency} />
+        )}
+        {activeTab === "customers" && !selectedSchoolId && (
+          <div className="p-8 text-center text-muted-foreground">Select a school to manage customers.</div>
+        )}
         {activeTab === "bookings" && selectedSchoolId && selectedConfig && (
           <BookingsTab
             schoolConfigId={selectedSchoolId}
@@ -256,11 +264,11 @@ export default function CenterPage() {
             {configsLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto" /> : "Select a school to manage bookings."}
           </div>
         )}
-        {activeTab === "customers" && selectedSchoolId && (
-          <CustomersTab schoolConfigId={selectedSchoolId} />
+        {activeTab === "forecast" && selectedSchoolId && selectedConfig && (
+          <ForecastTab schoolConfigId={selectedSchoolId} currency={selectedConfig.currency} />
         )}
-        {activeTab === "customers" && !selectedSchoolId && (
-          <div className="p-8 text-center text-muted-foreground">Select a school to manage customers.</div>
+        {activeTab === "forecast" && !selectedSchoolId && (
+          <div className="p-8 text-center text-muted-foreground">Select a school to view forecast.</div>
         )}
         {activeTab === "sales" && <SalesPage />}
         {activeTab === "incidents" && <IncidentsPage />}
@@ -282,7 +290,6 @@ function BookingsTab({
       <div className="flex gap-1 px-4 pt-3 pb-2 bg-muted/30 border-b">
         {([
           { id: "new" as const, label: "New Booking" },
-          { id: "overview" as const, label: "Overview" },
           { id: "timeline" as const, label: "Timeline" },
         ]).map(t => (
           <button
@@ -304,11 +311,8 @@ function BookingsTab({
         <NewBookingView
           schoolConfigId={schoolConfigId}
           currency={currency}
-          onCreated={() => onSubTabChange("overview")}
+          onCreated={() => onSubTabChange("timeline")}
         />
-      )}
-      {subTab === "overview" && (
-        <BookingOverview schoolConfigId={schoolConfigId} currency={currency} />
       )}
       {subTab === "timeline" && (
         <BookingTimeline schoolConfigId={schoolConfigId} currency={currency} />
@@ -1056,282 +1060,6 @@ function NewBookingView({
   );
 }
 
-function BookingOverview({
-  schoolConfigId, currency,
-}: {
-  schoolConfigId: number;
-  currency: string;
-}) {
-  const { isAdmin, isStationLead } = useAuth();
-  const { toast } = useToast();
-  const canEdit = isAdmin || isStationLead;
-
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterPayment, setFilterPayment] = useState("all");
-  const [filterDateFrom, setFilterDateFrom] = useState("");
-  const [filterDateTo, setFilterDateTo] = useState("");
-  const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
-
-  const { data: bookings = [], isLoading } = useQuery<Booking[]>({
-    queryKey: ["/api/school-bookings", schoolConfigId],
-    staleTime: 0,
-  });
-
-  const filteredBookings = useMemo(() => {
-    let result = bookings;
-    if (filterPayment !== "all") {
-      result = result.filter(b => b.paymentStatus === filterPayment);
-    }
-    if (filterDateFrom) {
-      result = result.filter(b => b.bookingDate >= filterDateFrom);
-    }
-    if (filterDateTo) {
-      result = result.filter(b => b.bookingDate <= filterDateTo);
-    }
-    if (searchTerm) {
-      const s = searchTerm.toLowerCase();
-      result = result.filter(b =>
-        b.bookingNumber.toLowerCase().includes(s) ||
-        b.customerName.toLowerCase().includes(s) ||
-        (b.customerEmail || "").toLowerCase().includes(s)
-      );
-    }
-    return result;
-  }, [bookings, filterPayment, filterDateFrom, filterDateTo, searchTerm]);
-
-  const paymentUpdateMutation = useMutation({
-    mutationFn: ({ id, paymentStatus }: { id: number; paymentStatus: string }) =>
-      apiRequest("PATCH", `/api/school-bookings/${id}/payment`, { paymentStatus }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/school-bookings", schoolConfigId] });
-      toast({ title: "Payment status updated" });
-    },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const emailMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("POST", `/api/school-bookings/${id}/email`),
-    onSuccess: () => toast({ title: "Receipt sent via email" }),
-    onError: (e: Error) => toast({ title: "Email failed", description: e.message, variant: "destructive" }),
-  });
-
-  return (
-    <div className="p-4 space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[160px]">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="pl-9"
-            data-testid="input-search-bookings"
-          />
-        </div>
-        <Select value={filterPayment} onValueChange={setFilterPayment}>
-          <SelectTrigger className="w-32" data-testid="select-filter-payment">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="unpaid">Unpaid</SelectItem>
-            <SelectItem value="cash">Cash</SelectItem>
-            <SelectItem value="credit_card">Card</SelectItem>
-          </SelectContent>
-        </Select>
-        <Input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="w-32" data-testid="input-filter-date-from" />
-        <Input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="w-32" data-testid="input-filter-date-to" />
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}</div>
-      ) : filteredBookings.length === 0 ? (
-        <div className="py-12 text-center text-muted-foreground">
-          <Receipt className="h-8 w-8 mx-auto opacity-30 mb-2" />
-          <p className="text-sm">{bookings.length === 0 ? "No bookings yet." : "No bookings found."}</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filteredBookings.map(booking => {
-            const pay = PAYMENT_LABELS[booking.paymentStatus];
-            const PayIcon = pay.icon;
-            return (
-              <Card
-                key={booking.id}
-                data-testid={`card-booking-${booking.id}`}
-                className="cursor-pointer hover:border-primary/30 transition-colors"
-                onClick={() => setDetailBooking(booking)}
-              >
-                <CardContent className="p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono font-bold text-sm text-primary" data-testid={`text-booking-number-${booking.id}`}>
-                          {booking.bookingNumber}
-                        </span>
-                        <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${pay.color}`}>
-                          <PayIcon className="h-3 w-3" />
-                          {pay.label}
-                        </span>
-                      </div>
-                      <p className="text-sm font-medium mt-0.5">{booking.customerName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {booking.items.length} items · {booking.bookingDate || ""}
-                        {booking.createdByName && ` · ${booking.createdByName}`}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-bold text-base" data-testid={`text-booking-total-${booking.id}`}>
-                        {formatPrice(booking.totalAmount, booking.currency)}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {detailBooking && (
-        <BookingDetailDialog
-          booking={detailBooking}
-          canEdit={canEdit}
-          onClose={() => setDetailBooking(null)}
-          onPaymentUpdate={(status) => {
-            paymentUpdateMutation.mutate({ id: detailBooking.id, paymentStatus: status });
-            setDetailBooking({ ...detailBooking, paymentStatus: status as "unpaid" | "cash" | "credit_card" });
-          }}
-          onEmail={() => emailMutation.mutate(detailBooking.id)}
-          emailPending={emailMutation.isPending}
-        />
-      )}
-    </div>
-  );
-}
-
-function BookingDetailDialog({
-  booking, canEdit, onClose, onPaymentUpdate, onEmail, emailPending,
-}: {
-  booking: Booking;
-  canEdit: boolean;
-  onClose: () => void;
-  onPaymentUpdate: (status: string) => void;
-  onEmail: () => void;
-  emailPending: boolean;
-}) {
-  const pay = PAYMENT_LABELS[booking.paymentStatus];
-  const PayIcon = pay.icon;
-
-  return (
-    <Dialog open onOpenChange={o => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Receipt className="h-5 w-5" />
-            {booking.bookingNumber}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-xs text-muted-foreground">Customer</p>
-              <p className="font-medium">{booking.customerName}</p>
-              {booking.customerEmail && <p className="text-xs text-muted-foreground">{booking.customerEmail}</p>}
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Date</p>
-              <p className="font-medium">{booking.bookingDate || "—"}</p>
-              {booking.createdByName && <p className="text-xs text-muted-foreground">by {booking.createdByName}</p>}
-              {booking.emailSentAt && <p className="text-xs text-green-600">Sent {new Date(booking.emailSentAt).toLocaleDateString("en-US")}</p>}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Payment Status</p>
-            <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium ${pay.color}`}>
-                <PayIcon className="h-3.5 w-3.5" />
-                {pay.label}
-              </span>
-              {canEdit && (
-                <Select value={booking.paymentStatus} onValueChange={onPaymentUpdate}>
-                  <SelectTrigger className="h-7 w-32 text-xs" data-testid="select-update-payment">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unpaid">Unpaid</SelectItem>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="credit_card">Card</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Items</p>
-            <div className="border rounded-lg overflow-hidden">
-              {booking.items.map((item, idx) => (
-                <div key={item.id || idx} className={`flex items-center justify-between p-2.5 text-sm ${idx % 2 === 0 ? "bg-muted/30" : ""}`} data-testid={`detail-item-${idx}`}>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm">{item.productName}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${CATEGORY_COLORS[item.category] || ""}`}>{item.category}</span>
-                      <span className="text-xs text-muted-foreground">× {item.quantity}</span>
-                    </div>
-                  </div>
-                  <span className="font-mono text-sm shrink-0">
-                    {booking.currency} {parseFloat(item.lineTotal).toFixed(2)}
-                  </span>
-                </div>
-              ))}
-              <div className="flex items-center justify-between p-3 border-t font-bold">
-                <span>Total</span>
-                <span className="text-lg" data-testid="text-detail-total">
-                  {booking.currency} {parseFloat(booking.totalAmount).toFixed(2)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {booking.notes && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Notes</p>
-              <p className="text-sm bg-muted/30 rounded p-2">{booking.notes}</p>
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-2 pt-2">
-            <a
-              href={`/api/school-bookings/${booking.id}/pdf`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm font-medium hover:bg-muted transition-colors"
-              data-testid="btn-download-receipt"
-            >
-              <FileDown className="h-4 w-4" /> PDF
-            </a>
-            {booking.customerEmail && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onEmail}
-                disabled={emailPending}
-                data-testid="btn-email-receipt"
-              >
-                {emailPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Mail className="h-4 w-4 mr-1" />}
-                Send Email
-              </Button>
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function parseDurationDays(productName: string): number {
   const lower = productName.toLowerCase();
   const weekMatch = lower.match(/(\d+)\s*week/);
@@ -1559,9 +1287,167 @@ function BookingTimeline({
   );
 }
 
-function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
-  const { isAdmin } = useAuth();
+function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; currency: string }) {
+  const { data: customers = [], isLoading: loadingCustomers } = useQuery<SchoolCustomer[]>({
+    queryKey: ["/api/school-customers", schoolConfigId],
+  });
+
+  const { data: bookings = [], isLoading: loadingBookings } = useQuery<Booking[]>({
+    queryKey: ["/api/school-bookings", schoolConfigId],
+  });
+
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const days = useMemo(() => {
+    const result: string[] = [];
+    let d = today;
+    let safety = 0;
+    while (safety < 35) {
+      result.push(d);
+      d = addDays(d, 1);
+      safety++;
+    }
+    return result;
+  }, [today]);
+
+  const dayData = useMemo(() => {
+    const data: { date: string; guests: number; arrivals: number; departures: number }[] = [];
+    for (const day of days) {
+      let guests = 0;
+      let arrivals = 0;
+      let departures = 0;
+      for (const c of customers) {
+        if (!c.arrivalDate || !c.departureDate) continue;
+        if (c.arrivalDate <= day && day <= c.departureDate) guests++;
+        if (c.arrivalDate === day) arrivals++;
+        if (c.departureDate === day) departures++;
+      }
+      data.push({ date: day, guests, arrivals, departures });
+    }
+    return data;
+  }, [customers, days]);
+
+  const unpaidCount = useMemo(() => {
+    return bookings.filter(b => b.paymentStatus === "unpaid").length;
+  }, [bookings]);
+
+  const todayData = dayData[0] || { guests: 0, arrivals: 0, departures: 0 };
+  const weekArrivals = dayData.slice(0, 7).reduce((s, d) => s + d.arrivals, 0);
+  const weekDepartures = dayData.slice(0, 7).reduce((s, d) => s + d.departures, 0);
+  const maxGuests = Math.max(1, ...dayData.map(d => d.guests));
+
+  const isLoading = loadingCustomers || loadingBookings;
+
+  if (isLoading) {
+    return (
+      <div className="p-4 space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}
+        </div>
+        <Skeleton className="h-64 w-full rounded-lg" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-4" data-testid="forecast-tab">
+      <div className="grid grid-cols-2 gap-3">
+        <Card>
+          <CardContent className="p-3 text-center">
+            <Users className="h-5 w-5 mx-auto text-primary mb-1" />
+            <p className="text-2xl font-bold" data-testid="text-guests-today">{todayData.guests}</p>
+            <p className="text-[10px] text-muted-foreground">Guests Today</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 text-center">
+            <ArrowUpRight className="h-5 w-5 mx-auto text-green-600 mb-1" />
+            <p className="text-2xl font-bold" data-testid="text-week-arrivals">{weekArrivals}</p>
+            <p className="text-[10px] text-muted-foreground">Arrivals (7d)</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 text-center">
+            <ArrowDownRight className="h-5 w-5 mx-auto text-red-500 mb-1" />
+            <p className="text-2xl font-bold" data-testid="text-week-departures">{weekDepartures}</p>
+            <p className="text-[10px] text-muted-foreground">Departures (7d)</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 text-center">
+            <XCircle className="h-5 w-5 mx-auto text-orange-500 mb-1" />
+            <p className="text-2xl font-bold" data-testid="text-unpaid-count">{unpaidCount}</p>
+            <p className="text-[10px] text-muted-foreground">Open Payments</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold mb-2 flex items-center gap-2">
+          <TrendingUp className="h-4 w-4" />
+          35-Day Occupancy
+        </p>
+        <div className="border rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <div className="flex" style={{ minWidth: days.length * 44 }}>
+              {dayData.map((d, idx) => {
+                const date = new Date(d.date + "T12:00:00Z");
+                const isToday = d.date === today;
+                const isWeekend = date.getUTCDay() % 6 === 0;
+                const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                const barHeight = maxGuests > 0 ? Math.round((d.guests / maxGuests) * 100) : 0;
+                return (
+                  <div
+                    key={d.date}
+                    className={`flex flex-col items-center shrink-0 border-r last:border-r-0 pb-1 ${isToday ? "bg-primary/10" : isWeekend ? "bg-muted/40" : ""}`}
+                    style={{ width: 44 }}
+                    data-testid={`forecast-day-${d.date}`}
+                  >
+                    <p className={`text-[9px] pt-1 ${isToday ? "font-bold text-primary" : "text-muted-foreground"}`}>
+                      {dayNames[date.getUTCDay()]}
+                    </p>
+                    <p className={`text-[10px] font-medium ${isToday ? "text-primary" : ""}`}>
+                      {date.getUTCDate()}.{date.getUTCMonth() + 1}
+                    </p>
+                    <div className="flex-1 flex flex-col justify-end mt-1" style={{ height: 80 }}>
+                      <div
+                        className={`w-6 mx-auto rounded-t transition-all ${isToday ? "bg-primary" : "bg-primary/60"}`}
+                        style={{ height: `${barHeight}%`, minHeight: d.guests > 0 ? 4 : 0 }}
+                      />
+                    </div>
+                    <p className={`text-[10px] font-bold mt-0.5 ${isToday ? "text-primary" : ""}`}>{d.guests}</p>
+                    <div className="flex items-center gap-0.5 mt-0.5 h-3">
+                      {d.arrivals > 0 && (
+                        <span className="text-[8px] text-green-600 font-medium flex items-center">
+                          <ArrowUpRight className="h-2.5 w-2.5" />{d.arrivals}
+                        </span>
+                      )}
+                      {d.departures > 0 && (
+                        <span className="text-[8px] text-red-500 font-medium flex items-center">
+                          <ArrowDownRight className="h-2.5 w-2.5" />{d.departures}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1"><ArrowUpRight className="h-3 w-3 text-green-600" /> Arrival</span>
+          <span className="flex items-center gap-1"><ArrowDownRight className="h-3 w-3 text-red-500" /> Departure</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded bg-primary/60" /> Guests</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CustomersTab({ schoolConfigId, currency }: { schoolConfigId: number; currency: string }) {
+  const { isAdmin, isStationLead } = useAuth();
   const { toast } = useToast();
+  const canEdit = isAdmin || isStationLead;
   const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -1599,6 +1485,32 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
     }
     return map;
   }, [bookings]);
+
+  const customerFullBookingsMap = useMemo(() => {
+    const map = new Map<string, Booking[]>();
+    for (const b of bookings) {
+      const key = b.customerName.toLowerCase().trim();
+      const existing = map.get(key) || [];
+      map.set(key, [...existing, b]);
+    }
+    return map;
+  }, [bookings]);
+
+  const paymentUpdateMutation = useMutation({
+    mutationFn: ({ id, paymentStatus }: { id: number; paymentStatus: string }) =>
+      apiRequest("PATCH", `/api/school-bookings/${id}/payment`, { paymentStatus }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/school-bookings", schoolConfigId] });
+      toast({ title: "Payment status updated" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const emailMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("POST", `/api/school-bookings/${id}/email`),
+    onSuccess: () => toast({ title: "Receipt sent via email" }),
+    onError: (e: Error) => toast({ title: "Email failed", description: e.message, variant: "destructive" }),
+  });
 
   function isCurrentlyHere(arrival: string, departure: string): boolean {
     const today = new Date().toISOString().slice(0, 10);
@@ -1826,6 +1738,8 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
   if (selectedCustomer && !editMode) {
     const c = selectedCustomer;
     const here = isCurrentlyHere(c.arrivalDate, c.departureDate);
+    const custKey = `${c.firstName} ${c.lastName}`.toLowerCase().trim();
+    const custBookings = customerFullBookingsMap.get(custKey) || [];
     return (
       <div className="p-4 max-w-2xl mx-auto space-y-4">
         <Button variant="ghost" size="sm" onClick={() => setSelectedCustomer(null)} data-testid="btn-back">
@@ -1869,6 +1783,104 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
             )}
           </CardContent>
         </Card>
+
+        <div>
+          <p className="text-sm font-semibold mb-2 flex items-center gap-2">
+            <Receipt className="h-4 w-4" />
+            Bookings ({custBookings.length})
+          </p>
+          {custBookings.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4 text-center">No bookings found for this customer.</p>
+          ) : (
+            <div className="space-y-3">
+              {custBookings.map(booking => {
+                const pay = PAYMENT_LABELS[booking.paymentStatus];
+                const PayIcon = pay.icon;
+                return (
+                  <Card key={booking.id} data-testid={`customer-booking-${booking.id}`}>
+                    <CardContent className="p-3 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono font-bold text-sm text-primary" data-testid={`text-booking-number-${booking.id}`}>
+                              {booking.bookingNumber}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${pay.color}`}>
+                              <PayIcon className="h-3 w-3" />
+                              {pay.label}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {booking.items.length} items · {booking.bookingDate || ""}
+                            {booking.createdByName && ` · ${booking.createdByName}`}
+                          </p>
+                          {booking.emailSentAt && <p className="text-[10px] text-green-600 mt-0.5">Email sent {new Date(booking.emailSentAt).toLocaleDateString("en-US")}</p>}
+                        </div>
+                        <p className="font-bold text-base shrink-0" data-testid={`text-booking-total-${booking.id}`}>
+                          {formatPrice(booking.totalAmount, booking.currency)}
+                        </p>
+                      </div>
+
+                      <div className="border rounded-lg overflow-hidden">
+                        {booking.items.map((item, idx) => (
+                          <div key={item.id || idx} className={`flex items-center justify-between p-2 text-sm ${idx % 2 === 0 ? "bg-muted/30" : ""}`}>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium">{item.productName}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${CATEGORY_COLORS[item.category] || ""}`}>{item.category}</span>
+                                <span className="text-[10px] text-muted-foreground">× {item.quantity}</span>
+                              </div>
+                            </div>
+                            <span className="font-mono text-xs shrink-0">
+                              {booking.currency} {parseFloat(item.lineTotal).toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {canEdit && (
+                          <Select value={booking.paymentStatus} onValueChange={(v) => paymentUpdateMutation.mutate({ id: booking.id, paymentStatus: v })}>
+                            <SelectTrigger className="h-7 w-28 text-xs" data-testid={`select-payment-${booking.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unpaid">Unpaid</SelectItem>
+                              <SelectItem value="cash">Cash</SelectItem>
+                              <SelectItem value="credit_card">Card</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                        <a
+                          href={`/api/school-bookings/${booking.id}/pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium hover:bg-muted transition-colors"
+                          data-testid={`btn-pdf-${booking.id}`}
+                        >
+                          <FileDown className="h-3 w-3" /> PDF
+                        </a>
+                        {booking.customerEmail && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => emailMutation.mutate(booking.id)}
+                            disabled={emailMutation.isPending}
+                            data-testid={`btn-email-${booking.id}`}
+                          >
+                            {emailMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Mail className="h-3 w-3 mr-1" />}
+                            Email
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -1931,17 +1943,15 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
             const here = isCurrentlyHere(c.arrivalDate, c.departureDate);
             const custKey = `${c.firstName} ${c.lastName}`.toLowerCase().trim();
             const custItems = customerBookingsMap.get(custKey) || [];
+            const custBkgs = customerFullBookingsMap.get(custKey) || [];
+            const hasUnpaid = custBkgs.some(b => b.paymentStatus === "unpaid");
+            const hasBookings = custBkgs.length > 0;
             const categoryIcons: Record<string, { icon: LucideIcon; color: string; label: string }> = {
               Course: { icon: GraduationCap, color: "text-blue-600 dark:text-blue-400", label: "Course" },
               Lesson: { icon: GraduationCap, color: "text-green-600 dark:text-green-400", label: "Lesson" },
               Rental: { icon: Wind, color: "text-orange-600 dark:text-orange-400", label: "Rental" },
               Other: { icon: WrenchIcon, color: "text-gray-600 dark:text-gray-400", label: "Service" },
             };
-            const categoryCounts = new Map<string, number>();
-            for (const item of custItems) {
-              const cat = item.category;
-              categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + item.quantity);
-            }
             const arrFmt = c.arrivalDate ? new Date(c.arrivalDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" }) : "–";
             const depFmt = c.departureDate ? new Date(c.departureDate + "T12:00:00Z").toLocaleDateString("en-US", { day: "numeric", month: "short" }) : "–";
             return (
@@ -1953,7 +1963,16 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
               >
                 <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{c.firstName} {c.lastName}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium text-sm">{c.firstName} {c.lastName}</p>
+                      {hasBookings && (
+                        <span
+                          className={`inline-block h-2 w-2 rounded-full shrink-0 ${hasUnpaid ? "bg-red-500" : "bg-green-500"}`}
+                          title={hasUnpaid ? "Has unpaid bookings" : "All bookings paid"}
+                          data-testid={`payment-indicator-${c.id}`}
+                        />
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                         <Calendar className="h-3 w-3" />
