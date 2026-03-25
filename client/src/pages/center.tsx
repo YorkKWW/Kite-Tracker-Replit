@@ -1385,33 +1385,49 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
 
   return (
     <div className="p-4 space-y-4" data-testid="forecast-tab">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-2">
         <Card>
-          <CardContent className="p-3 text-center">
-            <GraduationCap className="h-5 w-5 mx-auto text-blue-600 mb-1" />
-            <p className="text-2xl font-bold" data-testid="text-courses-today">{todayData.courses}</p>
-            <p className="text-[10px] text-muted-foreground">Courses Today</p>
+          <CardContent className="p-2 text-center">
+            <GraduationCap className="h-4 w-4 mx-auto text-blue-600 mb-0.5" />
+            <p className="text-xl font-bold" data-testid="text-courses-today">{todayData.courses}</p>
+            <p className="text-[9px] text-muted-foreground">Courses Today</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-3 text-center">
-            <Waves className="h-5 w-5 mx-auto text-amber-500 mb-1" />
-            <p className="text-2xl font-bold" data-testid="text-rentals-today">{todayData.rentals}</p>
-            <p className="text-[10px] text-muted-foreground">Rentals Today</p>
+          <CardContent className="p-2 text-center">
+            <Waves className="h-4 w-4 mx-auto text-amber-500 mb-0.5" />
+            <p className="text-xl font-bold" data-testid="text-rentals-today">{todayData.rentals}</p>
+            <p className="text-[9px] text-muted-foreground">Rentals Today</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-3 text-center">
-            <Users className="h-5 w-5 mx-auto text-primary mb-1" />
-            <p className="text-2xl font-bold" data-testid="text-guests-today">{todayData.total}</p>
-            <p className="text-[10px] text-muted-foreground">Total Guests Today</p>
+          <CardContent className="p-2 text-center">
+            <Users className="h-4 w-4 mx-auto text-primary mb-0.5" />
+            <p className="text-xl font-bold" data-testid="text-guests-today">{todayData.total}</p>
+            <p className="text-[9px] text-muted-foreground">Total Guests</p>
+          </CardContent>
+        </Card>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <Card>
+          <CardContent className="p-2 text-center">
+            <ArrowUpRight className="h-4 w-4 mx-auto text-green-600 mb-0.5" />
+            <p className="text-xl font-bold" data-testid="text-week-arrivals">{weekArrivals}</p>
+            <p className="text-[9px] text-muted-foreground">Arrivals (7d)</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-3 text-center">
-            <XCircle className="h-5 w-5 mx-auto text-orange-500 mb-1" />
-            <p className="text-2xl font-bold" data-testid="text-unpaid-count">{unpaidCount}</p>
-            <p className="text-[10px] text-muted-foreground">Open Payments</p>
+          <CardContent className="p-2 text-center">
+            <ArrowDownRight className="h-4 w-4 mx-auto text-red-500 mb-0.5" />
+            <p className="text-xl font-bold" data-testid="text-week-departures">{weekDepartures}</p>
+            <p className="text-[9px] text-muted-foreground">Departures (7d)</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-2 text-center">
+            <XCircle className="h-4 w-4 mx-auto text-orange-500 mb-0.5" />
+            <p className="text-xl font-bold" data-testid="text-unpaid-count">{unpaidCount}</p>
+            <p className="text-[9px] text-muted-foreground">Open Payments</p>
           </CardContent>
         </Card>
       </div>
