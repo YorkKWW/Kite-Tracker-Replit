@@ -1345,8 +1345,8 @@ function parseDurationDays(productName: string): number {
 }
 
 function addDays(date: string, days: number): string {
-  const d = new Date(date + "T00:00:00");
-  d.setDate(d.getDate() + days);
+  const d = new Date(date + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
@@ -1360,19 +1360,22 @@ function BookingTimeline({
 
   const { data: bookings = [], isLoading } = useQuery<Booking[]>({
     queryKey: ["/api/school-bookings", schoolConfigId],
-    staleTime: 0,
   });
 
-  const today = new Date().toISOString().slice(0, 10);
-  const startDate = addDays(today, -3);
-  const endDate = addDays(today, 10);
+  const { today, startDate, endDate } = useMemo(() => {
+    const now = new Date();
+    const t = now.toISOString().slice(0, 10);
+    return { today: t, startDate: addDays(t, -3), endDate: addDays(t, 10) };
+  }, []);
 
   const days = useMemo(() => {
     const result: string[] = [];
     let d = startDate;
-    while (d <= endDate) {
+    let safety = 0;
+    while (d <= endDate && safety < 30) {
       result.push(d);
       d = addDays(d, 1);
+      safety++;
     }
     return result;
   }, [startDate, endDate]);
@@ -1454,12 +1457,12 @@ function BookingTimeline({
   const LABEL_W = 160;
 
   function formatDay(d: string) {
-    const date = new Date(d + "T00:00:00");
+    const date = new Date(d + "T12:00:00Z");
     const dayNames = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
     return {
-      weekday: dayNames[date.getDay()],
-      day: date.getDate(),
-      month: date.getMonth() + 1,
+      weekday: dayNames[date.getUTCDay()],
+      day: date.getUTCDate(),
+      month: date.getUTCMonth() + 1,
     };
   }
 
@@ -1485,7 +1488,7 @@ function BookingTimeline({
                   {days.map(d => {
                     const { weekday, day, month } = formatDay(d);
                     const isToday = d === today;
-                    const isWeekend = new Date(d + "T00:00:00").getDay() % 6 === 0;
+                    const isWeekend = new Date(d + "T12:00:00Z").getUTCDay() % 6 === 0;
                     return (
                       <div
                         key={d}
@@ -1511,7 +1514,7 @@ function BookingTimeline({
                       const isStart = d === item.startDate;
                       const isEnd = d === item.endDate;
                       const isToday = d === today;
-                      const isWeekend = new Date(d + "T00:00:00").getDay() % 6 === 0;
+                      const isWeekend = new Date(d + "T12:00:00Z").getUTCDay() % 6 === 0;
                       return (
                         <div
                           key={d}
@@ -1546,7 +1549,7 @@ function BookingTimeline({
     <div className="py-4" data-testid="booking-timeline">
       <div className="px-4 mb-4">
         <p className="text-xs text-muted-foreground">
-          {new Date(startDate + "T00:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" })} – {new Date(endDate + "T00:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" })}
+          {new Date(startDate + "T12:00:00Z").toLocaleDateString("de-DE", { day: "numeric", month: "short" })} – {new Date(endDate + "T12:00:00Z").toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" })}
         </p>
       </div>
       {renderSection("Kurse", courseItems, "bg-blue-500", "bg-blue-50")}
