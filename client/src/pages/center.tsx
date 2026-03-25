@@ -1582,18 +1582,18 @@ function ForecastTab({ schoolConfigId, currency }: { schoolConfigId: number; cur
                     <p className={`text-[10px] font-medium ${isToday ? "text-primary" : ""}`}>
                       {date.getUTCDate()}.{date.getUTCMonth() + 1}
                     </p>
-                    <div className="flex-1 flex flex-col justify-end items-center mt-1" style={{ height: 80 }}>
+                    <div className="flex-1 flex flex-col justify-end items-center mt-1" style={{ height: 100 }}>
                       {(() => {
-                        const segments: { key: string; pct: number; cls: string; style?: Record<string, string | number> }[] = [];
-                        if (d.noService > 0) segments.push({ key: "ns", pct: noSvcPct, cls: isToday ? "bg-gray-400 dark:bg-gray-500" : "bg-gray-300 dark:bg-gray-600" });
-                        if (d.rentalOnly > 0) segments.push({ key: "ro", pct: rentalOnlyPct, cls: isToday ? "bg-amber-500" : "bg-amber-400" });
-                        if (d.both > 0) segments.push({ key: "bt", pct: bothPct, cls: "", style: { background: "linear-gradient(90deg, #3b82f6 50%, #f59e0b 50%)" } });
-                        if (d.courseOnly > 0) segments.push({ key: "co", pct: courseOnlyPct, cls: isToday ? "bg-blue-600" : "bg-blue-500" });
+                        const segments: { key: string; count: number; cls: string; style?: Record<string, string | number> }[] = [];
+                        if (d.noService > 0) segments.push({ key: "ns", count: d.noService, cls: isToday ? "bg-gray-400 dark:bg-gray-500" : "bg-gray-300 dark:bg-gray-600" });
+                        if (d.rentalOnly > 0) segments.push({ key: "ro", count: d.rentalOnly, cls: isToday ? "bg-amber-500" : "bg-amber-400" });
+                        if (d.both > 0) segments.push({ key: "bt", count: d.both, cls: "", style: { background: "linear-gradient(90deg, #3b82f6 50%, #f59e0b 50%)" } });
+                        if (d.courseOnly > 0) segments.push({ key: "co", count: d.courseOnly, cls: isToday ? "bg-blue-600" : "bg-blue-500" });
                         return segments.map((seg, i) => (
                           <div
                             key={seg.key}
-                            className={`w-6 ${i === 0 ? "rounded-t" : ""} ${seg.cls}`}
-                            style={{ height: `${seg.pct}%`, minHeight: 3, ...seg.style }}
+                            className={`w-7 ${i === 0 ? "rounded-t" : ""} ${seg.cls}`}
+                            style={{ height: Math.max(8, Math.round((seg.count / maxTotal) * 100)), minHeight: 8, ...seg.style }}
                           />
                         ));
                       })()}
