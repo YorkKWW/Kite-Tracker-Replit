@@ -1969,16 +1969,21 @@ function CustomersTab({ schoolConfigId }: { schoolConfigId: number }) {
                     {here && <Badge variant="outline" className="text-[10px] text-green-700 border-green-300 bg-green-50 dark:bg-green-900/20 dark:text-green-400">Here</Badge>}
                   </div>
                 </div>
-                {categoryCounts.size > 0 && (
-                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    {Array.from(categoryCounts.entries()).map(([cat, count]) => {
-                      const info = categoryIcons[cat] || categoryIcons.Other;
+                {custItems.length > 0 && (
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                    {custItems.map((item, idx) => {
+                      const info = categoryIcons[item.category] || categoryIcons.Other;
                       const Icon = info.icon;
+                      const nameMatch = item.productName.match(/^(.+?)\s[–\-]\s(.+)$/);
+                      const shortName = nameMatch ? nameMatch[2] : item.productName;
                       return (
-                        <span key={cat} className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${info.color}`} title={info.label}>
-                          <Icon className="h-3 w-3" />
-                          {count > 1 ? `×${count}` : ""}
-                          <span className="text-muted-foreground">{info.label}</span>
+                        <span
+                          key={idx}
+                          className={`inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-muted/60 ${info.color}`}
+                          title={item.productName}
+                        >
+                          <Icon className="h-3 w-3 shrink-0" />
+                          {item.quantity > 1 ? `${item.quantity}× ` : ""}{shortName}
                         </span>
                       );
                     })}
