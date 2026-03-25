@@ -1,4 +1,7 @@
 import { type ReactNode, useState } from "react";
+import type { LucideIcon } from "lucide-react";
+
+type NavItem = { href: string; label: string; icon: LucideIcon; indent?: boolean };
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
@@ -125,7 +128,7 @@ export default function Layout({ children }: LayoutProps) {
     },
   });
 
-  const navItems = isStationLead ? [
+  const navItems: NavItem[] = isStationLead ? [
     { href: "/center", label: "Center", icon: Store },
     { href: "/", label: "Equipment", icon: Package },
     { href: "/equipment", label: "Equipment List", icon: Package, indent: true },
@@ -265,7 +268,7 @@ export default function Layout({ children }: LayoutProps) {
           </div>
 
           <nav className="hidden md:flex items-center gap-1">
-            {navItems.filter((item) => !(item as any).indent).map((item) => (
+            {navItems.filter((item) => !item.indent).map((item) => (
               <Link key={item.href} href={item.href}>
                 <Button
                   variant={isActive(item.href) ? "secondary" : "ghost"}
