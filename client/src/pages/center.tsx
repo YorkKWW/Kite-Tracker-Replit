@@ -1367,19 +1367,19 @@ function CenterWindBarCard({
   const dir = degToCompass(direction);
 
   return (
-    <div className="flex flex-col items-center gap-0 min-w-[26px]">
-      <span className={`text-[8px] font-medium leading-tight ${isNow ? "text-sky-600 dark:text-sky-400 font-bold" : "text-muted-foreground"}`}>
+    <div className="flex flex-col items-center gap-0.5 min-w-[32px]">
+      <span className={`text-[9px] font-medium leading-tight ${isNow ? "text-sky-600 dark:text-sky-400 font-bold" : "text-muted-foreground"}`}>
         {isNow ? "Now" : label}
       </span>
-      <div className={`text-[7px] font-medium leading-tight ${windTextColor(wind)}`}>{dir}</div>
-      <div className="relative h-10 w-4 flex items-end justify-center">
+      <div className={`text-[8px] font-medium leading-tight ${windTextColor(wind)}`}>{dir}</div>
+      <div className="relative h-14 w-5 flex items-end justify-center">
         <div
-          className={`w-3 rounded-t-sm transition-all ${windBarColor(wind)} ${isCurrent ? "ring-1 ring-offset-1 ring-sky-400" : ""}`}
-          style={{ height: `${Math.max(8, barHeightPct)}%` }}
+          className={`w-4 rounded-t-sm transition-all ${windBarColor(wind)} ${isCurrent ? "ring-1 ring-offset-1 ring-sky-400" : ""}`}
+          style={{ height: `${Math.max(10, barHeightPct)}%` }}
         />
       </div>
-      <span className={`text-[9px] font-bold tabular-nums leading-tight ${windTextColor(wind)}`}>{Math.round(wind)}</span>
-      <span className="text-[7px] text-muted-foreground leading-tight">{Math.round(temp)}°</span>
+      <span className={`text-[10px] font-bold tabular-nums leading-tight ${windTextColor(wind)}`}>{Math.round(wind)}</span>
+      <span className="text-[8px] text-muted-foreground leading-tight">{Math.round(temp)}°</span>
     </div>
   );
 }
@@ -1549,7 +1549,7 @@ function WindForecastWidget({ stationName }: { stationName: string }) {
 
         <div
           ref={scrollRef}
-          className="overflow-x-auto flex gap-0.5 px-2 py-2 justify-center"
+          className="overflow-x-auto flex gap-1 px-3 py-3 justify-center"
           style={{ scrollbarWidth: "none" }}
         >
           {dayHours.length === 0 ? (
