@@ -19,7 +19,7 @@ import {
   CheckCircle, CreditCard, Banknote, XCircle, ChevronDown, ChevronUp,
   Users, ShoppingCart, AlertTriangle, Store, UserPlus, X, Pencil, ArrowLeft,
   Calendar, GraduationCap, Waves, Package as PackageIcon, Wind, Wrench as WrenchIcon,
-  BarChart3, ArrowUpRight, ArrowDownRight, TrendingUp, CircleDot,
+  BarChart3, ArrowUpRight, ArrowDownRight, TrendingUp, CircleDot, Navigation, Thermometer,
 } from "lucide-react";
 import type { SchoolCustomer } from "@shared/schema";
 import SalesPage from "./sales";
@@ -1289,114 +1289,304 @@ function BookingTimeline({
 
 type ForecastDetail = "courses" | "rentals" | "guests" | "arrivals" | "departures" | "unpaid" | null;
 
-const STATION_COORDS: Record<string, { lat: number; lon: number }> = {
-  dakhla: { lat: 23.7148, lon: -15.9328 },
-  tatajuba: { lat: -2.9377, lon: -40.0047 },
-  hamburg: { lat: 53.5511, lon: 9.9937 },
-  heidenau: { lat: 50.9831, lon: 13.8667 },
+const STATION_COORDS: Record<string, { lat: number; lon: number; label: string; timezone: string }> = {
+  dakhla:   { lat: 23.72,  lon: -15.93, label: "Dakhla",   timezone: "Africa/Casablanca" },
+  tatajuba: { lat: -2.77,  lon: -40.39, label: "Tatajuba", timezone: "America/Fortaleza" },
+  hamburg:  { lat: 53.55,  lon:   9.99, label: "Hamburg",  timezone: "Europe/Berlin" },
+  heidenau: { lat: 53.47,  lon:  10.11, label: "Heidenau", timezone: "Europe/Berlin" },
 };
 
-type WindData = {
-  hours: { time: string; speed: number; gust: number; direction: number }[];
-  currentSpeed: number;
-  currentGust: number;
-  currentDirection: number;
-  maxSpeed: number;
-  maxGust: number;
+function getStationCoords(name: string) {
+  const lower = name.toLowerCase();
+  for (const [key, val] of Object.entries(STATION_COORDS)) {
+    if (lower.includes(key)) return val;
+  }
+  return null;
+}
+
+function degToCompass(deg: number): string {
+  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  return dirs[Math.round(deg / 45) % 8];
+}
+
+function kiteRating(knots: number): { label: string; color: string } {
+  if (knots < 8)  return { label: "Too light", color: "text-muted-foreground" };
+  if (knots < 12) return { label: "Light", color: "text-yellow-600 dark:text-yellow-400" };
+  if (knots < 20) return { label: "Good", color: "text-emerald-600 dark:text-emerald-400" };
+  if (knots < 30) return { label: "Strong", color: "text-blue-600 dark:text-blue-400" };
+  return { label: "Storm", color: "text-red-600 dark:text-red-400" };
+}
+
+function windBarColor(knots: number): string {
+  if (knots < 8)  return "bg-slate-300 dark:bg-slate-600";
+  if (knots < 12) return "bg-yellow-400 dark:bg-yellow-500";
+  if (knots < 20) return "bg-emerald-500 dark:bg-emerald-400";
+  if (knots < 28) return "bg-blue-500 dark:bg-blue-400";
+  return "bg-red-500 dark:bg-red-400";
+}
+
+function windTextColor(knots: number): string {
+  if (knots < 8)  return "text-slate-400 dark:text-slate-500";
+  if (knots < 12) return "text-yellow-600 dark:text-yellow-400";
+  if (knots < 20) return "text-emerald-600 dark:text-emerald-400";
+  if (knots < 28) return "text-blue-600 dark:text-blue-400";
+  return "text-red-600 dark:text-red-400";
+}
+
+type CenterWeatherData = {
+  current: {
+    time: string;
+    temperature_2m: number;
+    wind_speed_10m: number;
+    wind_direction_10m: number;
+    weather_code: number;
+  };
+  hourly: {
+    time: string[];
+    wind_speed_10m: number[];
+    wind_direction_10m: number[];
+    temperature_2m: number[];
+    weather_code: number[];
+  };
+  daily: {
+    time: string[];
+    sunrise: string[];
+    sunset: string[];
+  };
 };
 
-function windDirectionLabel(deg: number): string {
-  const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
-  return dirs[Math.round(deg / 22.5) % 16];
+function CenterWindBarCard({
+  time, wind, direction, temp, isCurrent, isNow,
+}: {
+  time: string; wind: number; direction: number; temp: number; isCurrent: boolean; isNow: boolean;
+}) {
+  const maxBar = 35;
+  const barHeightPct = Math.min(100, (wind / maxBar) * 100);
+  const hour = new Date(time).getHours();
+  const label = `${String(hour).padStart(2, "0")}h`;
+  const dir = degToCompass(direction);
+
+  return (
+    <div className="flex flex-col items-center gap-0 min-w-[26px]">
+      <span className={`text-[8px] font-medium leading-tight ${isNow ? "text-sky-600 dark:text-sky-400 font-bold" : "text-muted-foreground"}`}>
+        {isNow ? "Now" : label}
+      </span>
+      <div className={`text-[7px] font-medium leading-tight ${windTextColor(wind)}`}>{dir}</div>
+      <div className="relative h-10 w-4 flex items-end justify-center">
+        <div
+          className={`w-3 rounded-t-sm transition-all ${windBarColor(wind)} ${isCurrent ? "ring-1 ring-offset-1 ring-sky-400" : ""}`}
+          style={{ height: `${Math.max(8, barHeightPct)}%` }}
+        />
+      </div>
+      <span className={`text-[9px] font-bold tabular-nums leading-tight ${windTextColor(wind)}`}>{Math.round(wind)}</span>
+      <span className="text-[7px] text-muted-foreground leading-tight">{Math.round(temp)}°</span>
+    </div>
+  );
 }
 
 function WindForecastWidget({ stationName }: { stationName: string }) {
-  const [windData, setWindData] = useState<WindData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const stationKey = stationName.toLowerCase().split(/\s+/)[0];
-  const coords = STATION_COORDS[stationKey];
+  const coords = getStationCoords(stationName);
+  const [activeDay, setActiveDay] = useState<0 | 1>(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const nowCardRef = useRef<HTMLDivElement>(null);
+
+  const { data, isLoading, isError } = useQuery<CenterWeatherData>({
+    queryKey: ["center-weather", coords?.lat, coords?.lon],
+    queryFn: async () => {
+      if (!coords) throw new Error("No coords");
+      const url = [
+        `https://api.open-meteo.com/v1/forecast`,
+        `?latitude=${coords.lat}&longitude=${coords.lon}`,
+        `&current=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code`,
+        `&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,weather_code`,
+        `&daily=sunrise,sunset`,
+        `&wind_speed_unit=kn`,
+        `&timezone=${encodeURIComponent(coords.timezone)}`,
+        `&forecast_days=2`,
+      ].join("");
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Weather fetch failed");
+      return res.json();
+    },
+    enabled: !!coords,
+    staleTime: 15 * 60 * 1000,
+    retry: 1,
+  });
 
   useEffect(() => {
-    if (!coords) { setLoading(false); return; }
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m&timezone=auto&start_date=${todayStr}&end_date=${todayStr}`;
-    fetch(url)
-      .then(r => r.json())
-      .then(data => {
-        if (!data.hourly) return;
-        const hours = data.hourly.time.map((t: string, i: number) => ({
-          time: t,
-          speed: data.hourly.wind_speed_10m[i],
-          gust: data.hourly.wind_gusts_10m[i],
-          direction: data.hourly.wind_direction_10m[i],
-        }));
-        const now = new Date();
-        const currentHour = now.getHours();
-        const current = hours[Math.min(currentHour, hours.length - 1)];
-        setWindData({
-          hours,
-          currentSpeed: current.speed,
-          currentGust: current.gust,
-          currentDirection: current.direction,
-          maxSpeed: Math.max(...hours.map((h: { speed: number }) => h.speed)),
-          maxGust: Math.max(...hours.map((h: { gust: number }) => h.gust)),
-        });
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [coords]);
+    if (activeDay === 0 && nowCardRef.current && scrollRef.current) {
+      setTimeout(() => {
+        nowCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      }, 100);
+    } else if (scrollRef.current) {
+      scrollRef.current.scrollLeft = 0;
+    }
+  }, [activeDay, data]);
 
   if (!coords) return null;
-  if (loading) return <Card><CardContent className="p-3 flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /><span className="text-xs text-muted-foreground">Loading wind data...</span></CardContent></Card>;
-  if (!windData) return null;
+  if (isLoading) return <Skeleton className="h-44 w-full rounded-xl" />;
+  if (isError || !data) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="p-4 text-center text-xs text-muted-foreground">
+          Weather data unavailable
+        </CardContent>
+      </Card>
+    );
+  }
 
-  const maxBarKnots = Math.max(windData.maxGust, 40);
-  const now = new Date();
-  const currentHour = now.getHours();
+  const currentWind = Math.round(data.current.wind_speed_10m);
+  const currentDir = degToCompass(data.current.wind_direction_10m);
+  const currentTemp = Math.round(data.current.temperature_2m);
+  const currentRating = kiteRating(currentWind);
+  const nowTime = data.current.time;
+
+  const sunrise = data.daily.sunrise[activeDay];
+  const sunset = data.daily.sunset[activeDay];
+
+  const sunriseDate = new Date(sunrise);
+  const sunsetDate = new Date(sunset);
+
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+
+  const dayHours = data.hourly.time
+    .map((t, i) => ({
+      time: t,
+      wind: data.hourly.wind_speed_10m[i],
+      direction: data.hourly.wind_direction_10m[i],
+      temp: data.hourly.temperature_2m[i],
+    }))
+    .filter(({ time }) => {
+      const d = new Date(time);
+      return d >= sunriseDate && d <= sunsetDate;
+    });
+
+  const nowHourStr = nowTime.substring(0, 13);
+  const nowHourNum = parseInt(nowHourStr.substring(11, 13), 10);
+  const nowIdx = activeDay === 0
+    ? dayHours.reduce((best, h, i) => {
+        const hNum = parseInt(h.time.substring(11, 13), 10);
+        const bestNum = best >= 0 ? parseInt(dayHours[best].time.substring(11, 13), 10) : 99;
+        return Math.abs(hNum - nowHourNum) < Math.abs(bestNum - nowHourNum) ? i : best;
+      }, -1)
+    : -1;
+
+  const peakHour = [...dayHours].sort((a, b) => b.wind - a.wind)[0];
+  const goodHours = dayHours.filter(h => h.wind >= 12 && h.wind < 28);
 
   return (
-    <Card data-testid="wind-forecast-card">
-      <CardContent className="p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <Wind className="h-4 w-4 text-sky-500" />
-            <p className="text-sm font-semibold">Wind Today</p>
-          </div>
-          <div className="text-right">
-            <p className="text-lg font-bold" data-testid="text-current-wind">{Math.round(windData.currentSpeed)} km/h</p>
-            <p className="text-[9px] text-muted-foreground">
-              Gusts {Math.round(windData.currentGust)} km/h · {windDirectionLabel(windData.currentDirection)}
-            </p>
+    <Card className="border-sky-200 dark:border-sky-800 overflow-hidden" data-testid="wind-forecast-card">
+      <CardContent className="p-0">
+        <div className="flex items-center border-b border-border px-3 py-2 gap-2">
+          <Wind className="h-3 w-3 text-sky-500 shrink-0" />
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide shrink-0">
+            {coords.label}
+          </span>
+          {activeDay === 0 ? (
+            <div className="flex items-center gap-1.5 ml-1 min-w-0">
+              <span className={`text-xs font-bold tabular-nums ${windTextColor(currentWind)}`} data-testid="text-current-wind">
+                {currentWind} kn
+              </span>
+              <Navigation
+                className="h-3 w-3 text-sky-500 shrink-0"
+                style={{ transform: `rotate(${data.current.wind_direction_10m}deg)` }}
+              />
+              <span className="text-[10px] font-semibold text-sky-600 dark:text-sky-400">{currentDir}</span>
+              <Thermometer className="h-3 w-3 text-orange-400" />
+              <span className="text-[10px] font-medium">{currentTemp}°</span>
+              <span className={`text-[10px] font-semibold ${currentRating.color}`} data-testid="text-kite-rating">
+                · {currentRating.label}
+              </span>
+            </div>
+          ) : peakHour ? (
+            <div className="flex items-center gap-1.5 ml-1 min-w-0">
+              <span className="text-[9px] text-muted-foreground shrink-0">peak</span>
+              <span className={`text-xs font-bold tabular-nums ${windTextColor(Math.round(peakHour.wind))}`}>
+                {Math.round(peakHour.wind)} kn
+              </span>
+              <Navigation
+                className="h-3 w-3 text-sky-500 shrink-0"
+                style={{ transform: `rotate(${peakHour.direction}deg)` }}
+              />
+              <span className="text-[10px] font-semibold text-sky-600 dark:text-sky-400">{degToCompass(peakHour.direction)}</span>
+              <Thermometer className="h-3 w-3 text-orange-400" />
+              <span className="text-[10px] font-medium">{Math.round(peakHour.temp)}°</span>
+              <span className={`text-[10px] font-semibold ${kiteRating(Math.round(peakHour.wind)).color}`}>
+                · {kiteRating(Math.round(peakHour.wind)).label}
+              </span>
+            </div>
+          ) : null}
+          <div className="flex ml-auto shrink-0">
+            {(["Today", "Tomorrow"] as const).map((label, i) => (
+              <button
+                key={label}
+                onClick={() => setActiveDay(i as 0 | 1)}
+                className={`px-2.5 py-0.5 text-[10px] font-semibold rounded-full transition-colors ${
+                  activeDay === i
+                    ? "bg-sky-500 text-white"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-testid={`button-center-weather-${label.toLowerCase()}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
-        <div className="flex items-end gap-px" style={{ height: 48 }}>
-          {windData.hours.map((h, i) => {
-            const speedH = Math.max(4, Math.round((h.speed / maxBarKnots) * 48));
-            const gustH = Math.max(0, Math.round(((h.gust - h.speed) / maxBarKnots) * 48));
-            const isPast = i < currentHour;
-            const isCurrent = i === currentHour;
-            return (
-              <div key={i} className="flex flex-col justify-end flex-1" style={{ height: 48 }} data-testid={`wind-hour-${i}`}>
-                <div
-                  className={`w-full rounded-t-sm ${isPast ? "bg-sky-200 dark:bg-sky-800" : isCurrent ? "bg-sky-500" : "bg-sky-400 dark:bg-sky-600"}`}
-                  style={{ height: gustH }}
-                  title={`Gust: ${Math.round(h.gust)} km/h`}
-                />
-                <div
-                  className={`w-full ${isPast ? "bg-sky-300 dark:bg-sky-700" : isCurrent ? "bg-sky-600" : "bg-sky-500 dark:bg-sky-500"}`}
-                  style={{ height: speedH }}
-                  title={`${Math.round(h.speed)} km/h`}
-                />
-              </div>
-            );
-          })}
+
+        <div className="grid grid-cols-3 items-center px-3 py-1 text-[9px] text-muted-foreground bg-amber-50/40 dark:bg-amber-950/10 border-b border-border">
+          <span>🌅 {fmt(sunrise)}</span>
+          <span className="font-medium text-amber-700 dark:text-amber-400 text-center leading-tight">
+            {goodHours.length > 0
+              ? `Best: ${fmt(goodHours[0].time)}–${fmt(goodHours[goodHours.length - 1].time)}`
+              : peakHour ? `Peak ${Math.round(peakHour.wind)} kn @ ${fmt(peakHour.time)}` : "No kite window"}
+          </span>
+          <span className="text-right">🌇 {fmt(sunset)}</span>
         </div>
-        <div className="flex justify-between text-[8px] text-muted-foreground">
-          <span>0h</span>
-          <span>6h</span>
-          <span>12h</span>
-          <span>18h</span>
-          <span>24h</span>
+
+        <div
+          ref={scrollRef}
+          className="overflow-x-auto flex gap-0.5 px-2 py-2 justify-center"
+          style={{ scrollbarWidth: "none" }}
+        >
+          {dayHours.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4 w-full text-center">No data for this day</p>
+          ) : (
+            dayHours.map((h, idx) => {
+              const isNow = idx === nowIdx;
+              return (
+                <div key={h.time} ref={isNow ? nowCardRef : undefined}>
+                  <CenterWindBarCard
+                    time={h.time}
+                    wind={h.wind}
+                    direction={h.direction}
+                    temp={h.temp}
+                    isCurrent={isNow}
+                    isNow={isNow}
+                  />
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="flex items-center justify-center gap-2 px-3 pb-2 border-t border-border pt-1.5">
+          {[
+            { color: "bg-slate-300 dark:bg-slate-600", label: "<8" },
+            { color: "bg-yellow-400", label: "8–12" },
+            { color: "bg-emerald-500", label: "12–20✓" },
+            { color: "bg-blue-500", label: "20–28✓" },
+            { color: "bg-red-500", label: ">28⚠" },
+          ].map(({ color, label }) => (
+            <div key={label} className="flex items-center gap-0.5">
+              <div className={`w-2 h-2 rounded-sm ${color}`} />
+              <span className="text-[8px] text-muted-foreground">{label}</span>
+            </div>
+          ))}
+          <span className="text-[8px] text-muted-foreground">kn</span>
         </div>
       </CardContent>
     </Card>

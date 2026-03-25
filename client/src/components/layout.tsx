@@ -126,6 +126,9 @@ export default function Layout({ children }: LayoutProps) {
   });
 
   const navItems = [
+    ...(isAdmin || isStationLead ? [
+      { href: "/center", label: "Center", icon: Store },
+    ] : []),
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/equipment", label: "Equipment", icon: Package },
     { href: "/accessories", label: "Accessories", icon: ShirtIcon },
@@ -143,10 +146,6 @@ export default function Layout({ children }: LayoutProps) {
       : []),
     ...(isStationLead ? [
       { href: "/quick-inventory", label: "Quick Inventory", icon: ClipboardCheck },
-      { href: "/center", label: "Center", icon: Store },
-    ] : []),
-    ...(isAdmin && !isStationLead ? [
-      { href: "/center", label: "Center", icon: Store },
     ] : []),
     ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
