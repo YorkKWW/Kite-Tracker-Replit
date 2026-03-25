@@ -281,14 +281,17 @@ export default function Layout({ children }: LayoutProps) {
           </nav>
 
           <div className="flex items-center gap-1">
-            {user?.isSuperAdmin && (
+            {(user?.role === "admin" || user?.role === "manager") && (
               <Select
-                value={viewMode ?? "super_admin"}
+                value={viewMode ?? (user?.isSuperAdmin ? "super_admin" : user?.role!)}
                 onValueChange={(v) => {
-                  if (v === "station_lead") {
+                  const selfValue = user?.isSuperAdmin ? "super_admin" : user?.role!;
+                  if (v === selfValue) {
+                    setViewMode(null);
+                  } else if (v === "station_lead") {
                     setStationPickerOpen(true);
                   } else {
-                    setViewMode(v === "super_admin" ? null : v as ViewMode);
+                    setViewMode(v as ViewMode);
                   }
                 }}
               >
@@ -297,9 +300,10 @@ export default function Layout({ children }: LayoutProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="super_admin">Super Admin</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="manager">Hamburg Manager</SelectItem>
+                  {user?.isSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
+                  {user?.role === "admin" && <SelectItem value="admin">Admin</SelectItem>}
+                  {user?.role === "manager" && <SelectItem value="manager">Hamburg Manager</SelectItem>}
+                  {(user?.isSuperAdmin || user?.role === "admin") && <SelectItem value="manager">Hamburg Manager</SelectItem>}
                   <SelectItem value="station_lead">Center Manager</SelectItem>
                 </SelectContent>
               </Select>
