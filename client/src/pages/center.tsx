@@ -1593,6 +1593,91 @@ function WindForecastWidget({ stationName }: { stationName: string }) {
   );
 }
 
+function CourseListWidget({ today, bookings, customers, customerBookingInfo }: {
+  today: string;
+  bookings: Booking[];
+  customers: SchoolCustomer[];
+  customerBookingInfo: Map<string, { services: string[]; hasUnpaid: boolean }>;
+}) {
+  const [activeDay, setActiveDay] = useState<0 | 1>(0);
+  const tomorrow = addDays(today, 1);
+  const dateStr = activeDay === 0 ? today : tomorrow;
+
+  const courses = useMemo(() => {
+    const result: { customerName: string; productName: string; isKww: boolean; hasUnpaid: boolean }[] = [];
+    for (const b of bookings) {
+      if (!b.bookingDate) continue;
+      for (const item of b.items) {
+        const cat = item.category;
+        if (cat !== "Course" && cat !== "Lesson") continue;
+        const dur = parseDurationDays(item.productName);
+        for (let i = 0; i < dur; i++) {
+          if (addDays(b.bookingDate, i) === dateStr) {
+            const custKey = b.customerName.toLowerCase().trim();
+            const customer = customers.find(c => `${c.firstName} ${c.lastName}`.toLowerCase().trim() === custKey);
+            const info = customerBookingInfo.get(custKey);
+            result.push({
+              customerName: b.customerName,
+              productName: item.productName,
+              isKww: customer?.guestType === "KiteWorldWide",
+              hasUnpaid: info?.hasUnpaid ?? false,
+            });
+            break;
+          }
+        }
+      }
+    }
+    return result;
+  }, [bookings, customers, customerBookingInfo, dateStr]);
+
+  return (
+    <Card data-testid="courses-today-tomorrow">
+      <CardContent className="p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <GraduationCap className="h-4 w-4 text-blue-600" />
+            <p className="text-sm font-semibold">Courses</p>
+          </div>
+          <div className="flex shrink-0">
+            {(["Today", "Tomorrow"] as const).map((label, i) => (
+              <button
+                key={label}
+                onClick={() => setActiveDay(i as 0 | 1)}
+                className={`px-2.5 py-0.5 text-[10px] font-semibold rounded-full transition-colors ${
+                  activeDay === i
+                    ? "bg-blue-500 text-white"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                data-testid={`button-courses-${label.toLowerCase()}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {courses.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground italic">No courses</p>
+        ) : (
+          <div className="space-y-1">
+            {courses.map((c, i) => (
+              <div key={i} className="flex items-center justify-between gap-2 text-[11px]" data-testid={`course-entry-${i}`}>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className={`shrink-0 text-[8px] px-1 py-0.5 rounded-full font-medium ${c.isKww ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"}`}>
+                    {c.isKww ? "KWW" : "W-in"}
+                  </span>
+                  <span className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${c.hasUnpaid ? "bg-red-500" : "bg-green-500"}`} />
+                  <span className="font-medium truncate">{c.customerName}</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground shrink-0 truncate max-w-[140px]">{c.productName}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function ForecastTab({ schoolConfigId, currency, stationName }: { schoolConfigId: number; currency: string; stationName: string }) {
   const [detailView, setDetailView] = useState<ForecastDetail>(null);
   const { data: customers = [], isLoading: loadingCustomers } = useQuery<SchoolCustomer[]>({
@@ -1966,77 +2051,7 @@ function ForecastTab({ schoolConfigId, currency, stationName }: { schoolConfigId
         </div>
       </div>
 
-      {(() => {
-        const tomorrow = addDays(today, 1);
-        const courseListForDay = (dateStr: string) => {
-          const result: { customerName: string; productName: string; isKww: boolean; hasUnpaid: boolean }[] = [];
-          for (const b of bookings) {
-            if (!b.bookingDate) continue;
-            for (const item of b.items) {
-              const cat = item.category;
-              if (cat !== "Course" && cat !== "Lesson") continue;
-              const dur = parseDurationDays(item.productName);
-              for (let i = 0; i < dur; i++) {
-                if (addDays(b.bookingDate, i) === dateStr) {
-                  const custKey = b.customerName.toLowerCase().trim();
-                  const customer = customers.find(c => `${c.firstName} ${c.lastName}`.toLowerCase().trim() === custKey);
-                  const info = customerBookingInfo.get(custKey);
-                  result.push({
-                    customerName: b.customerName,
-                    productName: item.productName,
-                    isKww: customer?.guestType === "KiteWorldWide",
-                    hasUnpaid: info?.hasUnpaid ?? false,
-                  });
-                  break;
-                }
-              }
-            }
-          }
-          return result;
-        };
-
-        const todayCourses = courseListForDay(today);
-        const tomorrowCourses = courseListForDay(tomorrow);
-
-        if (todayCourses.length === 0 && tomorrowCourses.length === 0) return null;
-
-        const renderList = (label: string, courses: typeof todayCourses) => (
-          <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
-            {courses.length === 0 ? (
-              <p className="text-[10px] text-muted-foreground italic">No courses</p>
-            ) : (
-              <div className="space-y-1">
-                {courses.map((c, i) => (
-                  <div key={i} className="flex items-center justify-between gap-2 text-[11px]" data-testid={`course-entry-${label.toLowerCase()}-${i}`}>
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className={`shrink-0 text-[8px] px-1 py-0.5 rounded-full font-medium ${c.isKww ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"}`}>
-                        {c.isKww ? "KWW" : "W-in"}
-                      </span>
-                      <span className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${c.hasUnpaid ? "bg-red-500" : "bg-green-500"}`} />
-                      <span className="font-medium truncate">{c.customerName}</span>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground shrink-0 truncate max-w-[140px]">{c.productName}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-
-        return (
-          <Card data-testid="courses-today-tomorrow">
-            <CardContent className="p-3 space-y-3">
-              <div className="flex items-center gap-1.5">
-                <GraduationCap className="h-4 w-4 text-blue-600" />
-                <p className="text-sm font-semibold">Courses</p>
-              </div>
-              {renderList("Today", todayCourses)}
-              {renderList("Tomorrow", tomorrowCourses)}
-            </CardContent>
-          </Card>
-        );
-      })()}
+      <CourseListWidget today={today} bookings={bookings} customers={customers} customerBookingInfo={customerBookingInfo} />
     </div>
   );
 }
