@@ -2494,7 +2494,7 @@ function FinanceTab({ schoolConfigId, currency }: { schoolConfigId: number; curr
                   </div>
                   {exp.receiptUrl && (
                     <button onClick={() => setViewReceiptUrl(exp.receiptUrl)} className="shrink-0" data-testid={`btn-view-receipt-${exp.id}`}>
-                      <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+                      <img src={exp.receiptUrl} alt="Receipt" className="h-8 w-8 rounded object-cover border" />
                     </button>
                   )}
                   <span className="text-sm font-semibold text-orange-600 dark:text-orange-400 shrink-0">

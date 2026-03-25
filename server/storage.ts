@@ -247,7 +247,9 @@ export interface IStorage {
   getNextBookingNumber(schoolConfigId: number, stationShortCode: string): Promise<string>;
 
   getCashRegisterEntry(schoolConfigId: number, date: string): Promise<CashRegisterEntry | undefined>;
+  getCashRegisterEntries(schoolConfigId: number, startDate?: string, endDate?: string): Promise<CashRegisterEntry[]>;
   upsertCashRegisterEntry(entry: InsertCashRegisterEntry): Promise<CashRegisterEntry>;
+  deleteCashRegisterEntry(schoolConfigId: number, date: string): Promise<void>;
 
   getSchoolExpenses(schoolConfigId: number, startDate?: string, endDate?: string): Promise<SchoolExpense[]>;
   createSchoolExpense(expense: InsertSchoolExpense): Promise<SchoolExpense>;
@@ -1800,6 +1802,15 @@ export class DatabaseStorage implements IStorage {
     return entry;
   }
 
+  async getCashRegisterEntries(schoolConfigId: number, startDate?: string, endDate?: string): Promise<CashRegisterEntry[]> {
+    const conditions = [eq(cashRegisterEntries.schoolConfigId, schoolConfigId)];
+    if (startDate) conditions.push(sql`${cashRegisterEntries.date} >= ${startDate}`);
+    if (endDate) conditions.push(sql`${cashRegisterEntries.date} <= ${endDate}`);
+    return db.select().from(cashRegisterEntries)
+      .where(and(...conditions))
+      .orderBy(desc(cashRegisterEntries.date));
+  }
+
   async upsertCashRegisterEntry(entry: InsertCashRegisterEntry): Promise<CashRegisterEntry> {
     const existing = await this.getCashRegisterEntry(entry.schoolConfigId, entry.date);
     if (existing) {
@@ -1811,6 +1822,11 @@ export class DatabaseStorage implements IStorage {
     }
     const [created] = await db.insert(cashRegisterEntries).values(entry).returning();
     return created;
+  }
+
+  async deleteCashRegisterEntry(schoolConfigId: number, date: string): Promise<void> {
+    await db.delete(cashRegisterEntries)
+      .where(and(eq(cashRegisterEntries.schoolConfigId, schoolConfigId), eq(cashRegisterEntries.date, date)));
   }
 
   async getSchoolExpenses(schoolConfigId: number, startDate?: string, endDate?: string): Promise<SchoolExpense[]> {

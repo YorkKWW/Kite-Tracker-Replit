@@ -4164,7 +4164,80 @@ export async function registerRoutes(
     }
   });
 
+  // ── Finance: Summary ───────────────────────────────────────────────────
+  app.get("/api/finance-summary/:schoolConfigId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid school config ID" });
+      if (user.role === "station_lead") {
+        const config = await storage.getSchoolConfig(schoolConfigId);
+        if (!config || config.stationId !== user.assignedStationId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      const { startDate, endDate } = req.query;
+      const bookings = await storage.getSchoolBookings(schoolConfigId);
+      const filteredBookings = bookings.filter(b => {
+        if (startDate && b.bookingDate < (startDate as string)) return false;
+        if (endDate && b.bookingDate > (endDate as string)) return false;
+        return true;
+      });
+      let cashTotal = 0, cardTotal = 0, unpaidTotal = 0;
+      for (const b of filteredBookings) {
+        const amt = parseFloat(b.totalAmount) || 0;
+        if (b.paymentStatus === "cash") cashTotal += amt;
+        else if (b.paymentStatus === "credit_card") cardTotal += amt;
+        else unpaidTotal += amt;
+      }
+      const expenses = await storage.getSchoolExpenses(
+        schoolConfigId,
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+      const expenseTotal = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+      const paidTotal = cashTotal + cardTotal;
+      res.json({
+        paidTotal: paidTotal.toFixed(2),
+        cashTotal: cashTotal.toFixed(2),
+        cardTotal: cardTotal.toFixed(2),
+        unpaidTotal: unpaidTotal.toFixed(2),
+        expenseTotal: expenseTotal.toFixed(2),
+        netResult: (paidTotal - expenseTotal).toFixed(2),
+        bookingCount: filteredBookings.length,
+        expenseCount: expenses.length,
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── Finance: Cash Register ─────────────────────────────────────────────
+  app.get("/api/cash-register/:schoolConfigId", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid school config ID" });
+      if (user.role === "station_lead") {
+        const config = await storage.getSchoolConfig(schoolConfigId);
+        if (!config || config.stationId !== user.assignedStationId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      const { startDate, endDate } = req.query;
+      const entries = await storage.getCashRegisterEntries(schoolConfigId, startDate as string | undefined, endDate as string | undefined);
+      res.json(entries);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.get("/api/cash-register/:schoolConfigId/:date", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
@@ -4210,6 +4283,27 @@ export async function registerRoutes(
         createdBy: user.id,
       });
       res.json(entry);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.delete("/api/cash-register/:schoolConfigId/:date", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.role !== "station_lead") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid school config ID" });
+      if (user.role === "station_lead") {
+        const config = await storage.getSchoolConfig(schoolConfigId);
+        if (!config || config.stationId !== user.assignedStationId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      await storage.deleteCashRegisterEntry(schoolConfigId, req.params.date);
+      res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
