@@ -1397,6 +1397,7 @@ function BookingTimeline({
     const rentals: TimelineItem[] = [];
 
     for (const b of bookings) {
+      if (!b.bookingDate) continue;
       for (const item of b.items) {
         const cat = item.category;
         if (cat !== "Course" && cat !== "Lesson" && cat !== "Rental") continue;
