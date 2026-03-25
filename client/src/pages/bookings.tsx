@@ -334,7 +334,7 @@ export default function BookingsPage() {
           onClose={() => setDetailBooking(null)}
           onPaymentUpdate={(status) => {
             paymentUpdateMutation.mutate({ id: detailBooking.id, paymentStatus: status });
-            setDetailBooking({ ...detailBooking, paymentStatus: status as any });
+            setDetailBooking({ ...detailBooking, paymentStatus: status as "unpaid" | "cash" | "credit_card" });
           }}
           onEmail={() => emailMutation.mutate(detailBooking.id)}
           emailPending={emailMutation.isPending}

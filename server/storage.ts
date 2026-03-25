@@ -240,7 +240,7 @@ export interface IStorage {
   getSchoolBookings(schoolConfigId: number): Promise<(SchoolBooking & { items: SchoolBookingItem[]; createdByName: string | null })[]>;
   getSchoolBooking(id: number): Promise<(SchoolBooking & { items: SchoolBookingItem[]; createdByName: string | null }) | undefined>;
   createSchoolBooking(booking: InsertSchoolBooking, items: Omit<InsertSchoolBookingItem, "bookingId">[]): Promise<SchoolBooking>;
-  updateSchoolBookingPayment(id: number, paymentStatus: string): Promise<SchoolBooking | undefined>;
+  updateSchoolBookingPayment(id: number, paymentStatus: "unpaid" | "cash" | "credit_card"): Promise<SchoolBooking | undefined>;
   getNextBookingNumber(schoolConfigId: number, stationShortCode: string): Promise<string>;
 }
 
@@ -1760,9 +1760,9 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async updateSchoolBookingPayment(id: number, paymentStatus: string): Promise<SchoolBooking | undefined> {
+  async updateSchoolBookingPayment(id: number, paymentStatus: "unpaid" | "cash" | "credit_card"): Promise<SchoolBooking | undefined> {
     const [updated] = await db.update(schoolBookings)
-      .set({ paymentStatus: paymentStatus as any })
+      .set({ paymentStatus })
       .where(eq(schoolBookings.id, id))
       .returning();
     return updated;

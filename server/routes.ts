@@ -3776,24 +3776,6 @@ export async function registerRoutes(
     return stationName.substring(0, 2).toUpperCase();
   }
 
-  app.get("/api/school-bookings/:schoolConfigId", requireAuth, async (req, res) => {
-    try {
-      const schoolConfigId = parseInt(req.params.schoolConfigId);
-      if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid school config ID" });
-      const user = req.user as any;
-      if (user.role === "station_lead") {
-        const config = await storage.getSchoolConfig(schoolConfigId);
-        if (!config || config.stationId !== user.assignedStationId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-      }
-      const bookings = await storage.getSchoolBookings(schoolConfigId);
-      res.json(bookings);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
-    }
-  });
-
   app.get("/api/school-bookings/detail/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -3827,6 +3809,24 @@ export async function registerRoutes(
       const shortCode = getStationShortCode(station?.name || "XX");
       const bookingNumber = await storage.getNextBookingNumber(schoolConfigId, shortCode);
       res.json({ bookingNumber });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/school-bookings/:schoolConfigId", requireAuth, async (req, res) => {
+    try {
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      if (isNaN(schoolConfigId)) return res.status(400).json({ message: "Invalid school config ID" });
+      const user = req.user as any;
+      if (user.role === "station_lead") {
+        const config = await storage.getSchoolConfig(schoolConfigId);
+        if (!config || config.stationId !== user.assignedStationId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      const bookings = await storage.getSchoolBookings(schoolConfigId);
+      res.json(bookings);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
