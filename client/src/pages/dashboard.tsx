@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Package, AlertTriangle, ArrowLeftRight, MapPin, MessageSquarePlus, ClipboardCheck, ShoppingCart, Users, Calendar, Wind, Thermometer, Navigation, GraduationCap, Tag, LogIn, LogOut } from "lucide-react";
+import { Package, AlertTriangle, ArrowLeftRight, MapPin, MessageSquarePlus, ClipboardCheck, ShoppingCart, Users, Calendar, Wind, Thermometer, Navigation, GraduationCap, Tag, LogIn, LogOut, Shirt, Wrench } from "lucide-react";
 import type { Transfer, Station, Equipment } from "@shared/schema";
 import { EQUIPMENT_TYPE_LABELS } from "@shared/schema";
 
@@ -118,6 +118,15 @@ export default function DashboardPage() {
   if (actualIsStationLead) {
     const featureCards = [
       {
+        label: "Equipment List",
+        href: "/equipment",
+        icon: Package,
+        color: "text-primary",
+        bgColor: "bg-primary/10",
+        borderColor: "border-primary/20",
+        description: "Manage inventory",
+      },
+      {
         label: "Quick Inventory",
         href: "/quick-inventory",
         icon: ClipboardCheck,
@@ -127,31 +136,31 @@ export default function DashboardPage() {
         description: "Count & check equipment",
       },
       {
-        label: "Equipment",
-        href: "/equipment",
-        icon: Package,
-        color: "text-primary",
-        bgColor: "bg-primary/10",
-        borderColor: "border-primary/20",
-        description: "Manage inventory",
+        label: "Accessories",
+        href: "/accessories",
+        icon: Shirt,
+        color: "text-orange-600 dark:text-orange-400",
+        bgColor: "bg-orange-50 dark:bg-orange-950/30",
+        borderColor: "border-orange-200 dark:border-orange-800",
+        description: "Manage accessories",
       },
       {
-        label: "Sales",
-        href: "/sales",
-        icon: ShoppingCart,
-        color: "text-emerald-600 dark:text-emerald-400",
-        bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
-        borderColor: "border-emerald-200 dark:border-emerald-800",
-        description: "Process rentals & sales",
+        label: "Transfers",
+        href: "/transfers",
+        icon: ArrowLeftRight,
+        color: "text-cyan-600 dark:text-cyan-400",
+        bgColor: "bg-cyan-50 dark:bg-cyan-950/30",
+        borderColor: "border-cyan-200 dark:border-cyan-800",
+        description: "Equipment transfers",
       },
       {
-        label: "Customers",
-        href: "/customers",
-        icon: Users,
-        color: "text-purple-600 dark:text-purple-400",
-        bgColor: "bg-purple-50 dark:bg-purple-950/30",
-        borderColor: "border-purple-200 dark:border-purple-800",
-        description: "Manage contacts",
+        label: "Repairs",
+        href: "/repairs",
+        icon: Wrench,
+        color: "text-amber-600 dark:text-amber-400",
+        bgColor: "bg-amber-50 dark:bg-amber-950/30",
+        borderColor: "border-amber-200 dark:border-amber-800",
+        description: "Track repairs",
       },
     ];
 
@@ -159,94 +168,16 @@ export default function DashboardPage() {
       <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight" data-testid="text-dashboard-title">
-            Welcome, {user?.name}
+            Equipment
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             {isStationLeadView
-              ? `${stationsList?.find(s => s.id === simStationId)?.name ?? "..."} · Station Overview`
-              : "Your station overview"}
+              ? `${stationsList?.find(s => s.id === simStationId)?.name ?? "..."} · Gear & Logistics`
+              : "Gear & logistics overview"}
           </p>
         </div>
 
-        {/* Weather widget */}
-        <WeatherWidget stationName={
-          isStationLeadView
-            ? stationsList?.find(s => s.id === simStationId)?.name ?? ""
-            : stationsList?.find(s => s.id === (user as any)?.assignedStationId)?.name ?? ""
-        } />
-
-        {/* Customer overview card */}
-        <Link href="/customers">
-          <Card className="cursor-pointer border-purple-200 dark:border-purple-800 hover:shadow-md transition-all">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Users className="h-4 w-4 text-purple-500 shrink-0" />
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Guests on site</span>
-              </div>
-
-              {!customersSummary || !Array.isArray(customersSummary) ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-9 w-full rounded-lg" />)}
-                </div>
-              ) : (
-                <div>
-                  {/* Column headers */}
-                  <div className="flex items-center justify-between px-2 mb-0.5">
-                    <span className="text-[9px] text-muted-foreground w-20" />
-                    <div className="flex gap-3">
-                      {[
-                        { icon: <LogIn className="h-3 w-3" />, label: "Arr", cls: "text-emerald-500" },
-                        { icon: <LogOut className="h-3 w-3" />, label: "Dep", cls: "text-amber-500" },
-                        { icon: <GraduationCap className="h-3 w-3" />, label: "Crs", cls: "text-purple-400" },
-                        { icon: <Tag className="h-3 w-3" />, label: "Rnt", cls: "text-slate-400" },
-                      ].map(({ icon, label, cls }) => (
-                        <div key={label} className={`flex flex-col items-center w-7 ${cls}`}>
-                          {icon}
-                          <span className="text-[8px] leading-none mt-0.5">{label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-px">
-                    {customersSummary.map((row, i) => {
-                      const d = new Date(row.date + "T12:00:00");
-                      const isToday = i === 0;
-                      const isTomorrow = i === 1;
-                      const label = isToday
-                        ? "Today"
-                        : isTomorrow
-                        ? "Tomorrow"
-                        : d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
-
-                      return (
-                        <div
-                          key={row.date}
-                          className={`flex items-center justify-between px-2 py-1 rounded-md ${
-                            isToday ? "bg-purple-600" : "bg-slate-50 dark:bg-slate-800/40"
-                          }`}
-                        >
-                          <span className={`text-sm font-semibold ${isToday ? "text-white" : "text-foreground"}`}>
-                            {label}
-                          </span>
-                          <div className="flex gap-3">
-                            <span className={`text-sm font-bold w-7 text-center ${isToday ? "text-emerald-200" : "text-emerald-600 dark:text-emerald-400"}`} data-testid={`text-customers-arrivals-${i}`}>{row.arrivals}</span>
-                            <span className={`text-sm font-bold w-7 text-center ${isToday ? "text-amber-200" : "text-amber-500 dark:text-amber-400"}`} data-testid={`text-customers-departures-${i}`}>{row.departures}</span>
-                            <span className={`text-sm font-bold w-7 text-center ${isToday ? "text-white" : "text-purple-600 dark:text-purple-400"}`} data-testid={`text-customers-course-${i}`}>{row.course}</span>
-                            <span className={`text-sm font-bold w-7 text-center ${isToday ? "text-purple-200" : "text-slate-400"}`} data-testid={`text-customers-rental-${i}`}>{row.rental}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </Link>
-
-        {/* Large feature cards */}
+        {/* Equipment sub-navigation cards */}
         <div className="grid grid-cols-2 gap-3 md:gap-4">
           {featureCards.map((card) => (
             <Link key={card.href} href={card.href}>

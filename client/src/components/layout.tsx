@@ -128,11 +128,6 @@ export default function Layout({ children }: LayoutProps) {
   const navItems = isStationLead ? [
     { href: "/center", label: "Center", icon: Store },
     { href: "/", label: "Equipment", icon: Package },
-    { href: "/equipment", label: "Equipment List", icon: Package },
-    { href: "/quick-inventory", label: "Quick Inventory", icon: ClipboardCheck },
-    { href: "/accessories", label: "Accessories", icon: ShirtIcon },
-    { href: "/transfers", label: "Transfers", icon: ArrowLeftRight },
-    { href: "/repairs", label: "Repairs", icon: Wrench },
     { href: "/settings", label: "Settings", icon: Settings },
   ] : [
     ...(isAdmin ? [
@@ -597,17 +592,19 @@ export default function Layout({ children }: LayoutProps) {
               </button>
             </Link>
           ))}
-          <button
-            className={cn(
-              "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors min-w-[60px]",
-              mobileMenuOpen ? "text-primary" : "text-muted-foreground"
-            )}
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            data-testid="link-bottom-nav-more"
-          >
-            <MoreHorizontal className="h-5 w-5" />
-            <span className="text-[10px] font-medium">More</span>
-          </button>
+          {navItems.some((item) => !bottomTabs.some((bt) => bt.href === item.href)) && (
+            <button
+              className={cn(
+                "flex flex-col items-center gap-1 px-3 py-2 rounded-md transition-colors min-w-[60px]",
+                mobileMenuOpen ? "text-primary" : "text-muted-foreground"
+              )}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              data-testid="link-bottom-nav-more"
+            >
+              <MoreHorizontal className="h-5 w-5" />
+              <span className="text-[10px] font-medium">More</span>
+            </button>
+          )}
         </div>
       </nav>
 
