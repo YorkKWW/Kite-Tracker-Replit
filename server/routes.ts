@@ -3655,6 +3655,170 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/school-bookings/import-bos/:schoolConfigId", requireAdmin, async (req, res) => {
+    try {
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      const config = await storage.getSchoolConfig(schoolConfigId);
+      if (!config) return res.status(404).json({ message: "School config not found" });
+      if (!config.destinationCodeBos) return res.status(400).json({ message: "No BOS destination code configured" });
+
+      const apiKey = process.env.BOS_API_KEY;
+      if (!apiKey) return res.status(500).json({ message: "BOS_API_KEY not configured" });
+
+      const dest = encodeURIComponent(config.destinationCodeBos);
+      const bosUrl = `https://bos.kiteworldwide.com/api/external/futureKiteSchoolData?destination=${dest}`;
+      const bosRes = await fetch(bosUrl, { headers: { Apikey: apiKey } });
+      if (!bosRes.ok) return res.status(502).json({ message: `BOS API error: ${bosRes.status}` });
+
+      type BosOperation = {
+        vog_akww: string;
+        vog_kundennummer: string;
+        bng_version: string;
+        bng_swuensche: string;
+        bng_reisebeginn: string;
+        bng_reiseende: string;
+        op_storno: string;
+        main_traveller: {
+          kstm_kundennummer: string;
+          kstm_email: string;
+          kstm_strasse: string;
+          kstm_hnummer: string;
+          kstm_plz: string;
+          kstm_ort: string;
+          kstm_land: string;
+          kstm_mobil: string;
+          kstm_festnetz: string;
+          rtnb_vorname: string;
+          rtnb_nachname: string;
+          rtnb_gebdat: string;
+          rtnb_kitelevel: string;
+          rtnb_gewicht: string;
+        };
+        sub_travellers: Array<{ tnnr: string; rtnb_vorname: string; rtnb_nachname: string }>;
+        packages: Array<{ tnuntbng_akww: string; tnuntbng_tnnr: string; tnuntbng_paket: string }>;
+        zusatzleistungen: Array<{ tnzuslbng_akww: string; tnzuslbng_tnnr: string; tnzuslbng_zuslcode: string }>;
+      };
+
+      const bosData = await bosRes.json() as { kiteBookings: { operations: BosOperation[] } };
+      const ops = bosData.kiteBookings.operations;
+
+      const existingCustomers = await storage.getSchoolCustomers(schoolConfigId);
+      const customerByBosNr = new Map(existingCustomers.filter(c => c.bosCustomerNumber).map(c => [c.bosCustomerNumber, c]));
+
+      const products = await storage.getSchoolProducts(schoolConfigId);
+      const productByBosCode = new Map(products.filter(p => p.bosCode).map(p => [p.bosCode, p]));
+
+      const travellers = new Map<string, { tnnr: string; name: string }>();
+      for (const op of ops) {
+        const t = op.main_traveller;
+        travellers.set(`${op.vog_akww}-${t.kstm_kundennummer}`, { tnnr: "1", name: `${t.rtnb_vorname} ${t.rtnb_nachname}` });
+        for (const st of op.sub_travellers) {
+          travellers.set(`${op.vog_akww}-${st.tnnr}`, { tnnr: st.tnnr, name: `${st.rtnb_vorname} ${st.rtnb_nachname}` });
+        }
+      }
+
+      let created = 0, updated = 0, unchanged = 0, deleted = 0, skippedNoCustomer = 0, skippedStorno = 0;
+      const skippedProducts: string[] = [];
+
+      for (const op of ops) {
+        const bookingNumber = op.vog_akww;
+        const isStorno = op.op_storno === "1";
+        const existing = await storage.getSchoolBookingByNumber(bookingNumber);
+
+        if (!existing && isStorno) { skippedStorno++; continue; }
+
+        if (existing && isStorno) {
+          await storage.deleteSchoolBooking(existing.id);
+          deleted++;
+          continue;
+        }
+
+        if (existing && existing.bookingVersionBos === op.bng_version) {
+          unchanged++;
+          continue;
+        }
+
+        const customer = customerByBosNr.get(op.main_traveller.kstm_kundennummer);
+        if (!customer) { skippedNoCustomer++; continue; }
+
+        const t = op.main_traveller;
+        const customerAddress = [t.kstm_strasse, t.kstm_hnummer].filter(Boolean).join(" ");
+        const customerCity = [t.kstm_plz, t.kstm_ort].filter(Boolean).join(" ");
+        const addressParts = [customerAddress, customerCity, t.kstm_land].filter(Boolean);
+
+        const items: Array<{ productId: number | null; productName: string; category: string; quantity: number; unitPrice: string; lineTotal: string }> = [];
+
+        for (const pkg of op.packages) {
+          const product = productByBosCode.get(pkg.tnuntbng_paket);
+          if (!product) {
+            if (!skippedProducts.includes(pkg.tnuntbng_paket)) skippedProducts.push(pkg.tnuntbng_paket);
+            continue;
+          }
+          const trav = travellers.get(`${op.vog_akww}-${pkg.tnuntbng_tnnr}`);
+          const label = trav ? `${product.name} (${trav.name})` : product.name;
+          items.push({
+            productId: product.id,
+            productName: label,
+            category: product.category,
+            quantity: 1,
+            unitPrice: product.defaultPrice,
+            lineTotal: product.defaultPrice,
+          });
+        }
+
+        for (const zl of op.zusatzleistungen) {
+          if (zl.tnzuslbng_zuslcode.startsWith("VER")) continue;
+          const product = productByBosCode.get(zl.tnzuslbng_zuslcode);
+          if (!product) {
+            if (!skippedProducts.includes(zl.tnzuslbng_zuslcode)) skippedProducts.push(zl.tnzuslbng_zuslcode);
+            continue;
+          }
+          const trav = travellers.get(`${op.vog_akww}-${zl.tnzuslbng_tnnr}`);
+          const label = trav ? `${product.name} (${trav.name})` : product.name;
+          items.push({
+            productId: product.id,
+            productName: label,
+            category: product.category,
+            quantity: 1,
+            unitPrice: product.defaultPrice,
+            lineTotal: product.defaultPrice,
+          });
+        }
+
+        const totalAmount = items.reduce((sum, i) => sum + parseFloat(i.lineTotal || "0"), 0).toFixed(2);
+        const noteParts = [op.bng_swuensche, addressParts.length > 0 ? `Adresse: ${addressParts.join(", ")}` : ""].filter(Boolean);
+
+        const bookingData = {
+          schoolConfigId,
+          bookingNumber,
+          customerId: customer.id,
+          customerName: `${t.rtnb_vorname} ${t.rtnb_nachname}`,
+          customerEmail: t.kstm_email || null,
+          bookingDate: op.bng_reisebeginn,
+          paymentStatus: "paid" as const,
+          totalAmount,
+          currency: "EUR",
+          notes: noteParts.join("; ") || null,
+          bookingVersionBos: op.bng_version,
+        };
+
+        if (existing) {
+          await storage.updateSchoolBooking(existing.id, bookingData, items);
+          updated++;
+        } else {
+          await storage.createSchoolBooking(bookingData, items);
+          created++;
+        }
+
+        if (req.query.limit === "1" && created >= 1) break;
+      }
+
+      res.json({ created, updated, unchanged, deleted, skippedNoCustomer, skippedStorno, skippedProducts, totalBosBookings: ops.length });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.patch("/api/school-products/:id", requireAdmin, async (req, res) => {
     const schema = z.object({
       name: z.string().min(1).optional(),

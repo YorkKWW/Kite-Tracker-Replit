@@ -244,7 +244,10 @@ export interface IStorage {
   getSchoolBookings(schoolConfigId: number): Promise<(SchoolBooking & { items: SchoolBookingItem[]; createdByName: string | null })[]>;
   getSchoolBooking(id: number): Promise<(SchoolBooking & { items: SchoolBookingItem[]; createdByName: string | null }) | undefined>;
   createSchoolBooking(booking: InsertSchoolBooking, items: Omit<InsertSchoolBookingItem, "bookingId">[]): Promise<SchoolBooking>;
-  updateSchoolBookingPayment(id: number, paymentStatus: "unpaid" | "cash" | "credit_card"): Promise<SchoolBooking | undefined>;
+  updateSchoolBooking(id: number, data: Partial<InsertSchoolBooking>, items?: Omit<InsertSchoolBookingItem, "bookingId">[]): Promise<SchoolBooking | undefined>;
+  deleteSchoolBooking(id: number): Promise<void>;
+  getSchoolBookingByNumber(bookingNumber: string): Promise<(SchoolBooking & { items: SchoolBookingItem[] }) | undefined>;
+  updateSchoolBookingPayment(id: number, paymentStatus: "unpaid" | "cash" | "credit_card" | "paid"): Promise<SchoolBooking | undefined>;
   getNextBookingNumber(schoolConfigId: number, stationShortCode: string): Promise<string>;
 
   getCashRegisterEntry(schoolConfigId: number, date: string): Promise<CashRegisterEntry | undefined>;
@@ -1807,7 +1810,35 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async updateSchoolBookingPayment(id: number, paymentStatus: "unpaid" | "cash" | "credit_card"): Promise<SchoolBooking | undefined> {
+  async updateSchoolBooking(id: number, data: Partial<InsertSchoolBooking>, items?: Omit<InsertSchoolBookingItem, "bookingId">[]): Promise<SchoolBooking | undefined> {
+    return await db.transaction(async (tx) => {
+      const [updated] = await tx.update(schoolBookings).set(data).where(eq(schoolBookings.id, id)).returning();
+      if (!updated) return undefined;
+      if (items) {
+        await tx.delete(schoolBookingItems).where(eq(schoolBookingItems.bookingId, id));
+        if (items.length > 0) {
+          await tx.insert(schoolBookingItems).values(items.map(item => ({ ...item, bookingId: id })));
+        }
+      }
+      return updated;
+    });
+  }
+
+  async deleteSchoolBooking(id: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(schoolBookingItems).where(eq(schoolBookingItems.bookingId, id));
+      await tx.delete(schoolBookings).where(eq(schoolBookings.id, id));
+    });
+  }
+
+  async getSchoolBookingByNumber(bookingNumber: string): Promise<(SchoolBooking & { items: SchoolBookingItem[] }) | undefined> {
+    const [row] = await db.select().from(schoolBookings).where(eq(schoolBookings.bookingNumber, bookingNumber));
+    if (!row) return undefined;
+    const items = await db.select().from(schoolBookingItems).where(eq(schoolBookingItems.bookingId, row.id));
+    return { ...row, items };
+  }
+
+  async updateSchoolBookingPayment(id: number, paymentStatus: "unpaid" | "cash" | "credit_card" | "paid"): Promise<SchoolBooking | undefined> {
     const [updated] = await db.update(schoolBookings)
       .set({ paymentStatus })
       .where(eq(schoolBookings.id, id))
