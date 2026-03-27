@@ -3561,6 +3561,7 @@ export async function registerRoutes(
               kstm_land: string;
               rtnb_vorname: string;
               rtnb_nachname: string;
+              rtnb_gebdat: string;
               rtnb_kitelevel: string;
               rtnb_gewicht: string;
             };
@@ -3569,6 +3570,14 @@ export async function registerRoutes(
       };
 
       const ops = bosData.kiteBookings.operations.filter(o => o.op_storno !== "1");
+
+      function parseBosDate(d: string): string {
+        if (!d) return "";
+        const parts = d.split(".");
+        if (parts.length !== 3) return "";
+        const [day, month, year] = parts;
+        return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+      }
 
       const kiteLevelMap: Record<string, string> = {
         "0": "Beginner", "1": "Beginner", "2": "Intermediate",
@@ -3603,6 +3612,7 @@ export async function registerRoutes(
           email: t.kstm_email || "",
           phone: t.kstm_mobil || t.kstm_festnetz || "",
           nationality: t.kstm_land || "",
+          dateOfBirth: parseBosDate(t.rtnb_gebdat),
           kiteLevel: kiteLevelMap[t.rtnb_kitelevel] || "Beginner",
           weightKg: parseInt(t.rtnb_gewicht) || null,
           arrivalDate: data.earliestStart,
@@ -3629,7 +3639,6 @@ export async function registerRoutes(
           await storage.createSchoolCustomer({
             schoolConfigId,
             guestType: "KiteWorldWide",
-            dateOfBirth: "",
             emergencyContact: "",
             bosCustomerNumber: custNr,
             ...fields,
