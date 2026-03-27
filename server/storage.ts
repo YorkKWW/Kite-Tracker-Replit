@@ -239,6 +239,7 @@ export interface IStorage {
   createSchoolProduct(product: InsertSchoolProduct): Promise<SchoolProduct>;
   updateSchoolProduct(id: number, data: Partial<InsertSchoolProduct>): Promise<SchoolProduct | undefined>;
   bulkImportSchoolProducts(schoolConfigId: number, products: Omit<InsertSchoolProduct, "schoolConfigId">[], replaceExisting: boolean): Promise<number>;
+  upsertBosProducts(schoolConfigId: number, products: { name: string; bosCode: string }[]): Promise<{ created: number; updated: number }>;
 
   getSchoolBookings(schoolConfigId: number): Promise<(SchoolBooking & { items: SchoolBookingItem[]; createdByName: string | null })[]>;
   getSchoolBooking(id: number): Promise<(SchoolBooking & { items: SchoolBookingItem[]; createdByName: string | null }) | undefined>;
@@ -1611,6 +1612,39 @@ export class DatabaseStorage implements IStorage {
         count++;
       }
       return count;
+    });
+  }
+
+  async upsertBosProducts(schoolConfigId: number, products: { name: string; bosCode: string }[]): Promise<{ created: number; updated: number }> {
+    return db.transaction(async (tx) => {
+      const existing = await tx.select().from(schoolProducts)
+        .where(and(
+          eq(schoolProducts.schoolConfigId, schoolConfigId),
+          eq(schoolProducts.source, "bos"),
+        ));
+      const byCode = Object.fromEntries(existing.filter(p => p.bosCode).map(p => [p.bosCode, p]));
+
+      let created = 0, updated = 0;
+      for (const p of products) {
+        const found = byCode[p.bosCode];
+        if (found) {
+          if (found.name !== p.name) {
+            await tx.update(schoolProducts).set({ name: p.name }).where(eq(schoolProducts.id, found.id));
+            updated++;
+          }
+        } else {
+          await tx.insert(schoolProducts).values({
+            schoolConfigId,
+            name: p.name,
+            category: "Package",
+            defaultPrice: "0.00",
+            source: "bos",
+            bosCode: p.bosCode,
+          });
+          created++;
+        }
+      }
+      return { created, updated };
     });
   }
 

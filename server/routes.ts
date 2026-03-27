@@ -3490,6 +3490,33 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/school-products/import-bos/:schoolConfigId", requireAdmin, async (req, res) => {
+    try {
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      const config = await storage.getSchoolConfig(schoolConfigId);
+      if (!config) return res.status(404).json({ message: "School config not found" });
+      if (!config.destinationCodeBos) return res.status(400).json({ message: "No BOS destination code configured for this school" });
+
+      const apiKey = process.env.BOS_API_KEY;
+      if (!apiKey) return res.status(500).json({ message: "BOS_API_KEY not configured" });
+
+      const bosUrl = `https://bos.kiteworldwide.com/api/external/packages?destination=${encodeURIComponent(config.destinationCodeBos)}`;
+      const bosRes = await fetch(bosUrl, { headers: { Apikey: apiKey } });
+      if (!bosRes.ok) return res.status(502).json({ message: `BOS API error: ${bosRes.status} ${bosRes.statusText}` });
+
+      const bosPackages = await bosRes.json() as Array<{ paketdest_paketcode: string; paket_name_en: string }>;
+      const products = bosPackages.map(p => ({
+        name: p.paket_name_en,
+        bosCode: p.paketdest_paketcode,
+      }));
+
+      const result = await storage.upsertBosProducts(schoolConfigId, products);
+      res.json({ ...result, total: bosPackages.length });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.patch("/api/school-products/:id", requireAdmin, async (req, res) => {
     const schema = z.object({
       name: z.string().min(1).optional(),
