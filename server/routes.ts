@@ -3449,12 +3449,11 @@ export async function registerRoutes(
       defaultPrice: z.union([z.string(), z.number()]).transform(v => String(v)),
       isActive: z.boolean().default(true),
       sortOrder: z.number().int().default(0),
-      source: z.enum(["walkin", "bos"]).default("walkin"),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
     try {
-      const product = await storage.createSchoolProduct(parsed.data);
+      const product = await storage.createSchoolProduct({ ...parsed.data, source: "walkin" });
       res.json(product);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -3497,7 +3496,6 @@ export async function registerRoutes(
       defaultPrice: z.union([z.string(), z.number()]).transform(v => String(v)).optional(),
       isActive: z.boolean().optional(),
       sortOrder: z.number().int().optional(),
-      source: z.enum(["walkin", "bos"]).optional(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
