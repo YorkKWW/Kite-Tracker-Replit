@@ -600,6 +600,11 @@ export const schoolConfigs = pgTable("school_configs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const PRODUCT_SOURCES = ["walkin", "bos"] as const;
+export type ProductSource = typeof PRODUCT_SOURCES[number];
+
+export const productSourceEnum = pgEnum("product_source", ["walkin", "bos"]);
+
 export const schoolProducts = pgTable("school_products", {
   id: serial("id").primaryKey(),
   schoolConfigId: integer("school_config_id").notNull().references(() => schoolConfigs.id),
@@ -609,6 +614,7 @@ export const schoolProducts = pgTable("school_products", {
   defaultPrice: decimal("default_price", { precision: 10, scale: 2 }).notNull(),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
+  source: productSourceEnum("source").notNull().default("walkin"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

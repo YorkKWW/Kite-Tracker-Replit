@@ -39,6 +39,7 @@ type SchoolProduct = {
   defaultPrice: string;
   isActive: boolean;
   sortOrder: number;
+  source: "walkin" | "bos";
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -431,6 +432,7 @@ export default function SchoolAdminPage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead>Source</TableHead>
                     <TableHead className="text-right">Price</TableHead>
                     <TableHead className="text-center">Sort</TableHead>
                     <TableHead className="text-center">Active</TableHead>
@@ -448,6 +450,15 @@ export default function SchoolAdminPage() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[p.category] ?? ""}`}>
                           {p.category}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          data-testid={`badge-source-${p.id}`}
+                          className={`text-[10px] ${p.source === "bos" ? "border-indigo-300 text-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-700" : "border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-400"}`}
+                        >
+                          {p.source === "bos" ? "BOS" : "Walk-in"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {formatPrice(p.defaultPrice, selectedConfig?.currency ?? "MAD")}

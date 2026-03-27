@@ -43,6 +43,7 @@ type SchoolProduct = {
   defaultPrice: string;
   isActive: boolean;
   sortOrder: number;
+  source: "walkin" | "bos";
 };
 
 type BookingItem = {
