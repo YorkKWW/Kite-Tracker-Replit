@@ -616,6 +616,7 @@ export const schoolProducts = pgTable("school_products", {
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   source: productSourceEnum("source").notNull().default("walkin"),
+  bosCode: text("bos_code"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
