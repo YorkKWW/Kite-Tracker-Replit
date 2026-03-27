@@ -3742,9 +3742,6 @@ export async function registerRoutes(
         if (!customer) { skippedNoCustomer++; continue; }
 
         const t = op.main_traveller;
-        const customerAddress = [t.kstm_strasse, t.kstm_hnummer].filter(Boolean).join(" ");
-        const customerCity = [t.kstm_plz, t.kstm_ort].filter(Boolean).join(" ");
-        const addressParts = [customerAddress, customerCity, t.kstm_land].filter(Boolean);
 
         const items: Array<{ productId: number | null; productName: string; category: string; quantity: number; unitPrice: string; lineTotal: string }> = [];
 
@@ -3786,7 +3783,6 @@ export async function registerRoutes(
         }
 
         const totalAmount = items.reduce((sum, i) => sum + parseFloat(i.lineTotal || "0"), 0).toFixed(2);
-        const noteParts = [op.bng_swuensche, addressParts.length > 0 ? `Adresse: ${addressParts.join(", ")}` : ""].filter(Boolean);
 
         const bookingData = {
           schoolConfigId,
@@ -3798,7 +3794,7 @@ export async function registerRoutes(
           paymentStatus: "paid" as const,
           totalAmount,
           currency: "EUR",
-          notes: noteParts.join("; ") || null,
+          notes: op.bng_swuensche || null,
           bookingVersionBos: op.bng_version,
         };
 
