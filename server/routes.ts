@@ -3643,7 +3643,7 @@ export async function registerRoutes(
               firstName: st.rtnb_vorname,
               lastName: st.rtnb_nachname,
               email: st.rtnb_email || "",
-              phone: st.rtnb_mobil || "",
+              phone: st.rtnb_mobil || mt.kstm_mobil || mt.kstm_festnetz || "",
               nationality: st.rtnb_land || "",
               dateOfBirth: parseBosDate(st.rtnb_gebdat),
               kiteLevel: kiteLevelMap[st.rtnb_kitelevel] || "Beginner",
