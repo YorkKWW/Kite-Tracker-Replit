@@ -3572,7 +3572,7 @@ export async function registerRoutes(
 
       const kiteLevelMap: Record<string, string> = {
         "0": "Beginner", "1": "Beginner", "2": "Intermediate",
-        "3": "Intermediate", "4": "Advanced", "5": "Pro",
+        "3": "Intermediate", "4": "Intermediate", "5": "Pro", "6": "Beginner",
       };
 
       const customerBookings = new Map<string, { traveller: typeof ops[0]["main_traveller"]; earliestStart: string; earliestEnd: string; notes: string[] }>();
