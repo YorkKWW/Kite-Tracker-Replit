@@ -661,6 +661,7 @@ export const schoolBookings = pgTable("school_bookings", {
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull().default("0"),
   currency: varchar("currency", { length: 3 }).notNull().default("MAD"),
   notes: text("notes"),
+  bookingVersionBos: text("booking_version_bos"),
   pdfUrl: text("pdf_url"),
   emailSentAt: timestamp("email_sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
