@@ -642,6 +642,7 @@ export const schoolCustomers = pgTable("school_customers", {
   arrivalDate: text("arrival_date").notNull(),
   departureDate: text("departure_date").notNull(),
   notes: text("notes"),
+  bosCustomerNumber: text("bos_customer_number"),
   createdAt: timestamp("created_at").defaultNow(),
   createdBy: integer("created_by").references(() => users.id),
 });

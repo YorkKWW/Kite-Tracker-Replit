@@ -3514,7 +3514,9 @@ export async function registerRoutes(
       const bosServices = await servicesRes.json() as Array<{ zusldest_zuslcode: string; zusldest_bezeichnung_en: string }>;
 
       const packages = bosPackages.map(p => ({ name: p.paket_name_en, bosCode: p.paketdest_paketcode }));
-      const services = bosServices.map(s => ({ name: s.zusldest_bezeichnung_en.trim(), bosCode: s.zusldest_zuslcode }));
+      const services = bosServices
+        .filter(s => !s.zusldest_zuslcode.startsWith("VER"))
+        .map(s => ({ name: s.zusldest_bezeichnung_en.trim(), bosCode: s.zusldest_zuslcode }));
 
       const pkgResult = await storage.upsertBosProducts(schoolConfigId, packages, "Package");
       const svcResult = await storage.upsertBosProducts(schoolConfigId, services, "Lesson");
