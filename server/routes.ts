@@ -3500,18 +3500,29 @@ export async function registerRoutes(
       const apiKey = process.env.BOS_API_KEY;
       if (!apiKey) return res.status(500).json({ message: "BOS_API_KEY not configured" });
 
-      const bosUrl = `https://bos.kiteworldwide.com/api/external/packages?destination=${encodeURIComponent(config.destinationCodeBos)}`;
-      const bosRes = await fetch(bosUrl, { headers: { Apikey: apiKey } });
-      if (!bosRes.ok) return res.status(502).json({ message: `BOS API error: ${bosRes.status} ${bosRes.statusText}` });
+      const dest = encodeURIComponent(config.destinationCodeBos);
+      const headers = { Apikey: apiKey };
 
-      const bosPackages = await bosRes.json() as Array<{ paketdest_paketcode: string; paket_name_en: string }>;
-      const products = bosPackages.map(p => ({
-        name: p.paket_name_en,
-        bosCode: p.paketdest_paketcode,
-      }));
+      const [packagesRes, servicesRes] = await Promise.all([
+        fetch(`https://bos.kiteworldwide.com/api/external/packages?destination=${dest}`, { headers }),
+        fetch(`https://bos.kiteworldwide.com/api/external/additionalServices?destination=${dest}`, { headers }),
+      ]);
+      if (!packagesRes.ok) return res.status(502).json({ message: `BOS packages API error: ${packagesRes.status}` });
+      if (!servicesRes.ok) return res.status(502).json({ message: `BOS additionalServices API error: ${servicesRes.status}` });
 
-      const result = await storage.upsertBosProducts(schoolConfigId, products);
-      res.json({ ...result, total: bosPackages.length });
+      const bosPackages = await packagesRes.json() as Array<{ paketdest_paketcode: string; paket_name_en: string }>;
+      const bosServices = await servicesRes.json() as Array<{ zusldest_zuslcode: string; zusldest_bezeichnung_en: string }>;
+
+      const packages = bosPackages.map(p => ({ name: p.paket_name_en, bosCode: p.paketdest_paketcode }));
+      const services = bosServices.map(s => ({ name: s.zusldest_bezeichnung_en.trim(), bosCode: s.zusldest_zuslcode }));
+
+      const pkgResult = await storage.upsertBosProducts(schoolConfigId, packages, "Package");
+      const svcResult = await storage.upsertBosProducts(schoolConfigId, services, "Lesson");
+
+      res.json({
+        packages: { ...pkgResult, total: bosPackages.length },
+        services: { ...svcResult, total: bosServices.length },
+      });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

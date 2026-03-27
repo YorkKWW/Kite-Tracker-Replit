@@ -1615,7 +1615,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async upsertBosProducts(schoolConfigId: number, products: { name: string; bosCode: string }[]): Promise<{ created: number; updated: number }> {
+  async upsertBosProducts(schoolConfigId: number, products: { name: string; bosCode: string }[], category: "Course" | "Lesson" | "Package" | "Rental" | "Other" = "Package"): Promise<{ created: number; updated: number }> {
     return db.transaction(async (tx) => {
       const existing = await tx.select().from(schoolProducts)
         .where(and(
@@ -1636,7 +1636,7 @@ export class DatabaseStorage implements IStorage {
           await tx.insert(schoolProducts).values({
             schoolConfigId,
             name: p.name,
-            category: "Package",
+            category,
             defaultPrice: "0.00",
             source: "bos",
             bosCode: p.bosCode,
