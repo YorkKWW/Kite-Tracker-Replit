@@ -3530,6 +3530,103 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/school-customers/import-bos/:schoolConfigId", requireAdmin, async (req, res) => {
+    try {
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      const config = await storage.getSchoolConfig(schoolConfigId);
+      if (!config) return res.status(404).json({ message: "School config not found" });
+      if (!config.destinationCodeBos) return res.status(400).json({ message: "No BOS destination code configured" });
+
+      const apiKey = process.env.BOS_API_KEY;
+      if (!apiKey) return res.status(500).json({ message: "BOS_API_KEY not configured" });
+
+      const bosUrl = `https://bos.kiteworldwide.com/api/external/futureKiteSchoolData?destination=${encodeURIComponent(config.destinationCodeBos)}`;
+      const bosRes = await fetch(bosUrl, { headers: { Apikey: apiKey } });
+      if (!bosRes.ok) return res.status(502).json({ message: `BOS API error: ${bosRes.status}` });
+
+      const bosData = await bosRes.json() as {
+        kiteBookings: {
+          operations: Array<{
+            vog_akww: string;
+            vog_kundennummer: string;
+            bng_swuensche: string;
+            bng_reisebeginn: string;
+            bng_reiseende: string;
+            op_storno: string;
+            main_traveller: {
+              kstm_kundennummer: string;
+              kstm_email: string;
+              kstm_mobil: string;
+              kstm_festnetz: string;
+              kstm_land: string;
+              rtnb_vorname: string;
+              rtnb_nachname: string;
+              rtnb_kitelevel: string;
+              rtnb_gewicht: string;
+            };
+          }>;
+        };
+      };
+
+      const ops = bosData.kiteBookings.operations.filter(o => o.op_storno !== "1");
+
+      const kiteLevelMap: Record<string, string> = {
+        "0": "Beginner", "1": "Beginner", "2": "Intermediate",
+        "3": "Intermediate", "4": "Advanced", "5": "Pro",
+      };
+
+      const customerBookings = new Map<string, { traveller: typeof ops[0]["main_traveller"]; earliestStart: string; earliestEnd: string; notes: string[] }>();
+      for (const op of ops) {
+        const custNr = op.main_traveller.kstm_kundennummer;
+        const existing = customerBookings.get(custNr);
+        if (!existing || op.bng_reisebeginn < existing.earliestStart) {
+          customerBookings.set(custNr, {
+            traveller: op.main_traveller,
+            earliestStart: op.bng_reisebeginn,
+            earliestEnd: op.bng_reiseende,
+            notes: op.bng_swuensche ? [op.bng_swuensche] : [],
+          });
+        } else if (op.bng_swuensche) {
+          existing.notes.push(op.bng_swuensche);
+        }
+      }
+
+      const existingCustomers = await storage.getSchoolCustomers(schoolConfigId);
+      const existingByBosNr = new Set(existingCustomers.filter(c => c.bosCustomerNumber).map(c => c.bosCustomerNumber));
+
+      let created = 0, skipped = 0;
+      for (const [custNr, data] of customerBookings) {
+        if (existingByBosNr.has(custNr)) { skipped++; continue; }
+
+        const t = data.traveller;
+        await storage.createSchoolCustomer({
+          schoolConfigId,
+          guestType: "KiteWorldWide",
+          firstName: t.rtnb_vorname,
+          lastName: t.rtnb_nachname,
+          email: t.kstm_email || "",
+          phone: t.kstm_mobil || t.kstm_festnetz || "",
+          nationality: t.kstm_land || "",
+          dateOfBirth: "",
+          kiteLevel: kiteLevelMap[t.rtnb_kitelevel] || "Beginner",
+          weightKg: parseInt(t.rtnb_gewicht) || null,
+          emergencyContact: "",
+          arrivalDate: data.earliestStart,
+          departureDate: data.earliestEnd,
+          notes: data.notes.join("; ") || null,
+          bosCustomerNumber: custNr,
+        });
+        created++;
+
+        if (req.query.limit === "1") break;
+      }
+
+      res.json({ created, skipped, totalBosCustomers: customerBookings.size });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.patch("/api/school-products/:id", requireAdmin, async (req, res) => {
     const schema = z.object({
       name: z.string().min(1).optional(),
