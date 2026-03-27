@@ -3544,31 +3544,41 @@ export async function registerRoutes(
       const bosRes = await fetch(bosUrl, { headers: { Apikey: apiKey } });
       if (!bosRes.ok) return res.status(502).json({ message: `BOS API error: ${bosRes.status}` });
 
-      const bosData = await bosRes.json() as {
-        kiteBookings: {
-          operations: Array<{
-            vog_akww: string;
-            vog_kundennummer: string;
-            bng_swuensche: string;
-            bng_reisebeginn: string;
-            bng_reiseende: string;
-            op_storno: string;
-            main_traveller: {
-              kstm_kundennummer: string;
-              kstm_email: string;
-              kstm_mobil: string;
-              kstm_festnetz: string;
-              kstm_land: string;
-              rtnb_vorname: string;
-              rtnb_nachname: string;
-              rtnb_gebdat: string;
-              rtnb_kitelevel: string;
-              rtnb_gewicht: string;
-            };
-          }>;
+      type BosCustOperation = {
+        vog_akww: string;
+        vog_kundennummer: string;
+        bng_swuensche: string;
+        bng_reisebeginn: string;
+        bng_reiseende: string;
+        op_storno: string;
+        main_traveller: {
+          kstm_kundennummer: string;
+          kstm_email: string;
+          kstm_mobil: string;
+          kstm_festnetz: string;
+          kstm_land: string;
+          tnnr: string;
+          rtnb_vorname: string;
+          rtnb_nachname: string;
+          rtnb_email: string;
+          rtnb_gebdat: string;
+          rtnb_kitelevel: string;
+          rtnb_gewicht: string;
         };
+        sub_travellers: Array<{
+          tnnr: string;
+          rtnb_vorname: string;
+          rtnb_nachname: string;
+          rtnb_email: string;
+          rtnb_gebdat: string;
+          rtnb_land: string;
+          rtnb_mobil: string;
+          rtnb_kitelevel: string;
+          rtnb_gewicht: string;
+        }>;
       };
 
+      const bosData = await bosRes.json() as { kiteBookings: { operations: BosCustOperation[] } };
       const ops = bosData.kiteBookings.operations.filter(o => o.op_storno !== "1");
 
       function parseBosDate(d: string): string {
@@ -3584,19 +3594,65 @@ export async function registerRoutes(
         "3": "Intermediate", "4": "Intermediate", "5": "Pro", "6": "Nonkite",
       };
 
-      const customerBookings = new Map<string, { traveller: typeof ops[0]["main_traveller"]; earliestStart: string; earliestEnd: string; notes: string[] }>();
+      type TravellerData = {
+        bosNr: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        phone: string;
+        nationality: string;
+        dateOfBirth: string;
+        kiteLevel: string;
+        weightKg: number | null;
+        earliestStart: string;
+        earliestEnd: string;
+        notes: string[];
+      };
+
+      const travellerMap = new Map<string, TravellerData>();
+
       for (const op of ops) {
-        const custNr = op.main_traveller.kstm_kundennummer;
-        const existing = customerBookings.get(custNr);
-        if (!existing || op.bng_reisebeginn < existing.earliestStart) {
-          customerBookings.set(custNr, {
-            traveller: op.main_traveller,
+        const mt = op.main_traveller;
+        const mainBosNr = mt.kstm_kundennummer;
+        const existingMain = travellerMap.get(mainBosNr);
+        if (!existingMain || op.bng_reisebeginn < existingMain.earliestStart) {
+          travellerMap.set(mainBosNr, {
+            bosNr: mainBosNr,
+            firstName: mt.rtnb_vorname,
+            lastName: mt.rtnb_nachname,
+            email: mt.kstm_email || mt.rtnb_email || "",
+            phone: mt.kstm_mobil || mt.kstm_festnetz || "",
+            nationality: mt.kstm_land || "",
+            dateOfBirth: parseBosDate(mt.rtnb_gebdat),
+            kiteLevel: kiteLevelMap[mt.rtnb_kitelevel] || "Beginner",
+            weightKg: parseInt(mt.rtnb_gewicht) || null,
             earliestStart: op.bng_reisebeginn,
             earliestEnd: op.bng_reiseende,
             notes: op.bng_swuensche ? [op.bng_swuensche] : [],
           });
         } else if (op.bng_swuensche) {
-          existing.notes.push(op.bng_swuensche);
+          existingMain.notes.push(op.bng_swuensche);
+        }
+
+        for (const st of op.sub_travellers) {
+          const subBosNr = `${mt.kstm_kundennummer}-${st.tnnr}`;
+          const existingSub = travellerMap.get(subBosNr);
+          if (!existingSub || op.bng_reisebeginn < existingSub.earliestStart) {
+            travellerMap.set(subBosNr, {
+              bosNr: subBosNr,
+              firstName: st.rtnb_vorname,
+              lastName: st.rtnb_nachname,
+              email: st.rtnb_email || "",
+              phone: st.rtnb_mobil || "",
+              nationality: st.rtnb_land || "",
+              dateOfBirth: parseBosDate(st.rtnb_gebdat),
+              kiteLevel: kiteLevelMap[st.rtnb_kitelevel] || "Beginner",
+              weightKg: parseInt(st.rtnb_gewicht) || null,
+              earliestStart: op.bng_reisebeginn,
+              earliestEnd: op.bng_reiseende,
+              notes: [],
+            });
+          }
         }
       }
 
@@ -3604,23 +3660,22 @@ export async function registerRoutes(
       const existingByBosNr = new Map(existingCustomers.filter(c => c.bosCustomerNumber).map(c => [c.bosCustomerNumber, c]));
 
       let created = 0, updated = 0, unchanged = 0;
-      for (const [custNr, data] of customerBookings) {
-        const t = data.traveller;
+      for (const [bosNr, data] of travellerMap) {
         const fields = {
-          firstName: t.rtnb_vorname,
-          lastName: t.rtnb_nachname,
-          email: t.kstm_email || "",
-          phone: t.kstm_mobil || t.kstm_festnetz || "",
-          nationality: t.kstm_land || "",
-          dateOfBirth: parseBosDate(t.rtnb_gebdat),
-          kiteLevel: kiteLevelMap[t.rtnb_kitelevel] || "Beginner",
-          weightKg: parseInt(t.rtnb_gewicht) || null,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          phone: data.phone,
+          nationality: data.nationality,
+          dateOfBirth: data.dateOfBirth,
+          kiteLevel: data.kiteLevel,
+          weightKg: data.weightKg,
           arrivalDate: data.earliestStart,
           departureDate: data.earliestEnd,
           notes: data.notes.join("; ") || null,
         };
 
-        const existing = existingByBosNr.get(custNr);
+        const existing = existingByBosNr.get(bosNr);
         if (existing) {
           const changes: Record<string, any> = {};
           for (const [key, val] of Object.entries(fields)) {
@@ -3640,7 +3695,7 @@ export async function registerRoutes(
             schoolConfigId,
             guestType: "KiteWorldWide",
             emergencyContact: "",
-            bosCustomerNumber: custNr,
+            bosCustomerNumber: bosNr,
             ...fields,
           });
           created++;
@@ -3649,7 +3704,7 @@ export async function registerRoutes(
         if (req.query.limit === "1" && created >= 1) break;
       }
 
-      res.json({ created, updated, unchanged, totalBosCustomers: customerBookings.size });
+      res.json({ created, updated, unchanged, totalBosCustomers: travellerMap.size });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -3708,104 +3763,107 @@ export async function registerRoutes(
       const products = await storage.getSchoolProducts(schoolConfigId);
       const productByBosCode = new Map(products.filter(p => p.bosCode).map(p => [p.bosCode, p]));
 
-      const travellers = new Map<string, { tnnr: string; name: string }>();
-      for (const op of ops) {
-        const t = op.main_traveller;
-        travellers.set(`${op.vog_akww}-${t.kstm_kundennummer}`, { tnnr: "1", name: `${t.rtnb_vorname} ${t.rtnb_nachname}` });
-        for (const st of op.sub_travellers) {
-          travellers.set(`${op.vog_akww}-${st.tnnr}`, { tnnr: st.tnnr, name: `${st.rtnb_vorname} ${st.rtnb_nachname}` });
-        }
-      }
-
       let created = 0, updated = 0, unchanged = 0, deleted = 0, skippedNoCustomer = 0, skippedStorno = 0;
       const skippedProducts: string[] = [];
 
       for (const op of ops) {
-        const bookingNumber = op.vog_akww;
         const isStorno = op.op_storno === "1";
-        const existing = await storage.getSchoolBookingByNumber(bookingNumber);
+        const mt = op.main_traveller;
 
-        if (!existing && isStorno) { skippedStorno++; continue; }
+        type TravellerInfo = { tnnr: string; bosNr: string; name: string; email: string };
+        const allTravellers: TravellerInfo[] = [
+          { tnnr: mt.tnnr || "1", bosNr: mt.kstm_kundennummer, name: `${mt.rtnb_vorname} ${mt.rtnb_nachname}`, email: mt.kstm_email || mt.rtnb_email || "" },
+          ...op.sub_travellers.map(st => ({
+            tnnr: st.tnnr,
+            bosNr: `${mt.kstm_kundennummer}-${st.tnnr}`,
+            name: `${st.rtnb_vorname} ${st.rtnb_nachname}`,
+            email: st.rtnb_email || "",
+          })),
+        ];
 
-        if (existing && isStorno) {
-          await storage.deleteSchoolBooking(existing.id);
-          deleted++;
-          continue;
-        }
+        for (const trav of allTravellers) {
+          const bookingNumber = `${op.vog_akww}-${trav.tnnr}`;
+          const existing = await storage.getSchoolBookingByNumber(bookingNumber);
 
-        if (existing && existing.bookingVersionBos === op.bng_version) {
-          unchanged++;
-          continue;
-        }
+          if (!existing && isStorno) { skippedStorno++; continue; }
 
-        const customer = customerByBosNr.get(op.main_traveller.kstm_kundennummer);
-        if (!customer) { skippedNoCustomer++; continue; }
-
-        const t = op.main_traveller;
-
-        const items: Array<{ productId: number | null; productName: string; category: string; quantity: number; unitPrice: string; lineTotal: string }> = [];
-
-        for (const pkg of op.packages) {
-          const product = productByBosCode.get(pkg.tnuntbng_paket);
-          if (!product) {
-            if (!skippedProducts.includes(pkg.tnuntbng_paket)) skippedProducts.push(pkg.tnuntbng_paket);
+          if (existing && isStorno) {
+            await storage.deleteSchoolBooking(existing.id);
+            deleted++;
             continue;
           }
-          const trav = travellers.get(`${op.vog_akww}-${pkg.tnuntbng_tnnr}`);
-          const label = trav ? `${product.name} (${trav.name})` : product.name;
-          items.push({
-            productId: product.id,
-            productName: label,
-            category: product.category,
-            quantity: 1,
-            unitPrice: product.defaultPrice,
-            lineTotal: product.defaultPrice,
-          });
-        }
 
-        for (const zl of op.zusatzleistungen) {
-          if (zl.tnzuslbng_zuslcode.startsWith("VER")) continue;
-          const product = productByBosCode.get(zl.tnzuslbng_zuslcode);
-          if (!product) {
-            if (!skippedProducts.includes(zl.tnzuslbng_zuslcode)) skippedProducts.push(zl.tnzuslbng_zuslcode);
+          if (existing && existing.bookingVersionBos === op.bng_version) {
+            unchanged++;
             continue;
           }
-          const trav = travellers.get(`${op.vog_akww}-${zl.tnzuslbng_tnnr}`);
-          const label = trav ? `${product.name} (${trav.name})` : product.name;
-          items.push({
-            productId: product.id,
-            productName: label,
-            category: product.category,
-            quantity: 1,
-            unitPrice: product.defaultPrice,
-            lineTotal: product.defaultPrice,
-          });
+
+          const customer = customerByBosNr.get(trav.bosNr);
+          if (!customer) { skippedNoCustomer++; continue; }
+
+          const items: Array<{ productId: number | null; productName: string; category: string; quantity: number; unitPrice: string; lineTotal: string }> = [];
+
+          for (const pkg of op.packages) {
+            if (pkg.tnuntbng_tnnr !== trav.tnnr) continue;
+            const product = productByBosCode.get(pkg.tnuntbng_paket);
+            if (!product) {
+              if (!skippedProducts.includes(pkg.tnuntbng_paket)) skippedProducts.push(pkg.tnuntbng_paket);
+              continue;
+            }
+            items.push({
+              productId: product.id,
+              productName: product.name,
+              category: product.category,
+              quantity: 1,
+              unitPrice: product.defaultPrice,
+              lineTotal: product.defaultPrice,
+            });
+          }
+
+          for (const zl of op.zusatzleistungen) {
+            if (zl.tnzuslbng_zuslcode.startsWith("VER")) continue;
+            if (zl.tnzuslbng_tnnr !== trav.tnnr) continue;
+            const product = productByBosCode.get(zl.tnzuslbng_zuslcode);
+            if (!product) {
+              if (!skippedProducts.includes(zl.tnzuslbng_zuslcode)) skippedProducts.push(zl.tnzuslbng_zuslcode);
+              continue;
+            }
+            items.push({
+              productId: product.id,
+              productName: product.name,
+              category: product.category,
+              quantity: 1,
+              unitPrice: product.defaultPrice,
+              lineTotal: product.defaultPrice,
+            });
+          }
+
+          const totalAmount = items.reduce((sum, i) => sum + parseFloat(i.lineTotal || "0"), 0).toFixed(2);
+
+          const bookingData = {
+            schoolConfigId,
+            bookingNumber,
+            customerId: customer.id,
+            customerName: trav.name,
+            customerEmail: trav.email || null,
+            bookingDate: op.bng_reisebeginn,
+            paymentStatus: "paid" as const,
+            totalAmount,
+            currency: "EUR",
+            notes: op.bng_swuensche || null,
+            bookingVersionBos: op.bng_version,
+          };
+
+          if (existing) {
+            await storage.updateSchoolBooking(existing.id, bookingData, items);
+            updated++;
+          } else {
+            await storage.createSchoolBooking(bookingData, items);
+            created++;
+          }
+
+          if (req.query.limit === "1" && created >= 1) break;
         }
-
-        const totalAmount = items.reduce((sum, i) => sum + parseFloat(i.lineTotal || "0"), 0).toFixed(2);
-
-        const bookingData = {
-          schoolConfigId,
-          bookingNumber,
-          customerId: customer.id,
-          customerName: `${t.rtnb_vorname} ${t.rtnb_nachname}`,
-          customerEmail: t.kstm_email || null,
-          bookingDate: op.bng_reisebeginn,
-          paymentStatus: "paid" as const,
-          totalAmount,
-          currency: "EUR",
-          notes: op.bng_swuensche || null,
-          bookingVersionBos: op.bng_version,
-        };
-
-        if (existing) {
-          await storage.updateSchoolBooking(existing.id, bookingData, items);
-          updated++;
-        } else {
-          await storage.createSchoolBooking(bookingData, items);
-          created++;
-        }
-
         if (req.query.limit === "1" && created >= 1) break;
       }
 
