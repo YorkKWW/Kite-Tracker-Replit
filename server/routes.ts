@@ -3408,6 +3408,7 @@ export async function registerRoutes(
       currency: z.string().length(3).default("MAD"),
       isActive: z.boolean().default(true),
       contactEmail: z.string().email().optional().nullable(),
+      destinationCodeBos: z.string().optional().nullable(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });
@@ -3425,6 +3426,7 @@ export async function registerRoutes(
       currency: z.string().length(3).optional(),
       isActive: z.boolean().optional(),
       contactEmail: z.string().email().nullable().optional(),
+      destinationCodeBos: z.string().nullable().optional(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid input" });

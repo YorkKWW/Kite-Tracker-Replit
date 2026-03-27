@@ -597,6 +597,7 @@ export const schoolConfigs = pgTable("school_configs", {
   currency: varchar("currency", { length: 3 }).notNull().default("MAD"),
   isActive: boolean("is_active").notNull().default(true),
   contactEmail: text("contact_email"),
+  destinationCodeBos: text("destination_code_bos"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

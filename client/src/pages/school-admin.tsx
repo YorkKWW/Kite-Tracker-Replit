@@ -27,6 +27,7 @@ type SchoolConfigWithStation = {
   currency: string;
   isActive: boolean;
   contactEmail: string | null;
+  destinationCodeBos: string | null;
   stationName: string;
 };
 
@@ -68,6 +69,7 @@ export default function SchoolAdminPage() {
   // School config form state
   const [schoolName, setSchoolName] = useState("");
   const [currency, setCurrency] = useState<string>("MAD");
+  const [destinationCodeBos, setDestinationCodeBos] = useState("");
 
   // Product form state
   const [prodName, setProdName] = useState("");
@@ -255,6 +257,7 @@ export default function SchoolAdminPage() {
     setEditConfigId(config.id);
     setSchoolName(config.schoolName);
     setCurrency(config.currency);
+    setDestinationCodeBos(config.destinationCodeBos ?? "");
   }
 
   function openAddProduct() {
@@ -326,6 +329,11 @@ export default function SchoolAdminPage() {
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-xs text-muted-foreground">No school</Badge>
+                        )}
+                        {config?.destinationCodeBos && (
+                          <Badge variant="outline" className="text-[10px] text-indigo-700 border-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-700" data-testid={`badge-bos-code-${config.id}`}>
+                            BOS: {config.destinationCodeBos}
+                          </Badge>
                         )}
                         {config && !config.isActive && (
                           <Badge variant="secondary" className="text-xs">Inactive</Badge>
@@ -563,6 +571,15 @@ export default function SchoolAdminPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1">
+              <Label>BOS Destination Code</Label>
+              <Input
+                data-testid="input-edit-bos-code"
+                placeholder="z.B. MARDK01"
+                value={destinationCodeBos}
+                onChange={e => setDestinationCodeBos(e.target.value)}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditConfigId(null)}>Cancel</Button>
@@ -574,6 +591,7 @@ export default function SchoolAdminPage() {
                 data: {
                   schoolName: schoolName.trim(),
                   currency,
+                  destinationCodeBos: destinationCodeBos.trim() || null,
                 },
               })}
             >
