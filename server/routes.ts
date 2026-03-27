@@ -3572,7 +3572,7 @@ export async function registerRoutes(
 
       const kiteLevelMap: Record<string, string> = {
         "0": "Beginner", "1": "Beginner", "2": "Intermediate",
-        "3": "Intermediate", "4": "Intermediate", "5": "Pro", "6": "Beginner",
+        "3": "Intermediate", "4": "Intermediate", "5": "Pro", "6": "Nonkite",
       };
 
       const customerBookings = new Map<string, { traveller: typeof ops[0]["main_traveller"]; earliestStart: string; earliestEnd: string; notes: string[] }>();
@@ -3592,36 +3592,55 @@ export async function registerRoutes(
       }
 
       const existingCustomers = await storage.getSchoolCustomers(schoolConfigId);
-      const existingByBosNr = new Set(existingCustomers.filter(c => c.bosCustomerNumber).map(c => c.bosCustomerNumber));
+      const existingByBosNr = new Map(existingCustomers.filter(c => c.bosCustomerNumber).map(c => [c.bosCustomerNumber, c]));
 
-      let created = 0, skipped = 0;
+      let created = 0, updated = 0, unchanged = 0;
       for (const [custNr, data] of customerBookings) {
-        if (existingByBosNr.has(custNr)) { skipped++; continue; }
-
         const t = data.traveller;
-        await storage.createSchoolCustomer({
-          schoolConfigId,
-          guestType: "KiteWorldWide",
+        const fields = {
           firstName: t.rtnb_vorname,
           lastName: t.rtnb_nachname,
           email: t.kstm_email || "",
           phone: t.kstm_mobil || t.kstm_festnetz || "",
           nationality: t.kstm_land || "",
-          dateOfBirth: "",
           kiteLevel: kiteLevelMap[t.rtnb_kitelevel] || "Beginner",
           weightKg: parseInt(t.rtnb_gewicht) || null,
-          emergencyContact: "",
           arrivalDate: data.earliestStart,
           departureDate: data.earliestEnd,
           notes: data.notes.join("; ") || null,
-          bosCustomerNumber: custNr,
-        });
-        created++;
+        };
 
-        if (req.query.limit === "1") break;
+        const existing = existingByBosNr.get(custNr);
+        if (existing) {
+          const changes: Record<string, any> = {};
+          for (const [key, val] of Object.entries(fields)) {
+            const oldVal = (existing as any)[key];
+            if (String(val ?? "") !== String(oldVal ?? "")) {
+              changes[key] = val;
+            }
+          }
+          if (Object.keys(changes).length > 0) {
+            await storage.updateSchoolCustomer(existing.id, changes);
+            updated++;
+          } else {
+            unchanged++;
+          }
+        } else {
+          await storage.createSchoolCustomer({
+            schoolConfigId,
+            guestType: "KiteWorldWide",
+            dateOfBirth: "",
+            emergencyContact: "",
+            bosCustomerNumber: custNr,
+            ...fields,
+          });
+          created++;
+        }
+
+        if (req.query.limit === "1" && created >= 1) break;
       }
 
-      res.json({ created, skipped, totalBosCustomers: customerBookings.size });
+      res.json({ created, updated, unchanged, totalBosCustomers: customerBookings.size });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

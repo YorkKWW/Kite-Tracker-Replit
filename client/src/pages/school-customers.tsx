@@ -21,6 +21,7 @@ const KITE_LEVEL_COLORS: Record<string, string> = {
   Intermediate: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
   Advanced: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
   Pro: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  Nonkite: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
 };
 
 type SchoolConfigItem = { id: number; stationId: number; schoolName: string; currency: string; isActive: boolean; stationName: string };

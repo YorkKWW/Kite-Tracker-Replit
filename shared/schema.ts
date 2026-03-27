@@ -620,7 +620,7 @@ export const schoolProducts = pgTable("school_products", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const KITE_LEVELS = ["Beginner", "Intermediate", "Advanced", "Pro"] as const;
+export const KITE_LEVELS = ["Beginner", "Intermediate", "Advanced", "Pro", "Nonkite"] as const;
 export type KiteLevel = typeof KITE_LEVELS[number];
 
 export const GUEST_TYPES = ["KiteWorldWide", "Walk-in"] as const;
