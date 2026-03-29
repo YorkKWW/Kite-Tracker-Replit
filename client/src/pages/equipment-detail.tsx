@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ConditionBadge, StatusBadge } from "@/components/condition-badge";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ArrowLeft, Star, Wrench, ArrowLeftRight, Camera,
+  ArrowLeft, Star, Wrench, ArrowLeftRight, Camera, Check,
   Upload, Trash2, MapPin, Calendar, Hash, X, ChevronLeft, ChevronRight,
   FileText, Package, AlertTriangle, Pencil, Loader2,
 } from "lucide-react";
@@ -1027,15 +1027,22 @@ function TransfersSection({
     },
   });
 
+  const [confirmTransferId, setConfirmTransferId] = useState<number | null>(null);
+  const [confirmArrived, setConfirmArrived] = useState<boolean | null>(null);
+  const [confirmCondition, setConfirmCondition] = useState<number | null>(null);
+
   const confirmMutation = useMutation({
-    mutationFn: (transferId: number) =>
-      apiRequest("POST", `/api/transfers/${transferId}/confirm`),
-    onSuccess: () => {
+    mutationFn: ({ id, arrived, condition }: { id: number; arrived: boolean; condition?: number }) =>
+      apiRequest("POST", `/api/transfers/${id}/confirm`, { arrived, condition }),
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/equipment", equipmentId.toString(), "transfers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment", equipmentId.toString()] });
       queryClient.invalidateQueries({ queryKey: ["/api/equipment"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transfers"] });
-      toast({ title: "Transfer confirmed" });
+      setConfirmTransferId(null);
+      setConfirmArrived(null);
+      setConfirmCondition(null);
+      toast({ title: vars.arrived ? "Transfer confirmed" : "Item reported missing" });
     },
   });
 
@@ -1103,15 +1110,56 @@ function TransfersSection({
                       </span>
                     </div>
                   </div>
-                  {t.status === "pending" && (
+                  {t.status === "pending" && confirmTransferId !== t.id && (
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => confirmMutation.mutate(t.id)}
+                      onClick={() => { setConfirmTransferId(t.id); setConfirmArrived(null); setConfirmCondition(null); }}
                       data-testid={`button-confirm-transfer-${t.id}`}
                     >
-                      Confirm
+                      Confirm Receipt
                     </Button>
+                  )}
+                  {t.status === "pending" && confirmTransferId === t.id && (
+                    <div className="flex flex-col gap-2 w-full mt-2">
+                      <p className="text-sm font-medium">Did the item arrive?</p>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant={confirmArrived === true ? "default" : "outline"} onClick={() => { setConfirmArrived(true); setConfirmCondition(null); }} data-testid="button-arrived-yes">
+                          <Check className="h-3 w-3 mr-1" /> Yes
+                        </Button>
+                        <Button size="sm" variant={confirmArrived === false ? "destructive" : "outline"} onClick={() => setConfirmArrived(false)} data-testid="button-arrived-no">
+                          <X className="h-3 w-3 mr-1" /> Missing
+                        </Button>
+                      </div>
+                      {confirmArrived === true && (
+                        <>
+                          <p className="text-sm font-medium">Condition (1-5)</p>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map(c => (
+                              <Button key={c} size="sm" variant={confirmCondition === c ? "default" : "outline"} onClick={() => setConfirmCondition(c)} data-testid={`button-condition-${c}`}>
+                                {c}
+                              </Button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      <div className="flex gap-2 mt-1">
+                        <Button
+                          size="sm"
+                          disabled={confirmArrived === null || (confirmArrived && !confirmCondition) || confirmMutation.isPending}
+                          onClick={() => {
+                            if (confirmArrived === null) return;
+                            confirmMutation.mutate({ id: t.id, arrived: confirmArrived, condition: confirmCondition ?? undefined });
+                          }}
+                          data-testid="button-submit-confirm"
+                        >
+                          Submit
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setConfirmTransferId(null)} data-testid="button-cancel-confirm">
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </div>
               </CardContent>
