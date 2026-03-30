@@ -1,4 +1,4 @@
-import { eq, and, desc, ilike, or, sql, inArray, isNull } from "drizzle-orm";
+import { eq, and, desc, ilike, or, sql, inArray, isNull, count } from "drizzle-orm";
 import { db } from "./db";
 
 export interface ActiveRepairItem {
@@ -263,6 +263,7 @@ export interface IStorage {
   deleteSchoolExpense(id: number): Promise<void>;
 
   getCustomerDocuments(customerId: number): Promise<(SchoolCustomerDocument & { uploaderName: string })[]>;
+  getCustomerDocumentCountsBySchool(schoolConfigId: number): Promise<Record<number, number>>;
   createCustomerDocument(doc: InsertSchoolCustomerDocument): Promise<SchoolCustomerDocument>;
   getCustomerDocument(id: number): Promise<SchoolCustomerDocument | undefined>;
   deleteCustomerDocument(id: number): Promise<void>;
@@ -1922,6 +1923,18 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSchoolExpense(id: number): Promise<void> {
     await db.delete(schoolExpenses).where(eq(schoolExpenses.id, id));
+  }
+
+  async getCustomerDocumentCountsBySchool(schoolConfigId: number): Promise<Record<number, number>> {
+    const rows = await db
+      .select({ customerId: schoolCustomerDocuments.customerId, cnt: count() })
+      .from(schoolCustomerDocuments)
+      .innerJoin(schoolCustomers, eq(schoolCustomers.id, schoolCustomerDocuments.customerId))
+      .where(eq(schoolCustomers.schoolConfigId, schoolConfigId))
+      .groupBy(schoolCustomerDocuments.customerId);
+    const result: Record<number, number> = {};
+    for (const row of rows) result[row.customerId] = Number(row.cnt);
+    return result;
   }
 
   async getCustomerDocuments(customerId: number): Promise<(SchoolCustomerDocument & { uploaderName: string })[]> {

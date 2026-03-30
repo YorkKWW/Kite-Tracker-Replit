@@ -4007,6 +4007,20 @@ export async function registerRoutes(
     return { allowed: false };
   }
 
+  app.get("/api/customer-documents/counts/:schoolConfigId", requireAuth, async (req, res) => {
+    const schoolConfigId = parseInt(req.params.schoolConfigId);
+    if (isNaN(schoolConfigId)) return res.status(400).json({ error: "Invalid schoolConfigId" });
+    const user = req.user as Express.User & { id: number; role: string; assignedStationId?: number | null };
+    if (user.role !== "admin" && user.assignedStationId) {
+      const schoolConfig = await storage.getSchoolConfigByStation(user.assignedStationId);
+      if (!schoolConfig || schoolConfig.id !== schoolConfigId) return res.status(403).json({ error: "Access denied" });
+    } else if (user.role !== "admin") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    const counts = await storage.getCustomerDocumentCountsBySchool(schoolConfigId);
+    res.json(counts);
+  });
+
   app.get("/api/customer-documents/upload-url", requireAuth, async (req, res) => {
     try {
       const customerIdStr = req.query.customerId as string | undefined;

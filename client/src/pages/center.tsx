@@ -2097,6 +2097,7 @@ function CustomerDocuments({ customerId }: { customerId: number }) {
       apiRequest("POST", "/api/customer-documents", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customer-documents/by-customer", customerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-documents/counts"] });
       toast({ title: "Document saved" });
       resetUpload();
     },
@@ -2107,6 +2108,7 @@ function CustomerDocuments({ customerId }: { customerId: number }) {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/customer-documents/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customer-documents/by-customer", customerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-documents/counts"] });
       toast({ title: "Document deleted" });
       setViewDoc(null);
     },
@@ -2360,6 +2362,11 @@ function CustomersTab({ schoolConfigId, currency }: { schoolConfigId: number; cu
 
   const { data: bookings = [] } = useQuery<Booking[]>({
     queryKey: ["/api/school-bookings", schoolConfigId],
+  });
+
+  const { data: docCounts = {} } = useQuery<Record<string, number>>({
+    queryKey: ["/api/customer-documents/counts", schoolConfigId],
+    queryFn: () => fetch(`/api/customer-documents/counts/${schoolConfigId}`, { credentials: "include" }).then(r => r.json()),
   });
 
   const customerBookingsMap = useMemo(() => {
@@ -2870,6 +2877,16 @@ function CustomersTab({ schoolConfigId, currency }: { schoolConfigId: number; cu
                           title={hasUnpaid ? "Has unpaid bookings" : "All bookings paid"}
                           data-testid={`payment-indicator-${c.id}`}
                         />
+                      )}
+                      {docCounts[c.id] > 0 && (
+                        <span
+                          className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium shrink-0"
+                          title={`${docCounts[c.id]} document${docCounts[c.id] > 1 ? "s" : ""} scanned`}
+                          data-testid={`doc-badge-${c.id}`}
+                        >
+                          <FileText className="h-2.5 w-2.5" />
+                          {docCounts[c.id]}
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
