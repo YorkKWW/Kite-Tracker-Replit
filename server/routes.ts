@@ -4026,7 +4026,9 @@ export async function registerRoutes(
   });
 
   app.get("/api/customer-documents/view/:id", requireAuth, async (req, res) => {
-    const doc = await storage.getCustomerDocument(parseInt(req.params.id));
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid document ID" });
+    const doc = await storage.getCustomerDocument(id);
     if (!doc) return res.status(404).json({ error: "Document not found" });
     const user = req.user as Express.User & { id: number; role: string; assignedStationId?: number | null };
     const { allowed } = await checkSchoolAccessForCustomer(user, doc.customerId);
@@ -4076,7 +4078,9 @@ export async function registerRoutes(
   });
 
   app.delete("/api/customer-documents/:id", requireAuth, async (req, res) => {
-    const doc = await storage.getCustomerDocument(parseInt(req.params.id));
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid document ID" });
+    const doc = await storage.getCustomerDocument(id);
     if (!doc) return res.status(404).json({ error: "Document not found" });
     const user = req.user as Express.User & { id: number; role: string; assignedStationId?: number | null };
     const { allowed } = await checkSchoolAccessForCustomer(user, doc.customerId);
