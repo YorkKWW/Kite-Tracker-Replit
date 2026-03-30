@@ -731,6 +731,22 @@ export type CashRegisterEntry = typeof cashRegisterEntries.$inferSelect;
 export type InsertSchoolExpense = z.infer<typeof insertSchoolExpenseSchema>;
 export type SchoolExpense = typeof schoolExpenses.$inferSelect;
 
+export const documentCategoryEnum = pgEnum("document_category", ["agb", "stundenzettel", "other"]);
+
+export const schoolCustomerDocuments = pgTable("school_customer_documents", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customer_id").notNull().references(() => schoolCustomers.id, { onDelete: "cascade" }),
+  category: documentCategoryEnum("category").notNull(),
+  objectKey: text("object_key").notNull(),
+  fileName: text("file_name").notNull(),
+  uploadedBy: integer("uploaded_by").notNull().references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export const insertSchoolCustomerDocumentSchema = createInsertSchema(schoolCustomerDocuments).omit({ id: true, uploadedAt: true });
+export type InsertSchoolCustomerDocument = z.infer<typeof insertSchoolCustomerDocumentSchema>;
+export type SchoolCustomerDocument = typeof schoolCustomerDocuments.$inferSelect;
+
 export const EQUIPMENT_TYPE_LABELS: Record<string, string> = {
   kite: "Kites",
   board: "Kiteboards",

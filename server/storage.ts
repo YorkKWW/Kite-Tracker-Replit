@@ -74,6 +74,8 @@ import {
   cashRegisterEntries, schoolExpenses,
   type CashRegisterEntry, type InsertCashRegisterEntry,
   type SchoolExpense, type InsertSchoolExpense,
+  schoolCustomerDocuments,
+  type SchoolCustomerDocument, type InsertSchoolCustomerDocument,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -259,6 +261,11 @@ export interface IStorage {
   createSchoolExpense(expense: InsertSchoolExpense): Promise<SchoolExpense>;
   getSchoolExpense(id: number): Promise<SchoolExpense | undefined>;
   deleteSchoolExpense(id: number): Promise<void>;
+
+  getCustomerDocuments(customerId: number): Promise<(SchoolCustomerDocument & { uploaderName: string })[]>;
+  createCustomerDocument(doc: InsertSchoolCustomerDocument): Promise<SchoolCustomerDocument>;
+  getCustomerDocument(id: number): Promise<SchoolCustomerDocument | undefined>;
+  deleteCustomerDocument(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1915,6 +1922,39 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSchoolExpense(id: number): Promise<void> {
     await db.delete(schoolExpenses).where(eq(schoolExpenses.id, id));
+  }
+
+  async getCustomerDocuments(customerId: number): Promise<(SchoolCustomerDocument & { uploaderName: string })[]> {
+    const rows = await db
+      .select({
+        id: schoolCustomerDocuments.id,
+        customerId: schoolCustomerDocuments.customerId,
+        category: schoolCustomerDocuments.category,
+        objectKey: schoolCustomerDocuments.objectKey,
+        fileName: schoolCustomerDocuments.fileName,
+        uploadedBy: schoolCustomerDocuments.uploadedBy,
+        uploadedAt: schoolCustomerDocuments.uploadedAt,
+        uploaderName: users.name,
+      })
+      .from(schoolCustomerDocuments)
+      .leftJoin(users, eq(users.id, schoolCustomerDocuments.uploadedBy))
+      .where(eq(schoolCustomerDocuments.customerId, customerId))
+      .orderBy(desc(schoolCustomerDocuments.uploadedAt));
+    return rows.map(r => ({ ...r, uploaderName: r.uploaderName || "Unknown" }));
+  }
+
+  async createCustomerDocument(doc: InsertSchoolCustomerDocument): Promise<SchoolCustomerDocument> {
+    const [created] = await db.insert(schoolCustomerDocuments).values(doc).returning();
+    return created;
+  }
+
+  async getCustomerDocument(id: number): Promise<SchoolCustomerDocument | undefined> {
+    const [doc] = await db.select().from(schoolCustomerDocuments).where(eq(schoolCustomerDocuments.id, id));
+    return doc;
+  }
+
+  async deleteCustomerDocument(id: number): Promise<void> {
+    await db.delete(schoolCustomerDocuments).where(eq(schoolCustomerDocuments.id, id));
   }
 }
 

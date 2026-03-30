@@ -20,8 +20,10 @@ import {
   Users, ShoppingCart, AlertTriangle, Store, UserPlus, X, Pencil, ArrowLeft,
   Calendar, GraduationCap, Waves, Package as PackageIcon, Wind, Wrench as WrenchIcon,
   BarChart3, ArrowUpRight, ArrowDownRight, TrendingUp, CircleDot, Navigation, Thermometer,
+  Camera, FileText, Eye, Upload,
 } from "lucide-react";
 import type { SchoolCustomer } from "@shared/schema";
+import { convertToScan } from "@/lib/scanConvert";
 import SalesPage from "./sales";
 import IncidentsPage from "./incidents";
 
@@ -79,6 +81,7 @@ const PAYMENT_LABELS: Record<string, { label: string; color: string; icon: Lucid
   unpaid: { label: "Unpaid", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", icon: XCircle },
   cash: { label: "Cash", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200", icon: Banknote },
   credit_card: { label: "Credit Card", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200", icon: CreditCard },
+  paid: { label: "Paid", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200", icon: CheckCircle },
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -2058,6 +2061,248 @@ function ForecastTab({ schoolConfigId, currency, stationName }: { schoolConfigId
 }
 
 
+type CustomerDoc = {
+  id: number;
+  customerId: number;
+  category: "agb" | "stundenzettel" | "other";
+  objectKey: string;
+  fileName: string;
+  uploadedBy: number;
+  uploadedAt: string;
+  uploaderName: string;
+};
+
+const DOC_CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
+  agb: { label: "AGB", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" },
+  stundenzettel: { label: "Stundenzettel", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
+  other: { label: "Sonstiges", color: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200" },
+};
+
+function CustomerDocuments({ customerId }: { customerId: number }) {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [scanPreview, setScanPreview] = useState<string | null>(null);
+  const [scanBlob, setScanBlob] = useState<Blob | null>(null);
+  const [docCategory, setDocCategory] = useState<"agb" | "stundenzettel" | "other">("agb");
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [viewDoc, setViewDoc] = useState<CustomerDoc | null>(null);
+
+  const { data: documents = [], isLoading } = useQuery<CustomerDoc[]>({
+    queryKey: ["/api/customer-documents/by-customer", customerId],
+  });
+
+  const createDocMutation = useMutation({
+    mutationFn: (data: { customerId: number; category: string; objectKey: string; fileName: string }) =>
+      apiRequest("POST", "/api/customer-documents", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-documents/by-customer", customerId] });
+      toast({ title: "Document saved" });
+      resetUpload();
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteDocMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/customer-documents/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-documents/by-customer", customerId] });
+      toast({ title: "Document deleted" });
+      setViewDoc(null);
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  function resetUpload() {
+    setScanPreview(null);
+    setScanBlob(null);
+    setDocCategory("agb");
+    setShowUploadDialog(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleFileCapture(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const blob = await convertToScan(file);
+      const previewUrl = URL.createObjectURL(blob);
+      setScanBlob(blob);
+      setScanPreview(previewUrl);
+      setShowUploadDialog(true);
+    } catch (err: any) {
+      toast({ title: "Scan failed", description: err.message, variant: "destructive" });
+    }
+  }
+
+  async function handleUpload() {
+    if (!scanBlob) return;
+    setIsUploading(true);
+    try {
+      const urlRes = await fetch("/api/customer-documents/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ fileName: `scan-${Date.now()}.jpg` }),
+      });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectKey } = await urlRes.json();
+
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: scanBlob,
+        headers: { "Content-Type": "image/jpeg" },
+      });
+      if (!putRes.ok) throw new Error("Upload failed");
+
+      createDocMutation.mutate({
+        customerId,
+        category: docCategory,
+        objectKey,
+        fileName: `scan-${Date.now()}.jpg`,
+      });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-semibold flex items-center gap-2">
+          <FileText className="h-4 w-4" />
+          Documents ({documents.length})
+        </p>
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleFileCapture}
+            data-testid="input-doc-capture"
+          />
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="btn-scan-document">
+            <Camera className="h-3 w-3 mr-1" /> Scan Document
+          </Button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <Skeleton className="h-16 w-full" />
+      ) : documents.length === 0 ? (
+        <p className="text-xs text-muted-foreground py-4 text-center">No documents scanned yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {documents.map(doc => {
+            const cat = DOC_CATEGORY_LABELS[doc.category] || DOC_CATEGORY_LABELS.other;
+            return (
+              <Card key={doc.id} data-testid={`doc-card-${doc.id}`}>
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div
+                    className="w-12 h-12 bg-muted rounded flex items-center justify-center cursor-pointer hover:bg-accent/50 transition-colors shrink-0"
+                    onClick={() => setViewDoc(doc)}
+                    data-testid={`doc-thumb-${doc.id}`}
+                  >
+                    <FileText className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cat.color}`}>{cat.label}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {doc.uploaderName} · {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString("de-DE") : ""}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => setViewDoc(doc)}
+                    data-testid={`btn-view-doc-${doc.id}`}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={showUploadDialog} onOpenChange={(open) => { if (!open) resetUpload(); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Save Document</DialogTitle>
+          </DialogHeader>
+          {scanPreview && (
+            <div className="border rounded-lg overflow-hidden bg-muted">
+              <img src={scanPreview} alt="Scan preview" className="w-full max-h-64 object-contain" data-testid="img-scan-preview" />
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label className="text-xs">Category</Label>
+            <Select value={docCategory} onValueChange={(v: any) => setDocCategory(v)}>
+              <SelectTrigger data-testid="select-doc-category"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="agb">AGB</SelectItem>
+                <SelectItem value="stundenzettel">Stundenzettel</SelectItem>
+                <SelectItem value="other">Sonstiges</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={resetUpload}>Cancel</Button>
+            <Button onClick={handleUpload} disabled={isUploading || !scanBlob} data-testid="btn-upload-doc">
+              {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewDoc} onOpenChange={(open) => { if (!open) setViewDoc(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {viewDoc && (DOC_CATEGORY_LABELS[viewDoc.category]?.label || "Document")}
+            </DialogTitle>
+          </DialogHeader>
+          {viewDoc && (
+            <div className="space-y-3">
+              <div className="border rounded-lg overflow-hidden bg-muted">
+                <img
+                  src={`/api/customer-documents/view/${viewDoc.id}`}
+                  alt="Document"
+                  className="w-full object-contain"
+                  data-testid="img-doc-full"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Uploaded by {viewDoc.uploaderName} on {viewDoc.uploadedAt ? new Date(viewDoc.uploadedAt).toLocaleDateString("de-DE") : ""}
+              </p>
+              <div className="flex justify-end">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => { if (confirm("Delete this document?")) deleteDocMutation.mutate(viewDoc.id); }}
+                  disabled={deleteDocMutation.isPending}
+                  data-testid="btn-delete-doc"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" /> Delete
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function CustomersTab({ schoolConfigId, currency }: { schoolConfigId: number; currency: string }) {
   const { isAdmin, isStationLead } = useAuth();
   const { toast } = useToast();
@@ -2419,7 +2664,7 @@ function CustomersTab({ schoolConfigId, currency }: { schoolConfigId: number; cu
           ) : (
             <div className="space-y-3">
               {custBookings.map(booking => {
-                const pay = PAYMENT_LABELS[booking.paymentStatus];
+                const pay = PAYMENT_LABELS[booking.paymentStatus] || PAYMENT_LABELS.unpaid;
                 const PayIcon = pay.icon;
                 return (
                   <Card key={booking.id} data-testid={`customer-booking-${booking.id}`}>
@@ -2506,6 +2751,8 @@ function CustomersTab({ schoolConfigId, currency }: { schoolConfigId: number; cu
             </div>
           )}
         </div>
+
+        <CustomerDocuments customerId={c.id} />
       </div>
     );
   }
