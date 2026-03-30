@@ -2288,7 +2288,30 @@ function CustomerDocuments({ customerId }: { customerId: number }) {
               <p className="text-xs text-muted-foreground">
                 Uploaded by {viewDoc.uploaderName} on {viewDoc.uploadedAt ? new Date(viewDoc.uploadedAt).toLocaleDateString("de-DE") : ""}
               </p>
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="btn-download-doc"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/customer-documents/view/${viewDoc.id}`, { credentials: "include" });
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = viewDoc.fileName || "document.jpg";
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      URL.revokeObjectURL(url);
+                    } catch {
+                      toast({ title: "Download failed", variant: "destructive" });
+                    }
+                  }}
+                >
+                  <FileDown className="h-3 w-3 mr-1" /> Download
+                </Button>
                 <Button
                   variant="destructive"
                   size="sm"
