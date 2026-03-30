@@ -4066,9 +4066,8 @@ export async function registerRoutes(
     if (!allowed) return res.status(403).json({ error: "Access denied" });
     try {
       const file = await objectStorage.getObjectEntityFile(doc.objectKey);
-      const safeName = (doc.fileName || "document.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
-      res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
-      res.setHeader("Content-Type", "image/jpeg");
+      const fileName = (doc.fileName || "document.jpg").replace(/["\r\n\\]/g, "_");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
       await objectStorage.downloadObject(file, res);
     } catch (e) {
       console.error("Error downloading doc:", e);
