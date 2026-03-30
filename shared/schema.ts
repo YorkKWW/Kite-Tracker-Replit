@@ -647,7 +647,7 @@ export const schoolCustomers = pgTable("school_customers", {
   createdBy: integer("created_by").references(() => users.id),
 });
 
-export const bookingPaymentStatusEnum = pgEnum("booking_payment_status", ["unpaid", "cash", "credit_card", "paid"]);
+export const bookingPaymentStatusEnum = pgEnum("booking_payment_status", ["unpaid", "cash", "credit_card", "paid", "paid-kww"]);
 
 export const schoolBookings = pgTable("school_bookings", {
   id: serial("id").primaryKey(),

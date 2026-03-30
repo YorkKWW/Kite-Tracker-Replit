@@ -3849,7 +3849,7 @@ export async function registerRoutes(
             customerName: trav.name,
             customerEmail: trav.email || null,
             bookingDate: op.bng_reisebeginn,
-            paymentStatus: "paid" as const,
+            paymentStatus: "paid-kww" as const,
             totalAmount,
             currency: "EUR",
             notes: op.bng_swuensche || null,
