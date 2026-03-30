@@ -3991,6 +3991,22 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  async function checkSchoolAccessForCustomer(
+    user: Express.User & { id: number; role: string; assignedStationId?: number | null },
+    customerId: number
+  ): Promise<{ allowed: boolean; customer?: ReturnType<typeof storage.getSchoolCustomer> extends Promise<infer T> ? T : never }> {
+    const customer = await storage.getSchoolCustomer(customerId);
+    if (!customer) return { allowed: false };
+    if (user.role === "admin") return { allowed: true, customer };
+    if (user.assignedStationId) {
+      const schoolConfig = await storage.getSchoolConfigByStation(user.assignedStationId);
+      if (schoolConfig && schoolConfig.id === customer.schoolConfigId) {
+        return { allowed: true, customer };
+      }
+    }
+    return { allowed: false };
+  }
+
   app.get("/api/customer-documents/upload-url", requireAuth, async (req, res) => {
     try {
       const uploadURL = await objectStorage.getObjectEntityUploadURL();
@@ -4005,6 +4021,9 @@ export async function registerRoutes(
   app.get("/api/customer-documents/view/:id", requireAuth, async (req, res) => {
     const doc = await storage.getCustomerDocument(parseInt(req.params.id));
     if (!doc) return res.status(404).json({ error: "Document not found" });
+    const user = req.user as Express.User & { id: number; role: string; assignedStationId?: number | null };
+    const { allowed } = await checkSchoolAccessForCustomer(user, doc.customerId);
+    if (!allowed) return res.status(403).json({ error: "Access denied" });
     try {
       const signedUrl = await objectStorage.getObjectEntitySignedURL(doc.objectKey);
       res.redirect(signedUrl);
@@ -4017,8 +4036,9 @@ export async function registerRoutes(
   app.get("/api/customer-documents/by-customer/:customerId", requireAuth, async (req, res) => {
     const customerId = parseInt(req.params.customerId);
     if (isNaN(customerId)) return res.status(400).json({ error: "Invalid customer ID" });
-    const customer = await storage.getSchoolCustomer(customerId);
-    if (!customer) return res.status(404).json({ error: "Customer not found" });
+    const user = req.user as Express.User & { id: number; role: string; assignedStationId?: number | null };
+    const { allowed } = await checkSchoolAccessForCustomer(user, customerId);
+    if (!allowed) return res.status(403).json({ error: "Access denied" });
     const docs = await storage.getCustomerDocuments(customerId);
     res.json(docs);
   });
@@ -4035,9 +4055,9 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
     }
     const { customerId, category, objectKey, fileName } = parsed.data;
-    const customer = await storage.getSchoolCustomer(customerId);
-    if (!customer) return res.status(404).json({ error: "Customer not found" });
-    const user = req.user as Express.User & { id: number };
+    const user = req.user as Express.User & { id: number; role: string; assignedStationId?: number | null };
+    const { allowed } = await checkSchoolAccessForCustomer(user, customerId);
+    if (!allowed) return res.status(403).json({ error: "Access denied" });
     const doc = await storage.createCustomerDocument({
       customerId,
       category,
@@ -4051,6 +4071,9 @@ export async function registerRoutes(
   app.delete("/api/customer-documents/:id", requireAuth, async (req, res) => {
     const doc = await storage.getCustomerDocument(parseInt(req.params.id));
     if (!doc) return res.status(404).json({ error: "Document not found" });
+    const user = req.user as Express.User & { id: number; role: string; assignedStationId?: number | null };
+    const { allowed } = await checkSchoolAccessForCustomer(user, doc.customerId);
+    if (!allowed) return res.status(403).json({ error: "Access denied" });
     try {
       const objectFile = await objectStorage.getObjectEntityFile(doc.objectKey);
       await objectFile.delete();
