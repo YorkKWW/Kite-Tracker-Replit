@@ -2130,8 +2130,8 @@ function CustomerDocuments({ customerId }: { customerId: number }) {
       setScanBlob(blob);
       setScanPreview(previewUrl);
       setShowUploadDialog(true);
-    } catch (err: any) {
-      toast({ title: "Scan failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Scan failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
     }
   }
 
@@ -2140,10 +2140,7 @@ function CustomerDocuments({ customerId }: { customerId: number }) {
     setIsUploading(true);
     try {
       const urlRes = await fetch("/api/customer-documents/upload-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ fileName: `scan-${Date.now()}.jpg` }),
       });
       if (!urlRes.ok) throw new Error("Failed to get upload URL");
       const { uploadURL, objectKey } = await urlRes.json();
@@ -2161,8 +2158,8 @@ function CustomerDocuments({ customerId }: { customerId: number }) {
         objectKey,
         fileName: `scan-${Date.now()}.jpg`,
       });
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Upload failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
     } finally {
       setIsUploading(false);
     }
@@ -2203,11 +2200,16 @@ function CustomerDocuments({ customerId }: { customerId: number }) {
               <Card key={doc.id} data-testid={`doc-card-${doc.id}`}>
                 <CardContent className="p-3 flex items-center gap-3">
                   <div
-                    className="w-12 h-12 bg-muted rounded flex items-center justify-center cursor-pointer hover:bg-accent/50 transition-colors shrink-0"
+                    className="w-12 h-12 bg-muted rounded overflow-hidden cursor-pointer hover:opacity-80 transition-opacity shrink-0"
                     onClick={() => setViewDoc(doc)}
                     data-testid={`doc-thumb-${doc.id}`}
                   >
-                    <FileText className="h-6 w-6 text-muted-foreground" />
+                    <img
+                      src={`/api/customer-documents/view/${doc.id}`}
+                      alt={DOC_CATEGORY_LABELS[doc.category]?.label || "Document"}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -2245,7 +2247,7 @@ function CustomerDocuments({ customerId }: { customerId: number }) {
           )}
           <div className="space-y-2">
             <Label className="text-xs">Category</Label>
-            <Select value={docCategory} onValueChange={(v: any) => setDocCategory(v)}>
+            <Select value={docCategory} onValueChange={(v: string) => setDocCategory(v as "agb" | "stundenzettel" | "other")}>
               <SelectTrigger data-testid="select-doc-category"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="agb">AGB</SelectItem>

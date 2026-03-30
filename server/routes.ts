@@ -3991,14 +3991,12 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  app.post("/api/customer-documents/upload-url", requireAuth, async (req, res) => {
+  app.get("/api/customer-documents/upload-url", requireAuth, async (req, res) => {
     try {
-      const { fileName } = req.body;
-      if (!fileName) return res.status(400).json({ error: "Missing fileName" });
       const uploadURL = await objectStorage.getObjectEntityUploadURL();
       const objectKey = objectStorage.normalizeObjectEntityPath(uploadURL);
       res.json({ uploadURL, objectKey });
-    } catch (e: any) {
+    } catch (e) {
       console.error("Error generating doc upload URL:", e);
       res.status(500).json({ error: "Failed to generate upload URL" });
     }
@@ -4010,14 +4008,18 @@ export async function registerRoutes(
     try {
       const signedUrl = await objectStorage.getObjectEntitySignedURL(doc.objectKey);
       res.redirect(signedUrl);
-    } catch (e: any) {
+    } catch (e) {
       console.error("Error serving doc:", e);
       res.status(500).json({ error: "Failed to serve document" });
     }
   });
 
   app.get("/api/customer-documents/by-customer/:customerId", requireAuth, async (req, res) => {
-    const docs = await storage.getCustomerDocuments(parseInt(req.params.customerId));
+    const customerId = parseInt(req.params.customerId);
+    if (isNaN(customerId)) return res.status(400).json({ error: "Invalid customer ID" });
+    const customer = await storage.getSchoolCustomer(customerId);
+    if (!customer) return res.status(404).json({ error: "Customer not found" });
+    const docs = await storage.getCustomerDocuments(customerId);
     res.json(docs);
   });
 
@@ -4035,7 +4037,7 @@ export async function registerRoutes(
     const { customerId, category, objectKey, fileName } = parsed.data;
     const customer = await storage.getSchoolCustomer(customerId);
     if (!customer) return res.status(404).json({ error: "Customer not found" });
-    const user = req.user as any;
+    const user = req.user as Express.User & { id: number };
     const doc = await storage.createCustomerDocument({
       customerId,
       category,
@@ -4052,8 +4054,9 @@ export async function registerRoutes(
     try {
       const objectFile = await objectStorage.getObjectEntityFile(doc.objectKey);
       await objectFile.delete();
-    } catch (e: any) {
-      console.warn("Could not delete object from storage:", e?.message);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      console.warn("Could not delete object from storage:", msg);
     }
     await storage.deleteCustomerDocument(doc.id);
     res.json({ success: true });
