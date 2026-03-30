@@ -3751,7 +3751,7 @@ export async function registerRoutes(
         };
         sub_travellers: Array<{ tnnr: string; rtnb_vorname: string; rtnb_nachname: string }>;
         packages: Array<{ tnuntbng_akww: string; tnuntbng_tnnr: string; tnuntbng_paket: string; gesamt_ek: string }>;
-        zusatzleistungen: Array<{ tnzuslbng_akww: string; tnzuslbng_tnnr: string; tnzuslbng_zuslcode: string; tnzuslbng_preis_ek: string }>;
+        zusatzleistungen: Array<{ tnzuslbng_akww: string; tnzuslbng_tnnr: string; tnzuslbng_zuslcode: string; tnzuslbng_preis_ek: string; tnzuslbng_kategorie: string; tnzuslbng_art: string; tnzuslbng_preis: string }>;
       };
 
       const bosData = await bosRes.json() as { kiteBookings: { operations: BosOperation[] } };
@@ -3824,20 +3824,37 @@ export async function registerRoutes(
           for (const zl of op.zusatzleistungen) {
             if (zl.tnzuslbng_zuslcode.startsWith("VER")) continue;
             if (zl.tnzuslbng_tnnr !== trav.tnnr) continue;
-            const product = productByBosCode.get(zl.tnzuslbng_zuslcode);
-            if (!product) {
-              if (!skippedProducts.includes(zl.tnzuslbng_zuslcode)) skippedProducts.push(zl.tnzuslbng_zuslcode);
-              continue;
+
+            const isSonderleistung = (zl.tnzuslbng_kategorie || "").toLowerCase() === "sonderleistungen";
+
+            if (isSonderleistung) {
+              if (!(zl.tnzuslbng_art || "").toLowerCase().includes("kite")) continue;
+              const rawPrice = parseFloat(zl.tnzuslbng_preis || "0");
+              const discountedPrice = Math.round(rawPrice * 0.7).toFixed(2);
+              items.push({
+                productId: null,
+                productName: zl.tnzuslbng_zuslcode,
+                category: "Other",
+                quantity: 1,
+                unitPrice: discountedPrice,
+                lineTotal: discountedPrice,
+              });
+            } else {
+              const product = productByBosCode.get(zl.tnzuslbng_zuslcode);
+              if (!product) {
+                if (!skippedProducts.includes(zl.tnzuslbng_zuslcode)) skippedProducts.push(zl.tnzuslbng_zuslcode);
+                continue;
+              }
+              const zlPrice = parseFloat(zl.tnzuslbng_preis_ek || "0").toFixed(2);
+              items.push({
+                productId: product.id,
+                productName: product.name,
+                category: product.category,
+                quantity: 1,
+                unitPrice: zlPrice,
+                lineTotal: zlPrice,
+              });
             }
-            const zlPrice = parseFloat(zl.tnzuslbng_preis_ek || "0").toFixed(2);
-            items.push({
-              productId: product.id,
-              productName: product.name,
-              category: product.category,
-              quantity: 1,
-              unitPrice: zlPrice,
-              lineTotal: zlPrice,
-            });
           }
 
           const totalAmount = items.reduce((sum, i) => sum + parseFloat(i.lineTotal || "0"), 0).toFixed(2);
