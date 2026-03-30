@@ -4056,6 +4056,26 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/customer-documents/download/:id", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid document ID" });
+    const doc = await storage.getCustomerDocument(id);
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+    const user = req.user as Express.User & { id: number; role: string; assignedStationId?: number | null };
+    const { allowed } = await checkSchoolAccessForCustomer(user, doc.customerId);
+    if (!allowed) return res.status(403).json({ error: "Access denied" });
+    try {
+      const file = await objectStorage.getObjectEntityFile(doc.objectKey);
+      const safeName = (doc.fileName || "document.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+      res.setHeader("Content-Type", "image/jpeg");
+      await objectStorage.downloadObject(file, res);
+    } catch (e) {
+      console.error("Error downloading doc:", e);
+      if (!res.headersSent) res.status(500).json({ error: "Failed to download document" });
+    }
+  });
+
   app.get("/api/customer-documents/by-customer/:customerId", requireAuth, async (req, res) => {
     const customerId = parseInt(req.params.customerId);
     if (isNaN(customerId)) return res.status(400).json({ error: "Invalid customer ID" });

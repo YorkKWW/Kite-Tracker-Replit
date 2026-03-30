@@ -2295,21 +2295,8 @@ function CustomerDocuments({ customerId }: { customerId: number }) {
                   variant="outline"
                   size="sm"
                   data-testid="btn-download-doc"
-                  onClick={async () => {
-                    try {
-                      const res = await fetch(`/api/customer-documents/view/${viewDoc.id}`, { credentials: "include" });
-                      const blob = await res.blob();
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = viewDoc.fileName || "document.jpg";
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                      URL.revokeObjectURL(url);
-                    } catch {
-                      toast({ title: "Download failed", variant: "destructive" });
-                    }
+                  onClick={() => {
+                    window.open(`/api/customer-documents/download/${viewDoc.id}`, "_blank");
                   }}
                 >
                   <FileDown className="h-3 w-3 mr-1" /> Download
