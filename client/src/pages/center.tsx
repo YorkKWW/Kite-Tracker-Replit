@@ -2114,6 +2114,7 @@ function CustomerDocuments({ customerId }: { customerId: number }) {
   });
 
   function resetUpload() {
+    if (scanPreview) URL.revokeObjectURL(scanPreview);
     setScanPreview(null);
     setScanBlob(null);
     setDocCategory("agb");
@@ -2126,6 +2127,7 @@ function CustomerDocuments({ customerId }: { customerId: number }) {
     if (!file) return;
     try {
       const blob = await convertToScan(file);
+      if (scanPreview) URL.revokeObjectURL(scanPreview);
       const previewUrl = URL.createObjectURL(blob);
       setScanBlob(blob);
       setScanPreview(previewUrl);
@@ -2139,7 +2141,7 @@ function CustomerDocuments({ customerId }: { customerId: number }) {
     if (!scanBlob) return;
     setIsUploading(true);
     try {
-      const urlRes = await fetch("/api/customer-documents/upload-url", {
+      const urlRes = await fetch(`/api/customer-documents/upload-url?customerId=${customerId}`, {
         credentials: "include",
       });
       if (!urlRes.ok) throw new Error("Failed to get upload URL");

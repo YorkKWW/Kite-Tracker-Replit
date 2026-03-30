@@ -4009,6 +4009,13 @@ export async function registerRoutes(
 
   app.get("/api/customer-documents/upload-url", requireAuth, async (req, res) => {
     try {
+      const customerIdStr = req.query.customerId as string | undefined;
+      if (!customerIdStr) return res.status(400).json({ error: "Missing customerId" });
+      const customerId = parseInt(customerIdStr);
+      if (isNaN(customerId)) return res.status(400).json({ error: "Invalid customerId" });
+      const user = req.user as Express.User & { id: number; role: string; assignedStationId?: number | null };
+      const { allowed } = await checkSchoolAccessForCustomer(user, customerId);
+      if (!allowed) return res.status(403).json({ error: "Access denied" });
       const uploadURL = await objectStorage.getObjectEntityUploadURL();
       const objectKey = objectStorage.normalizeObjectEntityPath(uploadURL);
       res.json({ uploadURL, objectKey });
