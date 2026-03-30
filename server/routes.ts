@@ -3473,7 +3473,7 @@ export async function registerRoutes(
         defaultPrice: z.union([z.string(), z.number()]).transform(v => String(v)),
         isActive: z.boolean().default(true),
         sortOrder: z.number().int().default(0),
-        source: z.enum(["walkin", "bos"]).default("walkin"),
+        source: z.enum(["walkin", "bos", "kiteworldwide"]).default("walkin"),
       })),
     });
     const parsed = schema.safeParse(req.body);

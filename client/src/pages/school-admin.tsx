@@ -40,7 +40,7 @@ type SchoolProduct = {
   defaultPrice: string;
   isActive: boolean;
   sortOrder: number;
-  source: "walkin" | "bos";
+  source: "walkin" | "bos" | "kiteworldwide";
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -463,9 +463,9 @@ export default function SchoolAdminPage() {
                         <Badge
                           variant="outline"
                           data-testid={`badge-source-${p.id}`}
-                          className={`text-[10px] ${p.source === "bos" ? "border-indigo-300 text-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-700" : "border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-400"}`}
+                          className={`text-[10px] ${p.source === "kiteworldwide" || p.source === "bos" ? "border-indigo-300 text-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-700" : "border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-400"}`}
                         >
-                          {p.source === "bos" ? "BOS" : "Walk-in"}
+                          {p.source === "kiteworldwide" || p.source === "bos" ? "KWW" : "Walk-in"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">

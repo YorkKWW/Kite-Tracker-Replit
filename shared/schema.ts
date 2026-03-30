@@ -601,10 +601,10 @@ export const schoolConfigs = pgTable("school_configs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const PRODUCT_SOURCES = ["walkin", "bos"] as const;
+export const PRODUCT_SOURCES = ["walkin", "bos", "kiteworldwide"] as const;
 export type ProductSource = typeof PRODUCT_SOURCES[number];
 
-export const productSourceEnum = pgEnum("product_source", ["walkin", "bos"]);
+export const productSourceEnum = pgEnum("product_source", ["walkin", "bos", "kiteworldwide"]);
 
 export const schoolProducts = pgTable("school_products", {
   id: serial("id").primaryKey(),

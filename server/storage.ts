@@ -249,7 +249,7 @@ export interface IStorage {
   updateSchoolBooking(id: number, data: Partial<InsertSchoolBooking>, items?: Omit<InsertSchoolBookingItem, "bookingId">[]): Promise<SchoolBooking | undefined>;
   deleteSchoolBooking(id: number): Promise<void>;
   getSchoolBookingByNumber(bookingNumber: string): Promise<(SchoolBooking & { items: SchoolBookingItem[] }) | undefined>;
-  updateSchoolBookingPayment(id: number, paymentStatus: "unpaid" | "cash" | "credit_card" | "paid"): Promise<SchoolBooking | undefined>;
+  updateSchoolBookingPayment(id: number, paymentStatus: "unpaid" | "cash" | "credit_card" | "paid" | "paid-kww"): Promise<SchoolBooking | undefined>;
   getNextBookingNumber(schoolConfigId: number, stationShortCode: string): Promise<string>;
 
   getCashRegisterEntry(schoolConfigId: number, date: string): Promise<CashRegisterEntry | undefined>;
@@ -1631,7 +1631,7 @@ export class DatabaseStorage implements IStorage {
       const existing = await tx.select().from(schoolProducts)
         .where(and(
           eq(schoolProducts.schoolConfigId, schoolConfigId),
-          eq(schoolProducts.source, "bos"),
+          eq(schoolProducts.source, "kiteworldwide"),
         ));
       const byCode = Object.fromEntries(existing.filter(p => p.bosCode).map(p => [p.bosCode, p]));
 
@@ -1649,7 +1649,7 @@ export class DatabaseStorage implements IStorage {
             name: p.name,
             category,
             defaultPrice: "0.00",
-            source: "bos",
+            source: "kiteworldwide",
             bosCode: p.bosCode,
           });
           created++;

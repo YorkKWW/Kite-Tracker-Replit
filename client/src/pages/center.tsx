@@ -45,7 +45,7 @@ type SchoolProduct = {
   defaultPrice: string;
   isActive: boolean;
   sortOrder: number;
-  source: "walkin" | "bos";
+  source: "walkin" | "bos" | "kiteworldwide";
 };
 
 type BookingItem = {
