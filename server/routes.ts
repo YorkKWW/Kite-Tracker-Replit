@@ -3750,8 +3750,8 @@ export async function registerRoutes(
           rtnb_gewicht: string;
         };
         sub_travellers: Array<{ tnnr: string; rtnb_vorname: string; rtnb_nachname: string }>;
-        packages: Array<{ tnuntbng_akww: string; tnuntbng_tnnr: string; tnuntbng_paket: string }>;
-        zusatzleistungen: Array<{ tnzuslbng_akww: string; tnzuslbng_tnnr: string; tnzuslbng_zuslcode: string }>;
+        packages: Array<{ tnuntbng_akww: string; tnuntbng_tnnr: string; tnuntbng_paket: string; gesamt_ek: string }>;
+        zusatzleistungen: Array<{ tnzuslbng_akww: string; tnzuslbng_tnnr: string; tnzuslbng_zuslcode: string; tnzuslbng_preis_ek: string }>;
       };
 
       const bosData = await bosRes.json() as { kiteBookings: { operations: BosOperation[] } };
@@ -3810,13 +3810,14 @@ export async function registerRoutes(
               if (!skippedProducts.includes(pkg.tnuntbng_paket)) skippedProducts.push(pkg.tnuntbng_paket);
               continue;
             }
+            const pkgPrice = parseFloat(pkg.gesamt_ek || "0").toFixed(2);
             items.push({
               productId: product.id,
               productName: product.name,
               category: product.category,
               quantity: 1,
-              unitPrice: product.defaultPrice,
-              lineTotal: product.defaultPrice,
+              unitPrice: pkgPrice,
+              lineTotal: pkgPrice,
             });
           }
 
@@ -3828,13 +3829,14 @@ export async function registerRoutes(
               if (!skippedProducts.includes(zl.tnzuslbng_zuslcode)) skippedProducts.push(zl.tnzuslbng_zuslcode);
               continue;
             }
+            const zlPrice = parseFloat(zl.tnzuslbng_preis_ek || "0").toFixed(2);
             items.push({
               productId: product.id,
               productName: product.name,
               category: product.category,
               quantity: 1,
-              unitPrice: product.defaultPrice,
-              lineTotal: product.defaultPrice,
+              unitPrice: zlPrice,
+              lineTotal: zlPrice,
             });
           }
 
