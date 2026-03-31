@@ -3911,6 +3911,181 @@ export async function registerRoutes(
     }
   });
 
+  // Combined import: customers + bookings + booking items in one call
+  app.post("/api/bos-import/run/:schoolConfigId", requireSuperAdmin, async (req, res) => {
+    try {
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      const config = await storage.getSchoolConfig(schoolConfigId);
+      if (!config) return res.status(404).json({ message: "School config not found" });
+      if (!config.destinationCodeBos) return res.status(400).json({ message: "No BOS destination code configured" });
+
+      const apiKey = process.env.BOS_API_KEY;
+      if (!apiKey) return res.status(500).json({ message: "BOS_API_KEY not configured" });
+
+      const bosUrl = `https://bos.kiteworldwide.com/api/external/futureKiteSchoolData?destination=${encodeURIComponent(config.destinationCodeBos)}`;
+      const bosRes = await fetch(bosUrl, { headers: { Apikey: apiKey } });
+      if (!bosRes.ok) return res.status(502).json({ message: `BOS API error: ${bosRes.status}` });
+
+      type BosCustOperation = {
+        vog_akww: string; vog_kundennummer: string; bng_swuensche: string;
+        bng_reisebeginn: string; bng_reiseende: string; bng_version: string; op_storno: string;
+        main_traveller: { kstm_kundennummer: string; kstm_email: string; kstm_mobil: string; kstm_festnetz: string; kstm_land: string; tnnr: string; rtnb_vorname: string; rtnb_nachname: string; rtnb_email: string; rtnb_gebdat: string; rtnb_kitelevel: string; rtnb_gewicht: string };
+        sub_travellers: Array<{ tnnr: string; rtnb_vorname: string; rtnb_nachname: string; rtnb_email: string; rtnb_gebdat: string; rtnb_land: string; rtnb_mobil: string; rtnb_kitelevel: string; rtnb_gewicht: string }>;
+        packages: Array<{ tnuntbng_tnnr: string; tnuntbng_paket: string; gesamt_ek: string }>;
+        zusatzleistungen: Array<{ tnzuslbng_tnnr: string; tnzuslbng_zuslcode: string; tnzuslbng_kategorie: string; tnzuslbng_art: string; tnzuslbng_preis: string; tnzuslbng_preis_ek: string }>;
+      };
+
+      const bosData = await bosRes.json() as { kiteBookings: { operations: BosCustOperation[] } };
+      const allOps = bosData.kiteBookings.operations;
+      const nonStornoOps = allOps.filter(o => o.op_storno !== "1");
+
+      function parseBosDate(d: string): string {
+        if (!d) return "";
+        const parts = d.split(".");
+        if (parts.length !== 3) return "";
+        const [day, month, year] = parts;
+        return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+      }
+      const kiteLevelMap: Record<string, string> = { "0": "Beginner", "1": "Beginner", "2": "Intermediate", "3": "Intermediate", "4": "Intermediate", "5": "Pro", "6": "Nonkite" };
+
+      // ── STEP 1: Import customers ──────────────────────────────────────────
+      const travellerMap = new Map<string, { bosNr: string; firstName: string; lastName: string; email: string; phone: string; nationality: string; dateOfBirth: string; kiteLevel: string; weightKg: number | null; earliestStart: string; earliestEnd: string; notes: string[] }>();
+
+      for (const op of nonStornoOps) {
+        const mt = op.main_traveller;
+        const mainBosNr = mt.kstm_kundennummer;
+        const existingMain = travellerMap.get(mainBosNr);
+        if (!existingMain || op.bng_reisebeginn < existingMain.earliestStart) {
+          travellerMap.set(mainBosNr, { bosNr: mainBosNr, firstName: mt.rtnb_vorname, lastName: mt.rtnb_nachname, email: mt.kstm_email || mt.rtnb_email || "", phone: mt.kstm_festnetz || mt.kstm_mobil || "", nationality: mt.kstm_land || "", dateOfBirth: parseBosDate(mt.rtnb_gebdat), kiteLevel: kiteLevelMap[mt.rtnb_kitelevel] || "Beginner", weightKg: parseInt(mt.rtnb_gewicht) || null, earliestStart: op.bng_reisebeginn, earliestEnd: op.bng_reiseende, notes: op.bng_swuensche ? [op.bng_swuensche] : [] });
+        } else if (op.bng_swuensche) { existingMain.notes.push(op.bng_swuensche); }
+
+        for (const st of op.sub_travellers) {
+          const subBosNr = `${mt.kstm_kundennummer}-${st.tnnr}`;
+          const existingSub = travellerMap.get(subBosNr);
+          if (!existingSub || op.bng_reisebeginn < existingSub.earliestStart) {
+            travellerMap.set(subBosNr, { bosNr: subBosNr, firstName: st.rtnb_vorname, lastName: st.rtnb_nachname, email: st.rtnb_email || "", phone: st.rtnb_mobil || mt.kstm_festnetz || mt.kstm_mobil || "", nationality: st.rtnb_land || "", dateOfBirth: parseBosDate(st.rtnb_gebdat), kiteLevel: kiteLevelMap[st.rtnb_kitelevel] || "Beginner", weightKg: parseInt(st.rtnb_gewicht) || null, earliestStart: op.bng_reisebeginn, earliestEnd: op.bng_reiseende, notes: [] });
+          }
+        }
+      }
+
+      const existingCustomersBefore = await storage.getSchoolCustomers(schoolConfigId);
+      const existingByBosNr = new Map(existingCustomersBefore.filter(c => c.bosCustomerNumber).map(c => [c.bosCustomerNumber, c]));
+
+      let custCreated = 0, custUpdated = 0, custUnchanged = 0;
+      for (const [bosNr, data] of travellerMap) {
+        const fields = { firstName: data.firstName, lastName: data.lastName, email: data.email, phone: data.phone, nationality: data.nationality, dateOfBirth: data.dateOfBirth, kiteLevel: data.kiteLevel, weightKg: data.weightKg, arrivalDate: data.earliestStart, departureDate: data.earliestEnd, notes: data.notes.join("; ") || null };
+        const existing = existingByBosNr.get(bosNr);
+        const runAt = new Date();
+        if (existing) {
+          const changes: Record<string, any> = {};
+          for (const [key, val] of Object.entries(fields)) { if (String(val ?? "") !== String((existing as any)[key] ?? "")) changes[key] = val; }
+          if (Object.keys(changes).length > 0) {
+            await storage.updateSchoolCustomer(existing.id, changes); custUpdated++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: bosNr, recordType: "customer", status: "updated", customerName: `${data.firstName} ${data.lastName}`, customerId: existing.id, rawData: data });
+          } else {
+            custUnchanged++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: bosNr, recordType: "customer", status: "unchanged", customerName: `${data.firstName} ${data.lastName}`, customerId: existing.id, rawData: data });
+          }
+        } else {
+          const created_ = await storage.createSchoolCustomer({ schoolConfigId, guestType: "KiteWorldWide", emergencyContact: "", bosCustomerNumber: bosNr, ...fields });
+          custCreated++;
+          await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: bosNr, recordType: "customer", status: "created", customerName: `${data.firstName} ${data.lastName}`, customerId: created_.id, rawData: data });
+        }
+      }
+
+      // ── STEP 2: Import bookings + booking items ───────────────────────────
+      // Re-query customers so freshly created ones are included
+      const allCustomers = await storage.getSchoolCustomers(schoolConfigId);
+      const customerByBosNr = new Map(allCustomers.filter(c => c.bosCustomerNumber).map(c => [c.bosCustomerNumber, c]));
+      const products = await storage.getSchoolProducts(schoolConfigId);
+      const productByBosCode = new Map(products.filter(p => p.bosCode).map(p => [p.bosCode, p]));
+
+      let bkgCreated = 0, bkgUpdated = 0, bkgUnchanged = 0, bkgDeleted = 0, bkgSkippedNoCustomer = 0, bkgSkippedStorno = 0;
+      const skippedProducts: string[] = [];
+
+      for (const op of allOps) {
+        const isStorno = op.op_storno === "1";
+        const mt = op.main_traveller;
+        type TravellerInfo = { tnnr: string; bosNr: string; name: string; email: string };
+        const allTravellers: TravellerInfo[] = [
+          { tnnr: mt.tnnr || "1", bosNr: mt.kstm_kundennummer, name: `${mt.rtnb_vorname} ${mt.rtnb_nachname}`, email: mt.kstm_email || mt.rtnb_email || "" },
+          ...op.sub_travellers.map(st => ({ tnnr: st.tnnr, bosNr: `${mt.kstm_kundennummer}-${st.tnnr}`, name: `${st.rtnb_vorname} ${st.rtnb_nachname}`, email: st.rtnb_email || "" })),
+        ];
+
+        for (const trav of allTravellers) {
+          const bookingNumber = `${op.vog_akww}-${trav.tnnr}`;
+          const existing = await storage.getSchoolBookingByNumber(bookingNumber);
+          const runAt = new Date();
+          if (!existing && isStorno) { bkgSkippedStorno++; continue; }
+          if (existing && isStorno) {
+            await storage.deleteSchoolBooking(existing.id); bkgDeleted++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking", status: "deleted", customerName: trav.name, bookingNumber, rawData: op });
+            continue;
+          }
+          if (existing && existing.bookingVersionBos === op.bng_version) {
+            bkgUnchanged++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking", status: "unchanged", customerName: trav.name, bookingNumber, customerId: existing.customerId, bookingId: existing.id, rawData: op });
+            continue;
+          }
+          const customer = customerByBosNr.get(trav.bosNr);
+          if (!customer) {
+            bkgSkippedNoCustomer++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking", status: "skipped", skipReason: `Kein Kunde gefunden für BOS-Nr. ${trav.bosNr}`, customerName: trav.name, bookingNumber, rawData: op });
+            continue;
+          }
+
+          const items: Array<{ productId: number | null; productName: string; category: string; quantity: number; unitPrice: string; lineTotal: string }> = [];
+          for (const pkg of op.packages) {
+            if (pkg.tnuntbng_tnnr !== trav.tnnr) continue;
+            const product = productByBosCode.get(pkg.tnuntbng_paket);
+            if (!product) { if (!skippedProducts.includes(pkg.tnuntbng_paket)) skippedProducts.push(pkg.tnuntbng_paket); continue; }
+            const pkgPrice = parseFloat(pkg.gesamt_ek || "0").toFixed(2);
+            items.push({ productId: product.id, productName: product.name, category: product.category, quantity: 1, unitPrice: pkgPrice, lineTotal: pkgPrice });
+          }
+          for (const zl of op.zusatzleistungen) {
+            if (zl.tnzuslbng_zuslcode.startsWith("VER")) continue;
+            if (zl.tnzuslbng_tnnr !== trav.tnnr) continue;
+            const isSonderleistung = (zl.tnzuslbng_kategorie || "").toLowerCase() === "sonderleistungen";
+            if (isSonderleistung) {
+              if (!(zl.tnzuslbng_art || "").toLowerCase().includes("kite")) continue;
+              const discountedPrice = Math.round(parseFloat(zl.tnzuslbng_preis || "0") * 0.7).toFixed(2);
+              items.push({ productId: null, productName: zl.tnzuslbng_zuslcode, category: "Other", quantity: 1, unitPrice: discountedPrice, lineTotal: discountedPrice });
+            } else {
+              const product = productByBosCode.get(zl.tnzuslbng_zuslcode);
+              if (!product) { if (!skippedProducts.includes(zl.tnzuslbng_zuslcode)) skippedProducts.push(zl.tnzuslbng_zuslcode); continue; }
+              const zlPrice = parseFloat(zl.tnzuslbng_preis_ek || "0").toFixed(2);
+              items.push({ productId: product.id, productName: product.name, category: product.category, quantity: 1, unitPrice: zlPrice, lineTotal: zlPrice });
+            }
+          }
+
+          const totalAmount = items.reduce((sum, i) => sum + parseFloat(i.lineTotal || "0"), 0).toFixed(2);
+          const bookingData = { schoolConfigId, bookingNumber, customerId: customer.id, customerName: trav.name, customerEmail: trav.email || null, bookingDate: op.bng_reisebeginn, paymentStatus: "paid-kww" as const, totalAmount, currency: "EUR", notes: op.bng_swuensche || null, bookingVersionBos: op.bng_version };
+
+          if (existing) {
+            await storage.updateSchoolBooking(existing.id, bookingData, items); bkgUpdated++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking", status: "updated", customerName: trav.name, bookingNumber, customerId: customer.id, bookingId: existing.id, rawData: op });
+            for (const item of items) {
+              await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking_item", status: "updated", customerName: trav.name, bookingNumber, customerId: customer.id, bookingId: existing.id, itemName: item.productName, itemPrice: item.lineTotal, rawData: { productId: item.productId, productName: item.productName, category: item.category, quantity: item.quantity, unitPrice: item.unitPrice, lineTotal: item.lineTotal } });
+            }
+          } else {
+            const newBooking = await storage.createSchoolBooking(bookingData, items); bkgCreated++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking", status: "created", customerName: trav.name, bookingNumber, customerId: customer.id, bookingId: newBooking.id, rawData: op });
+            for (const item of items) {
+              await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking_item", status: "created", customerName: trav.name, bookingNumber, customerId: customer.id, bookingId: newBooking.id, itemName: item.productName, itemPrice: item.lineTotal, rawData: { productId: item.productId, productName: item.productName, category: item.category, quantity: item.quantity, unitPrice: item.unitPrice, lineTotal: item.lineTotal } });
+            }
+          }
+        }
+      }
+
+      res.json({
+        customers: { created: custCreated, updated: custUpdated, unchanged: custUnchanged, total: travellerMap.size },
+        bookings: { created: bkgCreated, updated: bkgUpdated, unchanged: bkgUnchanged, deleted: bkgDeleted, skippedNoCustomer: bkgSkippedNoCustomer, skippedStorno: bkgSkippedStorno, skippedProducts, total: allOps.length },
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.get("/api/bos-import-logs/:schoolConfigId", requireSuperAdmin, async (req, res) => {
     try {
       const schoolConfigId = parseInt(req.params.schoolConfigId);
