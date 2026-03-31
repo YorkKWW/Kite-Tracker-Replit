@@ -3911,8 +3911,8 @@ export async function registerRoutes(
     }
   });
 
-  // Combined import: customers + bookings + booking items in one call
-  app.post("/api/bos-import/run/:schoolConfigId", requireSuperAdmin, async (req, res) => {
+  // ── BOS Preview: fetch BOS data + compute import status without importing ──
+  app.get("/api/bos-import/preview/:schoolConfigId", requireSuperAdmin, async (req, res) => {
     try {
       const schoolConfigId = parseInt(req.params.schoolConfigId);
       const config = await storage.getSchoolConfig(schoolConfigId);
@@ -3937,7 +3937,103 @@ export async function registerRoutes(
 
       const bosData = await bosRes.json() as { kiteBookings: { operations: BosCustOperation[] } };
       const allOps = bosData.kiteBookings.operations;
+      const products = await storage.getSchoolProducts(schoolConfigId);
+      const productByBosCode = new Map(products.filter(p => p.bosCode).map(p => [p.bosCode, p]));
+
+      const result: Array<{
+        bookingNumber: string; operationId: string; travellerBosNr: string; customerName: string;
+        isMainTraveller: boolean; arrivalDate: string; departureDate: string;
+        items: { code: string; name: string; price: string; mapped: boolean }[];
+        totalAmount: string; importStatus: "new" | "updated" | "unchanged" | "storno"; bosVersion: string; notes: string | null;
+      }> = [];
+
+      for (const op of allOps) {
+        const isStorno = op.op_storno === "1";
+        const mt = op.main_traveller;
+        const allTravellers = [
+          { tnnr: mt.tnnr || "1", bosNr: mt.kstm_kundennummer, name: `${mt.rtnb_vorname} ${mt.rtnb_nachname}`, isMain: true },
+          ...op.sub_travellers.map(st => ({ tnnr: st.tnnr, bosNr: `${mt.kstm_kundennummer}-${st.tnnr}`, name: `${st.rtnb_vorname} ${st.rtnb_nachname}`, isMain: false })),
+        ];
+        for (const trav of allTravellers) {
+          const bookingNumber = `${op.vog_akww}-${trav.tnnr}`;
+          const existing = await storage.getSchoolBookingByNumber(bookingNumber);
+          let importStatus: "new" | "updated" | "unchanged" | "storno";
+          if (isStorno) importStatus = "storno";
+          else if (!existing) importStatus = "new";
+          else if (existing.bookingVersionBos !== op.bng_version) importStatus = "updated";
+          else importStatus = "unchanged";
+
+          const items: { code: string; name: string; price: string; mapped: boolean }[] = [];
+          for (const pkg of op.packages) {
+            if (pkg.tnuntbng_tnnr !== trav.tnnr) continue;
+            const product = productByBosCode.get(pkg.tnuntbng_paket);
+            items.push({ code: pkg.tnuntbng_paket, name: product ? product.name : pkg.tnuntbng_paket, price: parseFloat(pkg.gesamt_ek || "0").toFixed(2), mapped: !!product });
+          }
+          for (const zl of op.zusatzleistungen) {
+            if (zl.tnzuslbng_zuslcode.startsWith("VER")) continue;
+            if (zl.tnzuslbng_tnnr !== trav.tnnr) continue;
+            const isSonder = (zl.tnzuslbng_kategorie || "").toLowerCase() === "sonderleistungen";
+            if (isSonder && !(zl.tnzuslbng_art || "").toLowerCase().includes("kite")) continue;
+            const product = productByBosCode.get(zl.tnzuslbng_zuslcode);
+            const price = isSonder
+              ? Math.round(parseFloat(zl.tnzuslbng_preis || "0") * 0.7).toFixed(2)
+              : parseFloat(zl.tnzuslbng_preis_ek || "0").toFixed(2);
+            items.push({ code: zl.tnzuslbng_zuslcode, name: product ? product.name : (zl.tnzuslbng_art || zl.tnzuslbng_zuslcode), price, mapped: !!product });
+          }
+          const totalAmount = items.reduce((s, i) => s + parseFloat(i.price), 0).toFixed(2);
+          result.push({ bookingNumber, operationId: op.vog_akww, travellerBosNr: trav.bosNr, customerName: trav.name, isMainTraveller: trav.isMain, arrivalDate: op.bng_reisebeginn, departureDate: op.bng_reiseende, items, totalAmount, importStatus, bosVersion: op.bng_version, notes: op.bng_swuensche || null });
+        }
+      }
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/bos-import/run/:schoolConfigId", requireSuperAdmin, async (req, res) => {
+    try {
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      const config = await storage.getSchoolConfig(schoolConfigId);
+      if (!config) return res.status(404).json({ message: "School config not found" });
+      if (!config.destinationCodeBos) return res.status(400).json({ message: "No BOS destination code configured" });
+
+      const apiKey = process.env.BOS_API_KEY;
+      if (!apiKey) return res.status(500).json({ message: "BOS_API_KEY not configured" });
+
+      // Optional filter: only import specific booking numbers
+      const { bookingNumbers } = req.body as { bookingNumbers?: string[] };
+      const selectedBookingNumbers: Set<string> | null = bookingNumbers && bookingNumbers.length > 0 ? new Set(bookingNumbers) : null;
+
+      const bosUrl = `https://bos.kiteworldwide.com/api/external/futureKiteSchoolData?destination=${encodeURIComponent(config.destinationCodeBos)}`;
+      const bosRes = await fetch(bosUrl, { headers: { Apikey: apiKey } });
+      if (!bosRes.ok) return res.status(502).json({ message: `BOS API error: ${bosRes.status}` });
+
+      type BosCustOperation = {
+        vog_akww: string; vog_kundennummer: string; bng_swuensche: string;
+        bng_reisebeginn: string; bng_reiseende: string; bng_version: string; op_storno: string;
+        main_traveller: { kstm_kundennummer: string; kstm_email: string; kstm_mobil: string; kstm_festnetz: string; kstm_land: string; tnnr: string; rtnb_vorname: string; rtnb_nachname: string; rtnb_email: string; rtnb_gebdat: string; rtnb_kitelevel: string; rtnb_gewicht: string };
+        sub_travellers: Array<{ tnnr: string; rtnb_vorname: string; rtnb_nachname: string; rtnb_email: string; rtnb_gebdat: string; rtnb_land: string; rtnb_mobil: string; rtnb_kitelevel: string; rtnb_gewicht: string }>;
+        packages: Array<{ tnuntbng_tnnr: string; tnuntbng_paket: string; gesamt_ek: string }>;
+        zusatzleistungen: Array<{ tnzuslbng_tnnr: string; tnzuslbng_zuslcode: string; tnzuslbng_kategorie: string; tnzuslbng_art: string; tnzuslbng_preis: string; tnzuslbng_preis_ek: string }>;
+      };
+
+      const bosData = await bosRes.json() as { kiteBookings: { operations: BosCustOperation[] } };
+      const allOps = bosData.kiteBookings.operations;
       const nonStornoOps = allOps.filter(o => o.op_storno !== "1");
+
+      // Build bookingNumber → travellerBosNr map for filter resolution
+      const bookingToTravellerBosNr = new Map<string, string>();
+      for (const op of allOps) {
+        const mt = op.main_traveller;
+        bookingToTravellerBosNr.set(`${op.vog_akww}-${mt.tnnr || "1"}`, mt.kstm_kundennummer);
+        for (const st of op.sub_travellers) {
+          bookingToTravellerBosNr.set(`${op.vog_akww}-${st.tnnr}`, `${mt.kstm_kundennummer}-${st.tnnr}`);
+        }
+      }
+      // Derive which travellerBosNrs are needed for the selected bookings
+      const selectedBosNrs: Set<string> | null = selectedBookingNumbers
+        ? new Set([...selectedBookingNumbers].map(bn => bookingToTravellerBosNr.get(bn)).filter((v): v is string => !!v))
+        : null;
 
       function parseBosDate(d: string): string {
         if (!d) return "";
@@ -3973,6 +4069,8 @@ export async function registerRoutes(
 
       let custCreated = 0, custUpdated = 0, custUnchanged = 0;
       for (const [bosNr, data] of travellerMap) {
+        // Skip customers not in the filter (if a filter is active)
+        if (selectedBosNrs && !selectedBosNrs.has(bosNr)) continue;
         const fields = { firstName: data.firstName, lastName: data.lastName, email: data.email, phone: data.phone, nationality: data.nationality, dateOfBirth: data.dateOfBirth, kiteLevel: data.kiteLevel, weightKg: data.weightKg, arrivalDate: data.earliestStart, departureDate: data.earliestEnd, notes: data.notes.join("; ") || null };
         const existing = existingByBosNr.get(bosNr);
         const runAt = new Date();
@@ -4014,6 +4112,8 @@ export async function registerRoutes(
 
         for (const trav of allTravellers) {
           const bookingNumber = `${op.vog_akww}-${trav.tnnr}`;
+          // Skip bookings not in the filter (if a filter is active)
+          if (selectedBookingNumbers && !selectedBookingNumbers.has(bookingNumber)) continue;
           const existing = await storage.getSchoolBookingByNumber(bookingNumber);
           const runAt = new Date();
           if (!existing && isStorno) { bkgSkippedStorno++; continue; }
