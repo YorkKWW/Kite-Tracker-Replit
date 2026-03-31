@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronDown, ChevronRight, CheckCircle2, RefreshCw, AlertCircle, Clock, Trash2, ArrowUpDown } from "lucide-react";
+import { ChevronDown, ChevronRight, CheckCircle2, RefreshCw, AlertCircle, Clock, Trash2, ArrowUpDown, Package } from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 
@@ -15,13 +14,15 @@ type BosImportLog = {
   runAt: string;
   bosRef: string;
   bosVersion: string | null;
-  recordType: "customer" | "booking";
+  recordType: "customer" | "booking" | "booking_item";
   status: "created" | "updated" | "unchanged" | "deleted" | "skipped" | "error";
   skipReason: string | null;
   customerId: number | null;
   bookingId: number | null;
   customerName: string | null;
   bookingNumber: string | null;
+  itemName: string | null;
+  itemPrice: string | null;
   rawData: Record<string, any> | null;
 };
 
@@ -30,37 +31,42 @@ type SchoolConfig = {
   stationName: string;
 };
 
-const STATUS_CONFIG: Record<BosImportLog["status"], { label: string; color: string; icon: typeof CheckCircle2 }> = {
-  created: { label: "Neu erstellt", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800", icon: CheckCircle2 },
-  updated: { label: "Aktualisiert", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800", icon: ArrowUpDown },
-  unchanged: { label: "Unverändert", color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700", icon: Clock },
-  deleted: { label: "Gelöscht", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800", icon: Trash2 },
-  skipped: { label: "Übersprungen", color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800", icon: AlertCircle },
-  error: { label: "Fehler", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800", icon: AlertCircle },
+const STATUS_CONFIG: Record<BosImportLog["status"], { label: string; color: string }> = {
+  created:   { label: "Neu erstellt",        color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800" },
+  updated:   { label: "Aktualisiert",         color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800" },
+  unchanged: { label: "Unverändert",          color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700" },
+  deleted:   { label: "Gelöscht",             color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800" },
+  skipped:   { label: "Übersprungen",         color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800" },
+  error:     { label: "Fehler",               color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800" },
 };
 
 function StatusBadge({ status }: { status: BosImportLog["status"] }) {
   const cfg = STATUS_CONFIG[status];
+  const Icon =
+    status === "created" ? CheckCircle2 :
+    status === "updated" ? ArrowUpDown :
+    status === "unchanged" ? Clock :
+    status === "deleted" ? Trash2 :
+    AlertCircle;
   return (
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${cfg.color}`}>
-      {status === "created" && <CheckCircle2 className="h-3 w-3" />}
-      {status === "updated" && <ArrowUpDown className="h-3 w-3" />}
-      {status === "unchanged" && <Clock className="h-3 w-3" />}
-      {status === "deleted" && <Trash2 className="h-3 w-3" />}
-      {(status === "skipped" || status === "error") && <AlertCircle className="h-3 w-3" />}
+      <Icon className="h-3 w-3" />
       {cfg.label}
     </span>
   );
 }
 
 function RecordTypeBadge({ type }: { type: BosImportLog["recordType"] }) {
+  const cfg =
+    type === "customer"
+      ? { label: "Kunde",    color: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 border-violet-200 dark:border-violet-800" }
+      : type === "booking"
+      ? { label: "Buchung",  color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800" }
+      : { label: "Leistung", color: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400 border-teal-200 dark:border-teal-800" };
   return (
-    <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full border font-medium ${
-      type === "customer"
-        ? "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 border-violet-200 dark:border-violet-800"
-        : "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
-    }`}>
-      {type === "customer" ? "Kunde" : "Buchung"}
+    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${cfg.color}`}>
+      {type === "booking_item" && <Package className="h-3 w-3" />}
+      {cfg.label}
     </span>
   );
 }
@@ -75,6 +81,18 @@ function RawDataView({ data }: { data: Record<string, any> }) {
 
 function LogRow({ log }: { log: BosImportLog }) {
   const [expanded, setExpanded] = useState(false);
+
+  const mainLabel =
+    log.recordType === "booking_item"
+      ? (log.itemName || "–")
+      : (log.customerName || "–");
+
+  const subLabel =
+    log.recordType === "booking_item"
+      ? (log.bookingNumber ? `Buchung: ${log.bookingNumber}` : null)
+      : log.recordType === "booking"
+      ? (log.bookingNumber ? `Buchung: ${log.bookingNumber}` : null)
+      : null;
 
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
@@ -96,14 +114,20 @@ function LogRow({ log }: { log: BosImportLog }) {
 
         <span className="flex-1 min-w-0">
           <span className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate block">
-            {log.customerName || "–"}
+            {mainLabel}
           </span>
-          {log.bookingNumber && (
+          {subLabel && (
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              Buchung: {log.bookingNumber}
+              {subLabel}
             </span>
           )}
         </span>
+
+        {log.recordType === "booking_item" && log.itemPrice && (
+          <span className="text-xs font-mono text-gray-700 dark:text-gray-300 flex-shrink-0">
+            {parseFloat(log.itemPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+          </span>
+        )}
 
         <span className="text-xs text-gray-400 font-mono flex-shrink-0">
           BOS #{log.bosRef}
@@ -132,10 +156,26 @@ function LogRow({ log }: { log: BosImportLog }) {
                 <div className="font-mono font-medium">{log.bookingNumber}</div>
               </div>
             )}
-            <div>
-              <div className="text-xs text-gray-500 mb-0.5">BOS Ref.</div>
-              <div className="font-mono font-medium">{log.bosRef}{log.bosVersion ? ` v${log.bosVersion}` : ""}</div>
-            </div>
+            {log.recordType === "booking_item" && log.itemName && (
+              <div>
+                <div className="text-xs text-gray-500 mb-0.5">Leistung</div>
+                <div className="font-medium">{log.itemName}</div>
+              </div>
+            )}
+            {log.recordType === "booking_item" && log.itemPrice && (
+              <div>
+                <div className="text-xs text-gray-500 mb-0.5">Preis (EK)</div>
+                <div className="font-mono font-medium">
+                  {parseFloat(log.itemPrice).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                </div>
+              </div>
+            )}
+            {log.recordType !== "booking_item" && (
+              <div>
+                <div className="text-xs text-gray-500 mb-0.5">BOS Ref.</div>
+                <div className="font-mono font-medium">{log.bosRef}{log.bosVersion ? ` v${log.bosVersion}` : ""}</div>
+              </div>
+            )}
           </div>
 
           {log.skipReason && (
@@ -199,12 +239,9 @@ export default function BosImporterPage() {
     return true;
   });
 
-  const summary = {
-    created: logs.filter(l => l.status === "created").length,
-    updated: logs.filter(l => l.status === "updated").length,
-    skipped: logs.filter(l => l.status === "skipped" || l.status === "error").length,
-    unchanged: logs.filter(l => l.status === "unchanged").length,
-  };
+  const customerLogs = logs.filter(l => l.recordType === "customer");
+  const bookingLogs = logs.filter(l => l.recordType === "booking");
+  const itemLogs = logs.filter(l => l.recordType === "booking_item");
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
@@ -239,29 +276,48 @@ export default function BosImporterPage() {
       )}
 
       {logs.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card className="border-green-200 dark:border-green-800">
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="border-violet-200 dark:border-violet-800">
             <CardContent className="pt-4 pb-3">
-              <div className="text-2xl font-bold text-green-700 dark:text-green-400">{summary.created}</div>
-              <div className="text-xs text-gray-500 mt-0.5">Neu erstellt</div>
+              <div className="flex items-baseline justify-between mb-1">
+                <div className="text-2xl font-bold text-violet-700 dark:text-violet-400">{customerLogs.length}</div>
+                <span className="text-xs text-violet-500">Kunden</span>
+              </div>
+              <div className="flex gap-2 text-xs text-gray-500">
+                <span className="text-green-600">{customerLogs.filter(l => l.status === "created").length} neu</span>
+                <span>·</span>
+                <span className="text-blue-600">{customerLogs.filter(l => l.status === "updated").length} akt.</span>
+                <span>·</span>
+                <span>{customerLogs.filter(l => l.status === "unchanged").length} unbew.</span>
+              </div>
             </CardContent>
           </Card>
-          <Card className="border-blue-200 dark:border-blue-800">
+          <Card className="border-indigo-200 dark:border-indigo-800">
             <CardContent className="pt-4 pb-3">
-              <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">{summary.updated}</div>
-              <div className="text-xs text-gray-500 mt-0.5">Aktualisiert</div>
+              <div className="flex items-baseline justify-between mb-1">
+                <div className="text-2xl font-bold text-indigo-700 dark:text-indigo-400">{bookingLogs.length}</div>
+                <span className="text-xs text-indigo-500">Buchungen</span>
+              </div>
+              <div className="flex gap-2 text-xs text-gray-500">
+                <span className="text-green-600">{bookingLogs.filter(l => l.status === "created").length} neu</span>
+                <span>·</span>
+                <span className="text-blue-600">{bookingLogs.filter(l => l.status === "updated").length} akt.</span>
+                <span>·</span>
+                <span className="text-amber-600">{bookingLogs.filter(l => l.status === "skipped" || l.status === "deleted").length} skip/del.</span>
+              </div>
             </CardContent>
           </Card>
-          <Card className="border-amber-200 dark:border-amber-800">
+          <Card className="border-teal-200 dark:border-teal-800">
             <CardContent className="pt-4 pb-3">
-              <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">{summary.skipped}</div>
-              <div className="text-xs text-gray-500 mt-0.5">Übersprungen / Fehler</div>
-            </CardContent>
-          </Card>
-          <Card className="border-gray-200 dark:border-gray-700">
-            <CardContent className="pt-4 pb-3">
-              <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{summary.unchanged}</div>
-              <div className="text-xs text-gray-500 mt-0.5">Unverändert</div>
+              <div className="flex items-baseline justify-between mb-1">
+                <div className="text-2xl font-bold text-teal-700 dark:text-teal-400">{itemLogs.length}</div>
+                <span className="text-xs text-teal-500">Leistungen</span>
+              </div>
+              <div className="flex gap-2 text-xs text-gray-500">
+                <span className="text-green-600">{itemLogs.filter(l => l.status === "created").length} neu</span>
+                <span>·</span>
+                <span className="text-blue-600">{itemLogs.filter(l => l.status === "updated").length} akt.</span>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -273,13 +329,14 @@ export default function BosImporterPage() {
             <CardTitle className="text-base">Import-Log</CardTitle>
             <div className="flex items-center gap-2">
               <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-32 h-8 text-xs" data-testid="select-filter-type">
+                <SelectTrigger className="w-36 h-8 text-xs" data-testid="select-filter-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Alle Typen</SelectItem>
                   <SelectItem value="customer">Kunden</SelectItem>
                   <SelectItem value="booking">Buchungen</SelectItem>
+                  <SelectItem value="booking_item">Leistungen</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={filterStatus} onValueChange={setFilterStatus}>

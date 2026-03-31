@@ -680,7 +680,7 @@ export const schoolBookingItems = pgTable("school_booking_items", {
 });
 
 export const bosImportLogStatusEnum = pgEnum("bos_import_log_status", ["created", "updated", "unchanged", "deleted", "skipped", "error"]);
-export const bosImportLogRecordTypeEnum = pgEnum("bos_import_log_record_type", ["customer", "booking"]);
+export const bosImportLogRecordTypeEnum = pgEnum("bos_import_log_record_type", ["customer", "booking", "booking_item"]);
 
 export const bosImportLogs = pgTable("bos_import_logs", {
   id: serial("id").primaryKey(),
@@ -695,6 +695,8 @@ export const bosImportLogs = pgTable("bos_import_logs", {
   bookingId: integer("booking_id"),
   customerName: text("customer_name"),
   bookingNumber: text("booking_number"),
+  itemName: text("item_name"),
+  itemPrice: text("item_price"),
   rawData: jsonb("raw_data"),
 });
 

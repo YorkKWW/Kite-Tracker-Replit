@@ -3888,10 +3888,16 @@ export async function registerRoutes(
             await storage.updateSchoolBooking(existing.id, bookingData, items);
             updated++;
             await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking", status: "updated", customerName: trav.name, bookingNumber, customerId: customer.id, bookingId: existing.id, rawData: op });
+            for (const item of items) {
+              await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking_item", status: "updated", customerName: trav.name, bookingNumber, customerId: customer.id, bookingId: existing.id, itemName: item.productName, itemPrice: item.lineTotal, rawData: { productId: item.productId, productName: item.productName, category: item.category, quantity: item.quantity, unitPrice: item.unitPrice, lineTotal: item.lineTotal } });
+            }
           } else {
             const newBooking = await storage.createSchoolBooking(bookingData, items);
             created++;
             await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking", status: "created", customerName: trav.name, bookingNumber, customerId: customer.id, bookingId: newBooking.id, rawData: op });
+            for (const item of items) {
+              await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking_item", status: "created", customerName: trav.name, bookingNumber, customerId: customer.id, bookingId: newBooking.id, itemName: item.productName, itemPrice: item.lineTotal, rawData: { productId: item.productId, productName: item.productName, category: item.category, quantity: item.quantity, unitPrice: item.unitPrice, lineTotal: item.lineTotal } });
+            }
           }
 
           if (req.query.limit === "1" && created >= 1) break;
