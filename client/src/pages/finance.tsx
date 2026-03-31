@@ -39,6 +39,8 @@ const PAYMENT_LABELS: Record<string, { label: string; icon: LucideIcon; color: s
   cash: { label: "Cash", icon: Banknote, color: "text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-950" },
   credit_card: { label: "Card", icon: CreditCard, color: "text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-950" },
   unpaid: { label: "Unpaid", icon: XCircle, color: "text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-950" },
+  paid: { label: "Paid", icon: CheckCircle, color: "text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-950" },
+  "paid-kww": { label: "Paid KWW", icon: CheckCircle, color: "text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-950" },
 };
 
 function formatPrice(price: string, curr: string) {
