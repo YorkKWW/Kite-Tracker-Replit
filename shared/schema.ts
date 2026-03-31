@@ -679,6 +679,28 @@ export const schoolBookingItems = pgTable("school_booking_items", {
   lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
 });
 
+export const bosImportLogStatusEnum = pgEnum("bos_import_log_status", ["created", "updated", "unchanged", "deleted", "skipped", "error"]);
+export const bosImportLogRecordTypeEnum = pgEnum("bos_import_log_record_type", ["customer", "booking"]);
+
+export const bosImportLogs = pgTable("bos_import_logs", {
+  id: serial("id").primaryKey(),
+  schoolConfigId: integer("school_config_id").notNull().references(() => schoolConfigs.id),
+  runAt: timestamp("run_at").defaultNow().notNull(),
+  bosRef: text("bos_ref").notNull(),
+  bosVersion: text("bos_version"),
+  recordType: bosImportLogRecordTypeEnum("record_type").notNull(),
+  status: bosImportLogStatusEnum("status").notNull(),
+  skipReason: text("skip_reason"),
+  customerId: integer("customer_id"),
+  bookingId: integer("booking_id"),
+  customerName: text("customer_name"),
+  bookingNumber: text("booking_number"),
+  rawData: jsonb("raw_data"),
+});
+
+export type BosImportLog = typeof bosImportLogs.$inferSelect;
+export type InsertBosImportLog = typeof bosImportLogs.$inferInsert;
+
 export const insertSchoolConfigSchema = createInsertSchema(schoolConfigs).omit({ id: true, createdAt: true });
 export const insertSchoolProductSchema = createInsertSchema(schoolProducts).omit({ id: true, createdAt: true });
 export const insertSchoolCustomerSchema = createInsertSchema(schoolCustomers).omit({ id: true, createdAt: true });

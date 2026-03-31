@@ -3676,6 +3676,7 @@ export async function registerRoutes(
         };
 
         const existing = existingByBosNr.get(bosNr);
+        const runAt = new Date();
         if (existing) {
           const changes: Record<string, any> = {};
           for (const [key, val] of Object.entries(fields)) {
@@ -3687,11 +3688,13 @@ export async function registerRoutes(
           if (Object.keys(changes).length > 0) {
             await storage.updateSchoolCustomer(existing.id, changes);
             updated++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: bosNr, recordType: "customer", status: "updated", customerName: `${data.firstName} ${data.lastName}`, customerId: existing.id, rawData: data });
           } else {
             unchanged++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: bosNr, recordType: "customer", status: "unchanged", customerName: `${data.firstName} ${data.lastName}`, customerId: existing.id, rawData: data });
           }
         } else {
-          await storage.createSchoolCustomer({
+          const created_ = await storage.createSchoolCustomer({
             schoolConfigId,
             guestType: "KiteWorldWide",
             emergencyContact: "",
@@ -3699,6 +3702,7 @@ export async function registerRoutes(
             ...fields,
           });
           created++;
+          await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: bosNr, recordType: "customer", status: "created", customerName: `${data.firstName} ${data.lastName}`, customerId: created_.id, rawData: data });
         }
 
         if (req.query.limit === "1" && created >= 1) break;
@@ -3785,21 +3789,28 @@ export async function registerRoutes(
           const bookingNumber = `${op.vog_akww}-${trav.tnnr}`;
           const existing = await storage.getSchoolBookingByNumber(bookingNumber);
 
+          const runAt = new Date();
           if (!existing && isStorno) { skippedStorno++; continue; }
 
           if (existing && isStorno) {
             await storage.deleteSchoolBooking(existing.id);
             deleted++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking", status: "deleted", customerName: trav.name, bookingNumber, rawData: op });
             continue;
           }
 
           if (existing && existing.bookingVersionBos === op.bng_version) {
             unchanged++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking", status: "unchanged", customerName: trav.name, bookingNumber, customerId: existing.customerId, bookingId: existing.id, rawData: op });
             continue;
           }
 
           const customer = customerByBosNr.get(trav.bosNr);
-          if (!customer) { skippedNoCustomer++; continue; }
+          if (!customer) {
+            skippedNoCustomer++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking", status: "skipped", skipReason: `Kein Kunde gefunden für BOS-Nr. ${trav.bosNr}`, customerName: trav.name, bookingNumber, rawData: op });
+            continue;
+          }
 
           const items: Array<{ productId: number | null; productName: string; category: string; quantity: number; unitPrice: string; lineTotal: string }> = [];
 
@@ -3876,9 +3887,11 @@ export async function registerRoutes(
           if (existing) {
             await storage.updateSchoolBooking(existing.id, bookingData, items);
             updated++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking", status: "updated", customerName: trav.name, bookingNumber, customerId: customer.id, bookingId: existing.id, rawData: op });
           } else {
-            await storage.createSchoolBooking(bookingData, items);
+            const newBooking = await storage.createSchoolBooking(bookingData, items);
             created++;
+            await storage.createBosImportLog({ schoolConfigId, runAt, bosRef: op.vog_akww, bosVersion: op.bng_version, recordType: "booking", status: "created", customerName: trav.name, bookingNumber, customerId: customer.id, bookingId: newBooking.id, rawData: op });
           }
 
           if (req.query.limit === "1" && created >= 1) break;
@@ -3887,6 +3900,17 @@ export async function registerRoutes(
       }
 
       res.json({ created, updated, unchanged, deleted, skippedNoCustomer, skippedStorno, skippedProducts, totalBosBookings: ops.length });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/bos-import-logs/:schoolConfigId", requireSuperAdmin, async (req, res) => {
+    try {
+      const schoolConfigId = parseInt(req.params.schoolConfigId);
+      const limit = parseInt(req.query.limit as string || "500");
+      const logs = await storage.getBosImportLogs(schoolConfigId, limit);
+      res.json(logs);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

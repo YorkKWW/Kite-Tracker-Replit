@@ -42,6 +42,7 @@ import {
   EyeOff,
   Shirt as ShirtIcon,
   Wallet,
+  FileDown,
 } from "lucide-react";
 import type { ViewMode } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -157,7 +158,10 @@ export default function Layout({ children }: LayoutProps) {
           { href: "/invoice-import", label: "Import Invoice", icon: FileUp },
         ]
       : []),
-    ...(isSuperAdmin ? [{ href: "/feedback", label: "Feedback", icon: MessageSquarePlus }] : []),
+    ...(isSuperAdmin ? [
+      { href: "/feedback", label: "Feedback", icon: MessageSquarePlus },
+      { href: "/bos-importer", label: "BOS Importer", icon: FileDown },
+    ] : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 

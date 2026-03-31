@@ -76,6 +76,8 @@ import {
   type SchoolExpense, type InsertSchoolExpense,
   schoolCustomerDocuments,
   type SchoolCustomerDocument, type InsertSchoolCustomerDocument,
+  bosImportLogs,
+  type BosImportLog, type InsertBosImportLog,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -261,6 +263,9 @@ export interface IStorage {
   createSchoolExpense(expense: InsertSchoolExpense): Promise<SchoolExpense>;
   getSchoolExpense(id: number): Promise<SchoolExpense | undefined>;
   deleteSchoolExpense(id: number): Promise<void>;
+
+  createBosImportLog(entry: InsertBosImportLog): Promise<BosImportLog>;
+  getBosImportLogs(schoolConfigId: number, limit?: number): Promise<BosImportLog[]>;
 
   getCustomerDocuments(customerId: number): Promise<(SchoolCustomerDocument & { uploaderName: string })[]>;
   getCustomerDocumentCountsBySchool(schoolConfigId: number): Promise<Record<number, number>>;
@@ -1968,6 +1973,20 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCustomerDocument(id: number): Promise<void> {
     await db.delete(schoolCustomerDocuments).where(eq(schoolCustomerDocuments.id, id));
+  }
+
+  // ─── BOS Import Logs ───────────────────────────────────────────────────────────
+
+  async createBosImportLog(entry: InsertBosImportLog): Promise<BosImportLog> {
+    const [created] = await db.insert(bosImportLogs).values(entry).returning();
+    return created;
+  }
+
+  async getBosImportLogs(schoolConfigId: number, limit = 500): Promise<BosImportLog[]> {
+    return db.select().from(bosImportLogs)
+      .where(eq(bosImportLogs.schoolConfigId, schoolConfigId))
+      .orderBy(desc(bosImportLogs.runAt))
+      .limit(limit);
   }
 }
 

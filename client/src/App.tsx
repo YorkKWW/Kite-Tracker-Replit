@@ -28,6 +28,7 @@ import RepairsPage from "@/pages/repairs";
 import SettingsPage from "@/pages/settings";
 import FeedbackAdminPage from "@/pages/feedback-admin";
 import SchoolAdminPage from "@/pages/school-admin";
+import BosImporterPage from "@/pages/bos-importer";
 import SchoolCustomersPage from "@/pages/school-customers";
 import BookingsPage from "@/pages/bookings";
 import CenterPage from "@/pages/center";
@@ -41,7 +42,7 @@ function RedirectToCenter() {
 }
 
 function AuthenticatedRouter() {
-  const { user, isLoading, isAdmin, isHamburg, isStationLead } = useAuth();
+  const { user, isLoading, isAdmin, isHamburg, isStationLead, isSuperAdmin } = useAuth();
   const path = window.location.pathname;
 
   // Public routes — accessible without login
@@ -81,6 +82,7 @@ function AuthenticatedRouter() {
         {isHamburg && <Route path="/invoice-import" component={InvoiceImportPage} />}
         {isHamburg && <Route path="/price-lists" component={PriceListsPage} />}
         {isAdmin && <Route path="/school-admin" component={SchoolAdminPage} />}
+        {isSuperAdmin && <Route path="/bos-importer" component={BosImporterPage} />}
         <Route path="/center" component={CenterPage} />
         <Route path="/finance" component={FinancePage} />
         <Route path="/customers" component={isStationLead ? RedirectToCenter : SchoolCustomersPage} />
