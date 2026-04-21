@@ -76521,7 +76521,6 @@ function registerObjectStorageRoutes(app2) {
 }
 
 // server/routes.ts
-var import_pdf_parse = require("pdf-parse");
 async function sendNotificationEmail(to, subject, body) {
   try {
     const host = process.env.SMTP_HOST;
@@ -76554,9 +76553,8 @@ async function sendNotificationEmail(to, subject, body) {
   }
 }
 async function parsePdfBuffer(buffer) {
-  const parser = new import_pdf_parse.PDFParse({ data: buffer });
-  const result = await parser.getText();
-  await parser.destroy();
+  const { default: pdfParse } = await import("pdf-parse");
+  const result = await pdfParse(buffer);
   return { text: result.text };
 }
 var objectStorage = new ObjectStorageService();

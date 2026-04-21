@@ -11,8 +11,6 @@ import { randomUUID } from "crypto";
 import PDFDocument from "pdfkit";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
-import { PDFParse } from "pdf-parse";
-
 async function sendNotificationEmail(to: string | string[], subject: string, body: string) {
   try {
     const host = process.env.SMTP_HOST;
@@ -46,9 +44,8 @@ async function sendNotificationEmail(to: string | string[], subject: string, bod
 }
 
 async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string }> {
-  const parser = new PDFParse({ data: buffer });
-  const result = await parser.getText();
-  await parser.destroy();
+  const { default: pdfParse } = await import("pdf-parse");
+  const result = await pdfParse(buffer);
   return { text: result.text };
 }
 
