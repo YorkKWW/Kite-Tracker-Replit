@@ -664,6 +664,19 @@ export async function registerRoutes(
   setupAuth(app);
   registerObjectStorageRoutes(app);
 
+  // TEMP: reset admin password — remove after use
+  app.get("/api/debug/reset-admin", async (_req, res) => {
+    try {
+      const hash = await hashPassword("test123");
+      const user = await storage.getUserByEmail("andre@kiteworldwide.com");
+      if (!user) return res.status(404).json({ error: "user not found" });
+      await storage.updateUser(user.id, { password: hash, role: "admin", isSuperAdmin: true });
+      res.json({ ok: true, id: user.id, email: user.email });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.use("/uploads", (req, res, next) => {
     const filePath = path.join(uploadDir, path.basename(req.path));
     res.sendFile(filePath, (err) => {

