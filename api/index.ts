@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
+import { registerRoutes } from "../server/routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -21,39 +22,27 @@ app.use(
 );
 app.use(express.urlencoded({ extended: false }));
 
-let ready: Promise<void> | null = null;
-let initError: Error | null = null;
-
-function ensureReady() {
-  if (!ready) {
-    ready = (async () => {
-      const { registerRoutes } = await import("../server/routes");
-      await registerRoutes(httpServer, app);
-
-      app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-        const status = err.status || err.statusCode || 500;
-        const message = err.message || "Internal Server Error";
-        if (res.headersSent) return next(err);
-        return res.status(status).json({ message });
-      });
-    })().catch((err) => {
-      initError = err;
-      console.error("[api/index] Initialization failed:", err);
-      throw err;
+const ready = registerRoutes(httpServer, app)
+  .then(() => {
+    app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      if (res.headersSent) return next(err);
+      return res.status(status).json({ message });
     });
-  }
-  return ready;
-}
+  })
+  .catch((err) => {
+    console.error("[api/index] Initialization failed:", err);
+    throw err;
+  });
 
 export default async function handler(req: any, res: any) {
   try {
-    await ensureReady();
+    await ready;
   } catch (err: any) {
-    console.error("[api/index] Handler error:", err);
     return res.status(500).json({
       error: "Server initialization failed",
       message: err?.message || String(err),
-      stack: process.env.NODE_ENV !== "production" ? err?.stack : undefined,
     });
   }
   app(req, res);
