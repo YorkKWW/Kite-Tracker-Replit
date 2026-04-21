@@ -9,7 +9,7 @@ import fs from "fs";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import PDFDocument from "pdfkit";
-import { ObjectStorageService, objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
+import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { PDFParse } from "pdf-parse";
 
@@ -2972,21 +2972,9 @@ export async function registerRoutes(
       // ── Upload PDF to object storage ──
       let pdfUrl: string | null = null;
       try {
-        const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
-        if (privateDir) {
-          const uuid = randomUUID();
-          const fullPath = `${privateDir}/invoices/${uuid}.pdf`;
-          const parts = (fullPath.startsWith("/") ? fullPath.slice(1) : fullPath).split("/");
-          const bucketName = parts[0];
-          const objectName = parts.slice(1).join("/");
-          const bucket = objectStorageClient.bucket(bucketName);
-          const file = bucket.file(objectName);
-          await file.save(pdfBuffer, { contentType: "application/pdf", metadata: { cacheControl: "private, max-age=3600" } });
-          let entityDir = privateDir.endsWith("/") ? privateDir : privateDir + "/";
-          const entityId = `invoices/${uuid}.pdf`;
-          pdfUrl = `/objects/${entityId}`;
-          await storage.updateSalesInvoice(invoice.id, { pdfUrl });
-        }
+        const uuid = randomUUID();
+        pdfUrl = await objectStorage.uploadBuffer(`invoices/${uuid}.pdf`, pdfBuffer, "application/pdf");
+        await storage.updateSalesInvoice(invoice.id, { pdfUrl });
       } catch (uploadErr) {
         console.error("PDF upload to object storage failed:", uploadErr);
       }

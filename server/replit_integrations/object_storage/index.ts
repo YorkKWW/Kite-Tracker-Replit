@@ -1,21 +1,3 @@
-export {
-  ObjectStorageService,
-  ObjectNotFoundError,
-  objectStorageClient,
-} from "./objectStorage";
-
-export type {
-  ObjectAclPolicy,
-  ObjectAccessGroup,
-  ObjectAccessGroupType,
-  ObjectAclRule,
-} from "./objectAcl";
-
-export {
-  canAccessObject,
-  getObjectAclPolicy,
-  setObjectAclPolicy,
-} from "./objectAcl";
-
+export { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+export type { ObjectAclPolicy } from "./objectAcl";
 export { registerObjectStorageRoutes } from "./routes";
-
