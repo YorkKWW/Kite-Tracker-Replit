@@ -22,6 +22,7 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 
 let ready: Promise<void> | null = null;
+let initError: Error | null = null;
 
 function ensureReady() {
   if (!ready) {
@@ -35,12 +36,25 @@ function ensureReady() {
         if (res.headersSent) return next(err);
         return res.status(status).json({ message });
       });
-    })();
+    })().catch((err) => {
+      initError = err;
+      console.error("[api/index] Initialization failed:", err);
+      throw err;
+    });
   }
   return ready;
 }
 
 export default async function handler(req: any, res: any) {
-  await ensureReady();
+  try {
+    await ensureReady();
+  } catch (err: any) {
+    console.error("[api/index] Handler error:", err);
+    return res.status(500).json({
+      error: "Server initialization failed",
+      message: err?.message || String(err),
+      stack: process.env.NODE_ENV !== "production" ? err?.stack : undefined,
+    });
+  }
   app(req, res);
 }
