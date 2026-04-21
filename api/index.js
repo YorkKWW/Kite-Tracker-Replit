@@ -76337,9 +76337,9 @@ function setupAuth(app2) {
       async (email, password, done) => {
         try {
           const user = await storage.getUserByEmail(email);
-          if (!user) return done(null, false, { message: "Invalid email or password" });
+          if (!user) return done(null, false, { message: "DEBUG: user not found for " + email });
           const valid = await comparePasswords(password, user.password);
-          if (!valid) return done(null, false, { message: "Invalid email or password" });
+          if (!valid) return done(null, false, { message: "DEBUG: wrong password for " + email });
           return done(null, user);
         } catch (err) {
           return done(err);
