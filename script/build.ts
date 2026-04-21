@@ -165,6 +165,21 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  console.log("building Vercel handler...");
+  await esbuild({
+    entryPoints: ["server/vercel-handler.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "api/index.js",
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+    minify: false,
+    external: externals,
+    logLevel: "info",
+  });
 }
 
 buildAll().catch((err) => {

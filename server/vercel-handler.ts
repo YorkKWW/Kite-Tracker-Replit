@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
-import { registerRoutes } from "../server/routes";
+import { registerRoutes } from "./routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -13,13 +13,7 @@ declare module "http" {
   }
 }
 
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  }),
-);
+app.use(express.json({ verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: false }));
 
 const ready = registerRoutes(httpServer, app)
@@ -32,18 +26,10 @@ const ready = registerRoutes(httpServer, app)
     });
   })
   .catch((err) => {
-    console.error("[api/index] Initialization failed:", err);
-    throw err;
+    console.error("[vercel] init failed:", err);
   });
 
 export default async function handler(req: any, res: any) {
-  try {
-    await ready;
-  } catch (err: any) {
-    return res.status(500).json({
-      error: "Server initialization failed",
-      message: err?.message || String(err),
-    });
-  }
+  await ready;
   app(req, res);
 }
