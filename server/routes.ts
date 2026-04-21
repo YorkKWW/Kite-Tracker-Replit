@@ -606,7 +606,9 @@ function parsePdfInvoice(text: string) {
   };
 }
 
-const uploadDir = path.join(process.cwd(), "uploads");
+const uploadDir = process.env.NODE_ENV === "production"
+  ? "/tmp/uploads"
+  : path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }

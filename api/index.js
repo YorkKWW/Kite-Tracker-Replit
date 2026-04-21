@@ -76991,7 +76991,7 @@ function parsePdfInvoice(text2) {
     items
   };
 }
-var uploadDir = import_path.default.join(process.cwd(), "uploads");
+var uploadDir = true ? "/tmp/uploads" : import_path.default.join(process.cwd(), "uploads");
 if (!import_fs.default.existsSync(uploadDir)) {
   import_fs.default.mkdirSync(uploadDir, { recursive: true });
 }
