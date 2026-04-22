@@ -1,0 +1,43 @@
+~/workspace$ npx tsx scripts/download-prod-storage.ts
+
+Listing files from bucket="replit-objstore-77a345c2-8aee-4028-bdfa-bd5a8e3dbab6" prefix=".private" [PRIVATE_OBJECT_DIR]
+  [DOWNLOAD] .private/invoices/d9b0129a-3811-41e1-9088-4e664341345c.pdf (3.6 KB) ... done
+  [DOWNLOAD] .private/uploads/079703ae-bd76-4e93-8395-3bf2c213dcaf (121.2 KB) ... done
+  [DOWNLOAD] .private/uploads/20837017-7e9a-4f4b-9cb4-1cc74b7eac5c (73.5 KB) ... done
+  [DOWNLOAD] .private/uploads/219316f4-7f8e-4dc6-bafb-0e68af19d0ad (172.5 KB) ... done
+  [DOWNLOAD] .private/uploads/29909eab-05dd-4aeb-9825-bef74bc06480 (91.1 KB) ... done
+  [DOWNLOAD] .private/uploads/368ccb71-56fb-4f21-9dfe-d6763d58e8f1 (400.1 KB) ... done
+  [DOWNLOAD] .private/uploads/38cbd1e6-d20c-424e-acd0-adf3406e4615 (333.8 KB) ... done
+  [DOWNLOAD] .private/uploads/3a8f7f46-96d0-4b58-984e-4574dc07fb73 (186.6 KB) ... done
+  [DOWNLOAD] .private/uploads/4b1f8ddf-4e3b-437d-82ac-33d006e592b8 (382.6 KB) ... done
+  [DOWNLOAD] .private/uploads/6116c63a-165f-4333-90f2-ffaf5b10d23e (19.2 KB) ... done
+  [DOWNLOAD] .private/uploads/6a252259-7d0c-425a-9919-52791bf5972f (711.2 KB) ... done
+  [DOWNLOAD] .private/uploads/83045beb-a27a-47db-8986-64de4cea945c (11 B) ... done
+  [DOWNLOAD] .private/uploads/8f8f46a5-c9ba-4b9a-bdc3-e404023e1219 (363.9 KB) ... done
+  [DOWNLOAD] .private/uploads/9092889e-6a9c-4cb0-bca1-177e48d7ed80 (116.3 KB) ... done
+  [DOWNLOAD] .private/uploads/9747f181-0c8d-424f-a473-59191c6ca657 (388.4 KB) ... done
+  [DOWNLOAD] .private/uploads/97b12471-3d1c-4a38-85e9-8116b4affe23 (33.8 KB) ... done
+  [DOWNLOAD] .private/uploads/9bae18e8-9bf5-4f1b-8748-65d368d829eb (162.1 KB) ... done
+  [DOWNLOAD] .private/uploads/a5d007b9-819c-4262-b857-1aeb5e920023 (428.8 KB) ... done
+  [DOWNLOAD] .private/uploads/b11ba31d-92bc-4ce9-af80-cc13a44ab5e1 (2.2 MB) ... done
+  [DOWNLOAD] .private/uploads/b4b29ca2-cea9-4e5a-8266-96501a4a8e32 (94.8 KB) ... done
+  [DOWNLOAD] .private/uploads/b84c70a3-a6e5-41d2-a929-08d0ab1aa248 (50.0 KB) ... done
+  [DOWNLOAD] .private/uploads/e94f8fb6-1bf3-47cb-9d74-fca5406fb547 (259.2 KB) ... done
+  [DOWNLOAD] .private/uploads/ec982efd-ae7e-4b0f-9721-4455158934db (422.4 KB) ... done
+  [DOWNLOAD] .private/uploads/fbd9c41e-65b2-4634-baa5-8b8217c24e49 (16 B) ... done
+  [DOWNLOAD] .private/uploads/fe7afe5b-8c9c-49cd-b430-3ce9553ff85e (479.5 KB) ... done
+  [DOWNLOAD] .private/uploads/fffc9656-0ede-4b8a-9fa7-add53a2468f3 (429.2 KB) ... done
+
+Listing files from bucket="replit-objstore-77a345c2-8aee-4028-bdfa-bd5a8e3dbab6" prefix="public" [PUBLIC_OBJECT_SEARCH_PATHS (/replit-objstore-77a345c2-8aee-4028-bdfa-bd5a8e3dbab6/public)]
+  [DOWNLOAD] public/ (0 B) ... Fatal error: Error: EISDIR: illegal operation on a directory, open '/home/runner/workspace/downloads/replit-objstore-77a345c2-8aee-4028-bdfa-bd5a8e3dbab6/public/'
+    at Object.openSync (node:fs:573:18)
+    at Module.writeFileSync (node:fs:2393:35)
+    at PassThroughShim.<anonymous> (file:///home/runner/workspace/node_modules/@google-cloud/storage/build/esm/src/file.js:1679:28)
+    at PassThroughShim.emit (node:events:536:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+  errno: -21,
+  code: 'EISDIR',
+  syscall: 'open',
+  path: '/home/runner/workspace/downloads/replit-objstore-77a345c2-8aee-4028-bdfa-bd5a8e3dbab6/public/'
+}

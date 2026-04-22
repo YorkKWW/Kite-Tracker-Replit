@@ -95,6 +95,13 @@ async function downloadAll() {
     for (const file of files) {
       const objectName = file.name;
 
+      // Skip GCS directory placeholder objects (trailing slash, 0 bytes)
+      if (objectName.endsWith("/")) {
+        console.log(`  [SKIP]     ${objectName} (directory placeholder)`);
+        skippedFiles++;
+        continue;
+      }
+
       const localFilePath = path.join(downloadsDir, bucketName, objectName);
 
       if (fs.existsSync(localFilePath)) {
