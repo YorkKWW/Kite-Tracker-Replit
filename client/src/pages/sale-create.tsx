@@ -26,7 +26,7 @@ type LineItem = {
   sku: string;
   unitPrice: string;
   priceSuggestion: { label: string; value: string } | null;
-  uvp: { retailPrice: string; dealerPrice: string | null; supplier: string } | null;
+  uvp: { retailPrice: string; dealerPrice: string | null; supplier: string; isActive?: boolean; uploadedAt?: string | null } | null;
   equipment: Equipment;
 };
 
@@ -95,7 +95,7 @@ export default function SaleCreatePage() {
       : equip.purchasePrice && parseFloat(equip.purchasePrice) > 0
         ? { label: "Reference (purchase price, net)", value: parseFloat(equip.purchasePrice).toFixed(2) }
         : null;
-    let uvp: { retailPrice: string; dealerPrice: string | null; supplier: string } | null = null;
+    let uvp: { retailPrice: string; dealerPrice: string | null; supplier: string; isActive?: boolean; uploadedAt?: string | null } | null = null;
     try {
       const params = new URLSearchParams();
       if (equip.sku) params.set("sku", equip.sku);
@@ -380,6 +380,11 @@ export default function SaleCreatePage() {
                           <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400 leading-tight">
                             MSRP: €{parseFloat(item.uvp.retailPrice).toLocaleString("en-US", { minimumFractionDigits: 2 })} <span className="font-normal text-muted-foreground">(gross incl. VAT)</span>
                           </p>
+                          {item.uvp.isActive === false && (
+                            <p className="text-[10px] text-amber-700 dark:text-amber-300 leading-tight">
+                              ⚠ From archived price list{item.uvp.uploadedAt ? ` (${new Date(item.uvp.uploadedAt).toLocaleDateString("en-US")})` : ""} — verify price
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <p className="text-[10px] text-muted-foreground leading-tight" data-testid={`text-no-uvp-${idx}`}>No retail price available</p>

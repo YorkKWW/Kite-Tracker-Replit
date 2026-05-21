@@ -53,7 +53,7 @@ export default function EquipmentDetailPage() {
     staleTime: 0,
     enabled: !!id,
   });
-  const { data: retailPrice } = useQuery<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId?: number; validFrom?: string | null; validTo?: string | null } | null>({
+  const { data: retailPrice } = useQuery<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId?: number; validFrom?: string | null; validTo?: string | null; isActive?: boolean; uploadedAt?: string | null } | null>({
     queryKey: ["/api/price-lists/lookup", item?.sku, item?.model, (item?.typeSpecificFields as any)?.size],
     queryFn: () => {
       if (!item) return Promise.resolve(null);
@@ -332,6 +332,11 @@ export default function EquipmentDetailPage() {
               <div className="mt-3 pt-3 border-t">
                 <p className="text-xs text-muted-foreground">
                   Price source: {retailPrice.supplier} · {retailPrice.productName}
+                  {retailPrice.isActive === false && (
+                    <span className="ml-2 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                      From archived price list{retailPrice.uploadedAt ? ` (${new Date(retailPrice.uploadedAt).toLocaleDateString("en-US")})` : ""}
+                    </span>
+                  )}
                   {(retailPrice.validFrom || retailPrice.validTo) && (
                     <span className="block mt-0.5">
                       Valid: {retailPrice.validFrom ? new Date(retailPrice.validFrom).toLocaleDateString("en-US") : "—"}

@@ -186,8 +186,8 @@ export interface IStorage {
   deactivatePriceLists(supplier: string): Promise<void>;
   deletePriceList(id: number): Promise<void>;
   getPriceListItems(priceListId: number): Promise<PriceListItem[]>;
-  lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId: number; validFrom: Date | null; validTo: Date | null } | null>;
-  lookupRetailPriceByName(name: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId: number; validFrom: Date | null; validTo: Date | null } | null>;
+  lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId: number; validFrom: Date | null; validTo: Date | null; isActive: boolean; uploadedAt: Date | null } | null>;
+  lookupRetailPriceByName(name: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId: number; validFrom: Date | null; validTo: Date | null; isActive: boolean; uploadedAt: Date | null } | null>;
 
   getAllDamageReports(): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[]; invoiceId?: number; invoiceNumber?: string; invoicePdfUrl?: string })[]>;
   getDamageReport(id: number): Promise<(DamageReport & { equipmentLabel: string; reporterName: string; stationName?: string; photos: DamageReportPhoto[]; invoiceId?: number; invoiceNumber?: string; invoicePdfUrl?: string }) | undefined>;
@@ -1154,7 +1154,7 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(priceListItems).where(eq(priceListItems.priceListId, priceListId));
   }
 
-  async lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId: number; validFrom: Date | null; validTo: Date | null } | null> {
+  async lookupRetailPrice(sku: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId: number; validFrom: Date | null; validTo: Date | null; isActive: boolean; uploadedAt: Date | null } | null> {
     if (!sku) return null;
     const rows = await db
       .select({
@@ -1165,13 +1165,13 @@ export class DatabaseStorage implements IStorage {
         priceListId: priceLists.id,
         validFrom: priceLists.validFrom,
         validTo: priceLists.validTo,
+        isActive: priceLists.isActive,
+        uploadedAt: priceLists.uploadedAt,
       })
       .from(priceListItems)
-      .innerJoin(priceLists, and(
-        eq(priceListItems.priceListId, priceLists.id),
-        eq(priceLists.isActive, true),
-      ))
+      .innerJoin(priceLists, eq(priceListItems.priceListId, priceLists.id))
       .where(ilike(priceListItems.sku, sku))
+      .orderBy(desc(priceLists.isActive), desc(priceLists.uploadedAt))
       .limit(1);
     if (!rows.length) return null;
     return {
@@ -1182,10 +1182,12 @@ export class DatabaseStorage implements IStorage {
       priceListId: rows[0].priceListId,
       validFrom: rows[0].validFrom,
       validTo: rows[0].validTo,
+      isActive: rows[0].isActive,
+      uploadedAt: rows[0].uploadedAt,
     };
   }
 
-  async lookupRetailPriceByName(name: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId: number; validFrom: Date | null; validTo: Date | null } | null> {
+  async lookupRetailPriceByName(name: string): Promise<{ retailPrice: string; dealerPrice: string | null; supplier: string; productName: string; priceListId: number; validFrom: Date | null; validTo: Date | null; isActive: boolean; uploadedAt: Date | null } | null> {
     if (!name || name.length < 3) return null;
     const rows = await db
       .select({
@@ -1196,13 +1198,13 @@ export class DatabaseStorage implements IStorage {
         priceListId: priceLists.id,
         validFrom: priceLists.validFrom,
         validTo: priceLists.validTo,
+        isActive: priceLists.isActive,
+        uploadedAt: priceLists.uploadedAt,
       })
       .from(priceListItems)
-      .innerJoin(priceLists, and(
-        eq(priceListItems.priceListId, priceLists.id),
-        eq(priceLists.isActive, true),
-      ))
+      .innerJoin(priceLists, eq(priceListItems.priceListId, priceLists.id))
       .where(ilike(priceListItems.productName, `%${name}%`))
+      .orderBy(desc(priceLists.isActive), desc(priceLists.uploadedAt))
       .limit(1);
     if (!rows.length) return null;
     return {
@@ -1213,6 +1215,8 @@ export class DatabaseStorage implements IStorage {
       priceListId: rows[0].priceListId,
       validFrom: rows[0].validFrom,
       validTo: rows[0].validTo,
+      isActive: rows[0].isActive,
+      uploadedAt: rows[0].uploadedAt,
     };
   }
 
